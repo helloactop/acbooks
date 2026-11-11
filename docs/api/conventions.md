@@ -2,7 +2,7 @@
 
 > 目标路径：`docs/api/conventions.md`  
 > 用途：供 AI 与开发者直接实现、测试和维护 acbooks API。  
-> 上位规范：`docs/architecture/system.md`、`sqlite.md`、`backend.md`、`docs/development/standards.md`。本文只定义**对外接口契约**，不重新定义表结构、模块职责或部署目录；冲突时先核对上位规范，禁止自行建立另一套实现。
+> 上位规范：`docs/architecture/system.md`、`sqlite.md`、`backend.md`、`security.md`、`docs/development/standards.md`。本文只定义**对外接口契约**，不重新定义表结构、模块职责或部署目录；冲突时先核对上位规范，禁止自行建立另一套实现。
 
 ## 1. 基本原则
 
@@ -27,7 +27,10 @@
 | 笔记划线 | `GET/POST /api/v1/books/{bookId}/annotations` |
 | 统计 | `GET /api/v1/stats/overview`、`GET /api/v1/books/{bookId}/stats` |
 | 增量同步 | `GET /api/v1/sync/changes`、`POST /api/v1/sync/mutations` |
-| 鉴权 | `POST /api/v1/auth/login`、`POST /api/v1/auth/logout` |
+| 首次初始化 | `GET /api/v1/setup/status`、`POST /api/v1/setup` |
+| Web 登录 | `GET /api/v1/auth/csrf`、`POST /api/v1/auth/login`、`POST /api/v1/auth/logout`、`GET /api/v1/auth/me` |
+| 原生端登录 | `POST /api/v1/auth/device-login`；设备使用同一管理员账号密码，返回可撤销 Bearer |
+| 凭据管理 | `PATCH /api/v1/auth/password`、`GET/POST /api/v1/auth/tokens`、`DELETE /api/v1/auth/tokens/{tokenId}` |
 | 开放协议 | `/opds`（OPDS）、`/webdav`（WebDAV）；**不套用 JSON REST 响应格式** |
 
 - 此表是资源命名和实现入口，**不是要求第一阶段一次实现所有接口**；仅实现已排期功能。
@@ -67,13 +70,45 @@
 - Pydantic 校验错误统一映射为 `422` 问题响应，必要时包含结构化 `errors`；业务代码不能依赖错误文案判断。
 - 请求 ID 随响应返回（`X-Request-ID`）；服务日志记录请求 ID、耗时和可安全记录的资源 ID，不记录口令、令牌及原始书籍内容。
 
-## 4. 鉴权与安全
+## 4. 首次初始化、账号密码登录与鉴权（本次明确契约）
 
-- 首次使用必须设置凭证，不存在默认密码。除登录及明确开放的健康检查外，资源接口均要求认证，**单用户不代表无鉴权**。
-- Web：受保护的 `HttpOnly`、`Secure`、`SameSite` 会话 Cookie；写请求实施 CSRF 防护及来源校验。原生客户端：`Authorization: Bearer <token>`；令牌可撤销、按需过期并安全保存。
-- OPDS/WebDAV 为第三方客户端提供独立、可撤销的访问凭据；如需 HTTP Basic，仅在 **HTTPS** 下使用。禁止在 URL 查询串、日志中存放令牌或长期口令；需要新增凭据持久化表时先更新 `sqlite.md` 并添加迁移。
-- CORS 仅允许明确配置的来源；按资源执行授权，不信任客户端提供的设备、路径、文件名、MIME 或归属信息。
-- 所有文件路径以配置的 `storage_root` 为边界，规范化并拒绝路径穿越、越界符号链接。`external` 目录默认只读，不能因 API 调用绕过文件管理规则。
+**唯一身份：** acbooks 仅有一个管理员，Web、Windows、Android 均用**用户名 + 密码**登录；不允许匿名书库、公开注册或默认密码。账号、会话、Token 的真实数据库模型以 `sqlite.md §2.1` 为准，安全行为以 `security.md` 为准。
+
+### 4.1 初始化与登录路由
+
+| 方法和路径 | 访问条件 | 输入 / 成功响应 | 失败与安全要求 |
+| --- | --- | --- | --- |
+| `GET /api/v1/setup/status` | 公开 | `200 {"initialized": false}`（或 `true`） | 仅返回布尔值；`Cache-Control: no-store`，不得返回安装码或账号资料 |
+| `GET /api/v1/auth/csrf` | 公开（初始化/登录前）、登录后可用 | `200 {"csrfToken":"..."}`；对未认证浏览器设置短期安全的预认证挑战 Cookie；认证后令牌绑定当前会话 | `Cache-Control: no-store`；CSRF 令牌与挑战必须防伪、短期有效，不能存 URL/日志；可用有服务端密钥签名的双提交方案，无需新增表 |
+| `POST /api/v1/setup` | 仅 `initialized=false` 且验证安装码 | JSON `{username,password,confirmPassword,setupCode}`；`201 {"id":"uuid","username":"ac"}`，`Location: /api/v1/auth/me` | 必须带 `X-CSRF-Token` 和可信来源校验；安装码错误 `403 SETUP_CODE_INVALID`；已初始化 `409 SETUP_ALREADY_INITIALIZED`；限速；服务端原子检查且只创建一个账号；成功后**仍须单独登录** |
+| `POST /api/v1/auth/login` | 公开；**Web Cookie 登录** | JSON `{username,password}`；`200 {"account":{"id":"uuid","username":"ac"}}` + `Set-Cookie` | 必须带 `X-CSRF-Token`、可信来源校验；错误统一 `401 INVALID_CREDENTIALS`，限速；**响应不返回 Cookie 原始值或 Bearer** |
+| `POST /api/v1/auth/device-login` | 公开；**Windows/Android 登录** | JSON `{username,password,deviceName?}`；`200 {"accessToken":"仅创建时返回","tokenType":"Bearer","tokenId":"uuid","expiresAt":1800000000000}` | 不产生 Cookie；密码错误同 `INVALID_CREDENTIALS`；受限速/HTTPS保护；Bearer 仅返回一次、不得记录；**无 Cookie 时不需要 CSRF** |
+| `GET /api/v1/auth/me` | 需要会话或 Bearer | `200 {"id":"uuid","username":"ac"}` | 未认证 `401`，不返回 `passwordHash`、凭据或内部角色 |
+| `POST /api/v1/auth/logout` | 当前有效 Web 会话 / Bearer | `204` 无响应体，撤销**当前**会话或 Token；Web 清除 Cookie | Cookie 认证必须校验 CSRF 和来源，撤销后下一请求 `401` |
+| `PATCH /api/v1/auth/password` | 已认证管理员 | JSON `{currentPassword,newPassword}`；`204` | 校验旧密码；强制撤销**全部**会话、Bearer、应用凭据，客户端重新登录；Cookie 请求须 CSRF |
+
+- **Web 会话**：Cookie 使用 `HttpOnly; Secure; SameSite=Lax`（可采用 `Strict`）、`Path=/` 且不设置 `Domain`；正式 HTTPS 可使用 `__Host-` 前缀。服务端检查会话摘要、过期和撤销；前端不把任何认证令牌放在 `localStorage`。开发环境仅允许受控 localhost 例外。
+- **CSRF**：`POST /setup`、`POST /auth/login` 及所有基于 Cookie 的写请求，必须同时校验 CSRF 与 `Origin` / `Referer` 来源；使用有绑定的预认证挑战处理“尚未登录”的初始化/登录，不可仅依赖 `SameSite` 或 CORS；缺失/伪造的挑战请求拒绝。原生端只有显式 `Authorization: Bearer`，不能接受会话 Cookie 旁路权限判断。
+- **初始化码**：安装时安全生成并放在 `/data/acbooks/secrets/`（`0600`），仅本地部署管理员可取得；不由公开 API 提供、不写入日志、永不作为日常登录凭据；初始化状态只由唯一管理员记录决定。忘记密码走**本地维护命令**，不可重开公开 setup。
+- **有效期**：建议首版 Web 会话最长 7 天、原生 Bearer 最长 30 天、应用凭据最长 90 天；允许部署方配置更短有效期，严禁永不过期的默认凭据。绝对到期后需要重新登录/重新签发；首版不必设计刷新令牌系统。
+
+### 4.2 OPDS / WebDAV 凭据管理
+
+| 方法和路径 | 要求 |
+| --- | --- |
+| `GET /api/v1/auth/tokens` | 已认证管理员；分页返回 `id, kind, scope, label, createdAt, expiresAt, revokedAt` 等**元数据**，绝不返回 token 值或 hash |
+| `POST /api/v1/auth/tokens` | 已认证管理员（Cookie 请求需 CSRF）；请求 `{label,scope:"read"}`，服务端创建 `kind=application`、`scope=read` 的凭据；`201 {"id":"uuid","token":"仅一次显示","scope":"read","expiresAt":1800000000000}`，`Location` 指向对应 Token 资源 |
+| `DELETE /api/v1/auth/tokens/{tokenId}` | 已认证管理员（Cookie 请求需 CSRF）；`204` 撤销指定凭据，下一次请求立即失效；不存在返回 `404` |
+
+- OPDS/WebDAV 客户端使用**单独签发的只读应用凭据**，不能复用管理员密码或 Web Cookie。确需 HTTP Basic 时，仅在 HTTPS 上将独立应用 token 作为凭据校验；受控文件写入仍需明确授权且首版不通过只读凭据开放。
+- 按 `kind`、`scope`、过期与撤销状态鉴权；客户端通过安全存储保存 Bearer；**不得在 URL 查询串、Cookie 以外的日志、异常或 OpenAPI 示例中放真实令牌**。
+- `GET /auth/tokens` 中的 `kind=device` 代表原生登录后签发的凭据；删除它可以使相应设备立即退出登录。这不改变阅读同步的 `devices` 表。
+
+### 4.3 统一安全响应
+
+- 登录名统一规范化查找，不区分“用户不存在”和“密码错误”；`401 INVALID_CREDENTIALS`、`403 SETUP_CODE_INVALID`、`409 SETUP_ALREADY_INITIALIZED`、`429 RATE_LIMITED` 均遵循本文件 §3 的 **`application/problem+json`** 格式，必要时携带 `Retry-After`。
+- 未认证请求 `401`，已认证但无权访问 `403`；`404` 不泄漏私有文件是否存在。初始化与登录接口严格限速，公开状态接口不能透露账号名、安装码或服务器路径。
+- CORS 仅允许明确来源，不开放带凭据的 `*`；反向代理只信任配置的转发来源，所有路径、文件、任务及协议权限统一由 Service 复核。
 
 ## 5. 文件、异步任务与阅读数据
 
@@ -95,8 +130,8 @@
 
 - 每个业务模块按 `backend.md` 放置 `router.py`、`schemas.py`、`service.py`、`repository.py`（按需创建）；`router` 显式声明 `response_model`、状态码、鉴权依赖和 OpenAPI `tags`/稳定 `operation_id`。
 - Pydantic DTO 提供 `camelCase` 映射并严格校验输入；API 文档、客户端类型来自 FastAPI **`/openapi.json`**，生成代码存放 `packages/acbooks-api-client/`，禁止手改生成文件。
-- API 发生变化时同步更新 OpenAPI、生成客户端及 `docs/api/`；测试代码存各应用 `tests/`，测试计划/报告存 `docs/testing/`。
-- 必测：鉴权、401/403/404、422 错误结构、分页排序、上传/Range 下载、路径越界、扫描异步状态、重复请求与幂等、冲突处理、同步游标、阅读统计不重复计时、OPDS/WebDAV 不越权。
+- API 发生变化时同步更新 OpenAPI、生成客户端及 `docs/api/`；测试代码存各应用 `tests/`，测试计划/报告存 `docs/testing/strategy.md`。**本文件定义目标契约，不表示接口已实现；实现时将本节端点、DTO 与状态码纳入实际 `/openapi.json`。**
+- 必测：安装码不能通过 API 获取、抢先初始化/并发初始化只能创建一个账号、初始化后禁用 setup、Web Cookie 登录与 CSRF、原生账号密码登录/撤销、改密后全部凭据失效、401/403/404/422 错误结构、分页排序、上传/Range 下载、路径越界、扫描异步状态、重复请求与幂等、冲突处理、同步游标、阅读统计不重复计时、OPDS/WebDAV 不越权。
 - 使用 **pytest + FastAPI TestClient/httpx** 做接口与契约测试；变更必须通过受影响测试及 Ruff/mypy。未经用户要求，不自动提交、推送、合并或部署。
 
 ## 8. 开源参考（取思路，不复制代码）

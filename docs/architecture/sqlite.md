@@ -31,7 +31,28 @@
 | 同步 | `sync_changes(seq, entity_type, entity_id, operation, changed_at)` | 递增 `seq`，供增量拉取 |
 | 同步 | `sync_mutations(id, device_id, mutation_id, created_at)` | 唯一 `(device_id, mutation_id)`，防重复提交 |
 | 任务 | `background_jobs(id, type, status, payload_json, created_at, updated_at)` | 扫描、导入、解析、整理任务 |
+| 认证 | `auth_accounts(id, singleton_slot, username, username_normalized, password_hash, password_changed_at, created_at, updated_at)` | 唯一管理员账号；`singleton_slot=1` 且唯一，不能创建第二账号 |
+| 认证 | `auth_sessions(id, account_id, session_token_hash, created_at, expires_at, revoked_at?, last_seen_at?)` | Web Cookie 会话；服务端可撤销，原文 session token 绝不存库 |
+| 认证 | `auth_tokens(id, account_id, token_hash, kind, scope, label, created_at, expires_at, revoked_at?, last_used_at?)` | 原生端 Bearer / OPDS、WebDAV 应用凭据；按类型与范围限制 |
 | 配置 | `app_settings(key, value_json)` | 系统配置；Alembic 自带迁移版本表 |
+
+### 2.1 单用户认证持久化约束（本次新增）
+
+本小节是 `docs/architecture/security.md` 的**唯一数据库契约**；`security.md` 负责安全行为，API 入参/响应由 `docs/api/conventions.md` 负责。认证仅支持一个管理员，**不引入多租户、角色表或公开注册**。
+
+| 表 | 必须满足的 SQLite 约束与行为 |
+| --- | --- |
+| `auth_accounts` | `id TEXT PRIMARY KEY`（UUID）；`singleton_slot INTEGER NOT NULL UNIQUE CHECK(singleton_slot = 1)`；`username_normalized TEXT NOT NULL UNIQUE`；`username` 与 `password_hash` 非空；时间字段 `INTEGER NOT NULL`。用户名在应用层去除首尾空格、规范化并生成大小写无关的 `username_normalized`；不允许插入第二个管理员。 |
+| `auth_sessions` | `id TEXT PRIMARY KEY`（UUID）、`account_id TEXT NOT NULL REFERENCES auth_accounts(id) ON DELETE RESTRICT`；`session_token_hash TEXT NOT NULL UNIQUE`；`created_at`、`expires_at` 为非空 UTC 毫秒，且 `expires_at > created_at`；`revoked_at`、`last_seen_at` 可空。仅 Web Cookie 使用。 |
+| `auth_tokens` | `id TEXT PRIMARY KEY`（UUID）、`account_id TEXT NOT NULL REFERENCES auth_accounts(id) ON DELETE RESTRICT`；`token_hash TEXT NOT NULL UNIQUE`；`kind TEXT NOT NULL CHECK(kind IN ('device','application'))`；`scope TEXT NOT NULL CHECK(scope IN ('full','read'))`；`label TEXT NOT NULL`；时间规则同会话，`revoked_at`、`last_used_at` 可空。首版应用凭据 `kind='application'` 必须 `scope='read'`，用 `CHECK(kind <> 'application' OR scope = 'read')` 固定；`device` 凭据可以为 `full`。 |
+
+- `password_hash` 必须为**含参数与随机盐的 Argon2id 编码字符串**；不能存明文、可逆密文或 SHA-256 密码摘要。参数由目标 NAS 性能测试决定，并符合适用的 OWASP 最低要求。
+- Web 会话与客户端/应用令牌必须使用密码学安全随机生成的 **至少 256 位不透明凭据**；数据库只存凭据的 SHA-256 摘要供等值查找。摘要不是密码哈希；不得把原始凭据、Cookie、初始化码写入 `payload_json`、日志或数据库。
+- 登录创建会话或令牌；请求验证时同时检查关联账号、`expires_at` 与 `revoked_at`；登出撤销当前会话或令牌；修改/本地重置密码须在事务中**撤销该账号全部现存会话和令牌**。
+- **初始化状态只由 `auth_accounts` 是否存在唯一记录判定**，不用 `app_settings` 再存一份 `initialized` 标志；安装码是 `/data/acbooks/secrets/` 内的权限 `0600` 文件，不进入 SQLite。`POST /setup` 在一个 `BEGIN IMMEDIATE` 或等效显式 SQLite 写事务中校验初始化前提并插入管理员；唯一约束保证并发请求只成功一个。初始化事务提交后废止安装码；即使废止文件失败，已有账号也永久阻止公开重试。
+- 单用户**不等于**使用全局超级令牌：应用凭据只读、与登录凭据隔离，支持过期、手动撤销；`devices` 仍只表达阅读同步的设备身份，不替代 `auth_tokens`。
+- `auth_sessions` 与 `auth_tokens` 可定期清理已过期、已撤销的历史行，但不得删当前有效凭据；密码变更和撤销要在下一次请求时立即生效。索引以唯一 token hash 为主，不引入不必要的会话缓存。
+- 首次建库通过**初始 Alembic revision** 纳入这三表；如果项目已存在已发布 schema，必须**新增** revision，绝不改写已发布 migration。测试需覆盖“旧库升级、空库初始化、并发抢注、账号唯一性、撤销及恢复”。
 
 **删除与扫描规则**：扫描不到文件时将 `storage_objects.file_status` 标为 `missing`，不自动删除 `Book`、笔记或阅读历史；移动文件尽量更新存储索引并保持书籍/文件 ID 稳定。ISBN、书名、文件哈希只用于候选匹配，歧义需人工确认。
 
@@ -133,5 +154,6 @@ class ReadingSession(Base):
 4. 阅读会话能够计算时长、次数、间隔；跨设备重叠与重复上传不重复统计。
 5. 离线同步重试幂等；位置冲突处理有确定结果；API/WebDAV/OPDS 不绕过权限。
 6. 外键与迁移有效；从旧数据库升级、异常中断和在线备份恢复均通过验证。
+7. 认证表唯一管理员约束有效；并发初始化只能一人成功，Web 会话/原生令牌在过期、登出和改密后立刻失效，旧库升级无数据丢失。
 
 **实现原则：先完成最小关系模型和正确性测试，再加搜索缓存、统计汇总或复杂并发。不得为了新增功能破坏 `docs/architecture/system.md` 的统一书库及目录约定。**
