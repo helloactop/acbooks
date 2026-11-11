@@ -38,8 +38,10 @@ API 与 Worker 的数据库调用可复用 `app.db.session` 的引擎和会话�
 
 ## 检查
 
+本地与 CI 的环境及覆盖范围见[自动化检查](../../docs/testing/strategy.md)。
+
 ```sh
-python -m pytest
 python -m ruff check .
 python -m mypy app tests
+python -m pytest
 ```
