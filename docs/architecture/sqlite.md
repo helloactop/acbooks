@@ -61,6 +61,12 @@
 迁移 `0002` 用 SQLite 触发器检查新增与更新，保留原表及其外键。旧库存在非法值时，
 升级会回滚。应先备份，按真实业务状态修正旧记录，再重试迁移。
 
+**阅读记录归属**：`reading_sessions`、`bookmarks` 和 `annotations` 的
+`book_file_id` 有值时，必须与关联文件的 `book_id` 一致。迁移 `0003` 校验旧库数据，
+禁止写入跨书关联及修改已被阅读记录引用的文件归属。删除文件仍按原外键规则清空
+`book_file_id`，保留阅读记录和书目关联。旧库出现不一致时，先备份并确认实际归属，
+修正后再升级。
+
 ## 3. SQLAlchemy 代码规范
 
 路径：`apps/acbooks-server/app/db/models/`；每个业务模块拥有自己的模型文件，统一从 `app/db/models/__init__.py` 导入，以供 Alembic 发现。
@@ -138,6 +144,9 @@ class ReadingSession(Base):
 - **连接初始化**：每个连接设置 `PRAGMA foreign_keys=ON`、`PRAGMA busy_timeout=5000`；初始化数据库时启用 `journal_mode=WAL`，`synchronous=FULL` 默认优先数据可靠性。
 - **事务**：API 和 Worker 共用业务服务；数据库写入使用 SQLAlchemy `Session` 的显式事务。扫描、网络、解压、哈希、文件搬运在事务**外**完成，再短事务保存结果。
 - **迁移**：模型变更 → 生成 Alembic revision → 审查 SQL/SQLite batch 重建 → 在旧数据副本测试升级 → 提交迁移。禁止改写已发布 migration。
+- **触发器**：SQLite batch 重建会删除原表触发器。涉及状态或阅读归属校验的表时，
+  升级和降级均须在同一事务中恢复目标版本仍需的触发器，并测试合法及非法的写入。Alembic 在提交前按
+  已应用版本核对必需触发器的名称与所属表，缺失时回滚迁移。
 - **备份**：使用 SQLite Online Backup API 或一致性快照；不要在运行中只复制 `.db` 而忽略 WAL；同时备份配置与必要密钥。
 - **安全**：由服务端校验文件真实路径始终位于允许的 `storage_root` 内；不跟随越界符号链接；路径与 SQL 均不直接拼接用户输入。
 

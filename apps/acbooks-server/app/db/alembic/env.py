@@ -1,9 +1,45 @@
 from pathlib import Path
 
 from alembic import context
+from alembic.script import ScriptDirectory
+from sqlalchemy.engine import Connection
 
 from app.db.base import Base
 from app.db.session import DATABASE_PATH, create_sqlite_engine
+
+
+def verify_integrity_triggers(connection: Connection) -> None:
+    script = ScriptDirectory.from_config(context.config)
+    heads = context.get_context().get_current_heads()
+    applied = {revision.revision for revision in script.iterate_revisions(heads, "base")}
+    required: set[tuple[str, str]] = set()
+    if "0002" in applied:
+        required.update(
+            (f"validate_{table}_{column}_{event}", table)
+            for table, column in (
+                ("background_jobs", "status"),
+                ("storage_objects", "file_status"),
+            )
+            for event in ("insert", "update")
+        )
+    if "0003" in applied:
+        required.add(("validate_book_files_reading_book_update", "book_files"))
+        required.update(
+            (f"validate_{table}_file_book_{event}", table)
+            for table in ("reading_sessions", "bookmarks", "annotations")
+            for event in ("insert", "update")
+        )
+    if required:
+        actual = {
+            (name, table)
+            for name, table in connection.exec_driver_sql(
+                "SELECT name, tbl_name FROM sqlite_schema WHERE type = 'trigger'"
+            )
+        }
+        missing = required.difference(actual)
+        if missing:
+            names = ", ".join(sorted(name for name, _ in missing))
+            raise RuntimeError(f"Required SQLite integrity triggers missing: {names}")
 
 
 def run_migrations() -> None:
@@ -23,6 +59,7 @@ def run_migrations() -> None:
                     transactional_ddl=True,
                 )
                 context.run_migrations()
+                verify_integrity_triggers(connection)
     finally:
         engine.dispose()
 

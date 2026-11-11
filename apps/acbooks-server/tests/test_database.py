@@ -1,3 +1,4 @@
+import shutil
 import sqlite3
 from argparse import Namespace
 from collections.abc import Iterator
@@ -321,3 +322,228 @@ def test_transactional_ddl_and_online_backup(database: Engine, tmp_path: Path) -
             assert connection.exec_driver_sql("PRAGMA integrity_check").scalar_one() == "ok"
     finally:
         restored.dispose()
+
+
+@pytest.mark.parametrize(
+    ("table", "insert"),
+    [
+        (
+            "reading_sessions",
+            "INSERT INTO reading_sessions (id, book_id, book_file_id, started_at, source)"
+            " VALUES (?, ?, ?, 1, 'manual')",
+        ),
+        (
+            "bookmarks",
+            "INSERT INTO bookmarks (id, book_id, book_file_id, created_at, updated_at)"
+            " VALUES (?, ?, ?, 1, 1)",
+        ),
+        (
+            "annotations",
+            "INSERT INTO annotations (id, book_id, book_file_id, created_at, updated_at)"
+            " VALUES (?, ?, ?, 1, 1)",
+        ),
+    ],
+)
+def test_reading_file_must_belong_to_book(tmp_path: Path, table: str, insert: str) -> None:
+    path = tmp_path / "reading.db"
+    config = migration_config(path)
+    command.upgrade(config, "0002")
+    engine = create_sqlite_engine(path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO books (id, title, created_at, updated_at)"
+                " VALUES ('a', 'A', 1, 1), ('b', 'B', 1, 1)"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO storage_roots VALUES ('root', 'NAS', '/books', 'external')"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO storage_objects (id, root_id, relative_path, size_bytes, mtime_ms)"
+                " VALUES ('oa', 'root', 'a.epub', 1, 1), ('ob', 'root', 'b.epub', 1, 1)"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO book_files VALUES ('fa', 'a', 'oa', 'epub'), ('fb', 'b', 'ob', 'epub')"
+            )
+            connection.exec_driver_sql(insert, ("record", "b", "fa"))
+
+        with pytest.raises(RuntimeError, match=f"Mismatched book and file in {table}"):
+            command.upgrade(config, "head")
+        with engine.begin() as connection:
+            assert (
+                connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one()
+                == "0002"
+            )
+            table_sql = connection.exec_driver_sql(
+                "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?", (table,)
+            ).scalar_one()
+            foreign_keys = connection.exec_driver_sql(f"PRAGMA foreign_key_list({table})").all()
+            read_record = f"SELECT book_id, book_file_id FROM {table} WHERE id = 'record'"
+            assert tuple(connection.exec_driver_sql(read_record).one()) == ("b", "fa")
+            connection.exec_driver_sql(f"UPDATE {table} SET book_id = 'a' WHERE id = 'record'")
+
+        command.upgrade(config, "head")
+        with engine.begin() as connection:
+            assert (
+                connection.exec_driver_sql(
+                    "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?", (table,)
+                ).scalar_one()
+                == table_sql
+            )
+            assert connection.exec_driver_sql(f"PRAGMA foreign_key_list({table})").all() == (
+                foreign_keys
+            )
+            assert tuple(connection.exec_driver_sql(read_record).one()) == ("a", "fa")
+            connection.exec_driver_sql(insert, ("physical", "b", None))
+            for statement, args in (
+                (insert, ("wrong", "b", "fa")),
+                (f"UPDATE {table} SET book_id = ? WHERE id = 'record'", ("b",)),
+                (f"UPDATE {table} SET book_file_id = ? WHERE id = 'record'", ("fb",)),
+                ("UPDATE book_files SET book_id = ? WHERE id = 'fa'", ("b",)),
+            ):
+                with pytest.raises(IntegrityError):
+                    connection.exec_driver_sql(statement, args)
+            connection.exec_driver_sql("UPDATE book_files SET book_id = 'a' WHERE id = 'fb'")
+            connection.exec_driver_sql("DELETE FROM book_files WHERE id = 'fa'")
+            assert tuple(connection.exec_driver_sql(read_record).one()) == ("a", None)
+            assert connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
+
+        command.downgrade(config, "0002")
+        with engine.begin() as connection:
+            connection.exec_driver_sql(insert, ("legacy", "b", "fb"))
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize("table", ["background_jobs", "storage_objects"])
+def test_batch_migration_must_preserve_status_triggers(tmp_path: Path, table: str) -> None:
+    path = tmp_path / "batch.db"
+    config = migration_config(path)
+    scripts = tmp_path / "alembic"
+    shutil.copytree(
+        SERVER_ROOT / "app/db/alembic", scripts, ignore=shutil.ignore_patterns("__pycache__")
+    )
+    config.set_main_option("script_location", str(scripts))
+    command.upgrade(config, "0003")
+    migration = scripts / "versions/0004_test_batch.py"
+    migration.write_text(
+        f"""
+import sqlalchemy as sa
+from alembic import op
+
+revision = "0004"
+down_revision = "0003"
+branch_labels = None
+depends_on = None
+
+def upgrade():
+    with op.batch_alter_table({table!r}, recreate="always") as batch:
+        batch.add_column(sa.Column("batch_test", sa.Text()))
+""",
+        encoding="utf-8",
+    )
+
+    engine = create_sqlite_engine(path)
+    try:
+        seed: tuple[str, ...]
+        invalid: tuple[str, ...]
+        with engine.begin() as connection:
+            if table == "background_jobs":
+                column, valid = "status", "queued"
+                insert = (
+                    "INSERT INTO background_jobs (id, type, status, payload_json, created_at,"
+                    " updated_at) VALUES (?, 'scan', ?, '{}', 1, 1)"
+                )
+                seed = ("existing", valid)
+                invalid = ("new", "invalid")
+            else:
+                column, valid = "file_status", "present"
+                connection.exec_driver_sql(
+                    "INSERT INTO storage_roots VALUES ('root', 'NAS', '/books', 'external')"
+                )
+                insert = (
+                    "INSERT INTO storage_objects (id, root_id, relative_path, size_bytes,"
+                    " file_status, mtime_ms) VALUES (?, 'root', ?, 1, ?, 1)"
+                )
+                seed = ("existing", "a.epub", valid)
+                invalid = ("new", "b.epub", "invalid")
+            connection.exec_driver_sql(insert, seed)
+        with pytest.raises(
+            RuntimeError, match=f"Required SQLite integrity triggers missing: validate_{table}"
+        ):
+            command.upgrade(config, "head")
+
+        assert "batch_test" not in {column["name"] for column in inspect(engine).get_columns(table)}
+        select_state = f"SELECT {column} FROM {table} WHERE id = 'existing'"
+        with engine.connect() as connection:
+            assert (
+                connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one()
+                == "0003"
+            )
+            assert connection.exec_driver_sql(select_state).scalar_one() == valid
+            definitions = (
+                connection.exec_driver_sql(
+                    "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND tbl_name = ?",
+                    (table,),
+                )
+                .scalars()
+                .all()
+            )
+            assert len(definitions) == 2
+        with migration.open("a", encoding="utf-8") as script:
+            for definition in definitions:
+                script.write(f"    op.execute({definition!r})\n")
+        command.upgrade(config, "head")
+        with engine.begin() as connection:
+            assert (
+                connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one()
+                == "0004"
+            )
+            with pytest.raises(IntegrityError, match=f"Invalid {table}"):
+                connection.exec_driver_sql(insert, invalid)
+            with pytest.raises(IntegrityError, match=f"Invalid {table}"):
+                connection.exec_driver_sql(
+                    f"UPDATE {table} SET {column} = 'invalid' WHERE id = 'existing'"
+                )
+            assert connection.exec_driver_sql(select_state).scalar_one() == valid
+            assert connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
+
+        with migration.open("a", encoding="utf-8") as script:
+            script.write(f"""
+
+def downgrade():
+    with op.batch_alter_table({table!r}, recreate="always") as batch:
+        batch.drop_column("batch_test")
+""")
+        with pytest.raises(
+            RuntimeError, match=f"Required SQLite integrity triggers missing: validate_{table}"
+        ):
+            command.downgrade(config, "0003")
+        assert "batch_test" in {field["name"] for field in inspect(engine).get_columns(table)}
+        with engine.connect() as connection:
+            assert (
+                connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one()
+                == "0004"
+            )
+            assert connection.exec_driver_sql(select_state).scalar_one() == valid
+
+        with migration.open("a", encoding="utf-8") as script:
+            for definition in definitions:
+                script.write(f"    op.execute({definition!r})\n")
+        command.downgrade(config, "0003")
+        assert "batch_test" not in {field["name"] for field in inspect(engine).get_columns(table)}
+        with engine.begin() as connection:
+            assert (
+                connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one()
+                == "0003"
+            )
+            with pytest.raises(IntegrityError, match=f"Invalid {table}"):
+                connection.exec_driver_sql(insert, invalid)
+            with pytest.raises(IntegrityError, match=f"Invalid {table}"):
+                connection.exec_driver_sql(
+                    f"UPDATE {table} SET {column} = 'invalid' WHERE id = 'existing'"
+                )
+            assert connection.exec_driver_sql(select_state).scalar_one() == valid
+            assert connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
+    finally:
+        engine.dispose()
