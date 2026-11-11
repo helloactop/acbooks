@@ -72,9 +72,10 @@ def internal_error(request: Request, error: Exception) -> JSONResponse:
 
 
 async def business_error(request: Request, error: Exception) -> Response:
-    code = cast(BusinessError, error).code
-    status, detail = _BUSINESS_PROBLEMS[code]
-    return problem_response(request, status, code.value, detail)
+    exc = cast(BusinessError, error)
+    status, detail = _BUSINESS_PROBLEMS[exc.code]
+    headers = {"Retry-After": str(exc.retry_after)} if exc.retry_after is not None else None
+    return problem_response(request, status, exc.code.value, detail, headers)
 
 
 async def http_error(request: Request, error: Exception) -> Response:

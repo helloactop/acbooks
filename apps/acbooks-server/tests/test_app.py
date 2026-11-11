@@ -97,17 +97,15 @@ def test_problem_responses(
         assert __file__ not in record.getMessage()
 
 
-@pytest.mark.parametrize(
-    ("code", "status", "expected_code"),
-    [
-        (BusinessErrorCode.REVISION_CONFLICT, 409, "REVISION_CONFLICT"),
-        (BusinessErrorCode.INVALID_CREDENTIALS, 401, "INVALID_CREDENTIALS"),
-        (BusinessErrorCode.SETUP_CODE_INVALID, 403, "SETUP_CODE_INVALID"),
-        (BusinessErrorCode.SETUP_ALREADY_INITIALIZED, 409, "SETUP_ALREADY_INITIALIZED"),
-        (BusinessErrorCode.RATE_LIMITED, 429, "RATE_LIMITED"),
-    ],
-)
-def test_business_error_contract(code: BusinessErrorCode, status: int, expected_code: str) -> None:
+@pytest.mark.parametrize("code", list(BusinessErrorCode))
+def test_business_error_contract(code: BusinessErrorCode) -> None:
+    expected_code, status = {
+        BusinessErrorCode.REVISION_CONFLICT: ("REVISION_CONFLICT", 409),
+        BusinessErrorCode.INVALID_CREDENTIALS: ("INVALID_CREDENTIALS", 401),
+        BusinessErrorCode.SETUP_CODE_INVALID: ("SETUP_CODE_INVALID", 403),
+        BusinessErrorCode.SETUP_ALREADY_INITIALIZED: ("SETUP_ALREADY_INITIALIZED", 409),
+        BusinessErrorCode.RATE_LIMITED: ("RATE_LIMITED", 429),
+    }[code]
     app = create_app()
 
     @app.get("/business-error")
@@ -122,3 +120,36 @@ def test_business_error_contract(code: BusinessErrorCode, status: int, expected_
     assert body["status"] == status
     assert body["code"] == expected_code
     assert body["requestId"] == response.headers["X-Request-ID"]
+    assert "Retry-After" not in response.headers
+
+
+@pytest.mark.parametrize("retry_after", [0, 60])
+def test_rate_limit_can_include_retry_delay(retry_after: int) -> None:
+    app = create_app()
+
+    @app.get("/rate-limited")
+    async def rate_limited() -> None:
+        raise BusinessError(BusinessErrorCode.RATE_LIMITED, retry_after=retry_after)
+
+    @app.get("/http-rate-limited")
+    async def http_rate_limited() -> None:
+        raise HTTPException(429, headers={"Retry-After": str(retry_after)})
+
+    with TestClient(app) as client:
+        for path, code in (
+            ("/rate-limited", "RATE_LIMITED"),
+            ("/http-rate-limited", "TOO_MANY_REQUESTS"),
+        ):
+            response = client.get(path)
+            assert response.status_code == 429
+            assert response.headers["Retry-After"] == str(retry_after)
+            assert response.headers["content-type"] == "application/problem+json"
+            assert response.json()["code"] == code
+            assert response.json()["requestId"] == response.headers["X-Request-ID"]
+
+
+def test_retry_delay_is_only_valid_for_rate_limits() -> None:
+    with pytest.raises(ValueError, match="Retry delay"):
+        BusinessError(BusinessErrorCode.RATE_LIMITED, retry_after=-1)
+    with pytest.raises(ValueError, match="Retry delay"):
+        BusinessError(BusinessErrorCode.REVISION_CONFLICT, retry_after=60)
