@@ -56,6 +56,11 @@
 
 **删除与扫描规则**：扫描不到文件时将 `storage_objects.file_status` 标为 `missing`，不自动删除 `Book`、笔记或阅读历史；移动文件尽量更新存储索引并保持书籍/文件 ID 稳定。ISBN、书名、文件哈希只用于候选匹配，歧义需人工确认。
 
+**状态值约束**：`storage_objects.file_status` 允许 `present`（默认）和 `missing`；
+`background_jobs.status` 允许 `queued`、`running`、`succeeded`、`failed`，状态流转按 [后台任务规范](jobs.md) 执行。
+迁移 `0002` 用 SQLite 触发器检查新增与更新，保留原表及其外键。旧库存在非法值时，
+升级会回滚。应先备份，按真实业务状态修正旧记录，再重试迁移。
+
 ## 3. SQLAlchemy 代码规范
 
 路径：`apps/acbooks-server/app/db/models/`；每个业务模块拥有自己的模型文件，统一从 `app/db/models/__init__.py` 导入，以供 Alembic 发现。

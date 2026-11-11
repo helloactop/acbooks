@@ -214,6 +214,87 @@ def test_only_one_admin_can_be_created_concurrently(database: Engine) -> None:
         assert sorted(pool.map(create_admin, ["first", "second"])) == [False, True]
 
 
+@pytest.mark.parametrize(
+    ("table", "column", "allowed", "insert"),
+    [
+        (
+            "background_jobs",
+            "status",
+            ("queued", "running", "succeeded", "failed"),
+            "INSERT INTO background_jobs VALUES (?, 'scan', ?, '{}', 1, 1)",
+        ),
+        (
+            "storage_objects",
+            "file_status",
+            ("present", "missing"),
+            "INSERT INTO storage_objects"
+            " (id, root_id, relative_path, size_bytes, file_status, mtime_ms)"
+            " VALUES (?, 'root', 'second.epub', 1, ?, 1)",
+        ),
+    ],
+)
+def test_status_validation_on_existing_database(
+    tmp_path: Path, table: str, column: str, allowed: tuple[str, ...], insert: str
+) -> None:
+    path = tmp_path / "existing.db"
+    config = migration_config(path)
+    command.upgrade(config, "0001")
+    engine = create_sqlite_engine(path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO books (id, title, created_at, updated_at)"
+                " VALUES ('book', 'Book', 1, 1)"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO storage_roots VALUES ('root', 'NAS', '/books', 'external')"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO storage_objects (id, root_id, relative_path, size_bytes, mtime_ms)"
+                " VALUES ('object', 'root', 'book.epub', 1, 1)"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO book_files VALUES ('file', 'book', 'object', 'epub')"
+            )
+            connection.exec_driver_sql(insert, ("legacy", "invalid"))
+        with pytest.raises(RuntimeError, match=rf"Unsupported values in {table}\.{column}"):
+            command.upgrade(config, "head")
+        with engine.begin() as connection:
+            assert (
+                connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one()
+                == "0001"
+            )
+            select_status = f"SELECT {column} FROM {table} WHERE id = 'legacy'"
+            update_status = f"UPDATE {table} SET {column} = ? WHERE id = 'legacy'"
+            assert connection.exec_driver_sql(select_status).scalar_one() == "invalid"
+            connection.exec_driver_sql(update_status, (allowed[0],))
+
+        command.upgrade(config, "head")
+        with engine.begin() as connection:
+            assert connection.exec_driver_sql(select_status).scalar_one() == allowed[0]
+            file = connection.exec_driver_sql(
+                "SELECT book_id, storage_object_id FROM book_files WHERE id = 'file'"
+            ).one()
+            assert tuple(file) == ("book", "object")
+            assert connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
+            for status in allowed:
+                connection.exec_driver_sql(update_status, (status,))
+            with pytest.raises(IntegrityError, match=f"Invalid {table}.{column}"):
+                connection.exec_driver_sql(update_status, ("invalid",))
+            assert connection.exec_driver_sql(select_status).scalar_one() == allowed[-1]
+            connection.exec_driver_sql(f"DELETE FROM {table} WHERE id = 'legacy'")
+            with pytest.raises(IntegrityError, match=f"Invalid {table}.{column}"):
+                connection.exec_driver_sql(insert, ("new", "invalid"))
+            connection.exec_driver_sql(insert, ("legacy", allowed[0]))
+
+        command.downgrade(config, "0001")
+        with engine.begin() as connection:
+            connection.exec_driver_sql(update_status, ("invalid",))
+            assert connection.exec_driver_sql(select_status).scalar_one() == "invalid"
+    finally:
+        engine.dispose()
+
+
 def test_transactional_ddl_and_online_backup(database: Engine, tmp_path: Path) -> None:
     with pytest.raises(RuntimeError), database.begin() as connection:
         connection.exec_driver_sql("CREATE TABLE interrupted (id INTEGER)")

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,7 +28,9 @@ class StorageObject(Base):
     relative_path: Mapped[str] = mapped_column(Text)
     size_bytes: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str | None] = mapped_column(Text)
-    file_status: Mapped[str] = mapped_column(Text, server_default="present")
+    file_status: Mapped[Literal["present", "missing"]] = mapped_column(
+        Text, server_default="present"
+    )
     mtime_ms: Mapped[int] = mapped_column(Integer)
 
 

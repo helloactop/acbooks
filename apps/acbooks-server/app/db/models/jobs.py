@@ -1,3 +1,5 @@
+from typing import Literal
+
 from sqlalchemy import Index, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,7 +12,7 @@ class BackgroundJob(Base):
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
     type: Mapped[str] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(Text)
+    status: Mapped[Literal["queued", "running", "succeeded", "failed"]] = mapped_column(Text)
     payload_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[int] = mapped_column(Integer)
     updated_at: Mapped[int] = mapped_column(Integer)
