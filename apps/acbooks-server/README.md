@@ -14,6 +14,28 @@ python -m uvicorn app.main:create_app --factory --no-access-log
 `/docs`。OpenAPI 始终在 `/openapi.json` 提供。健康检查见
 [后端健康检查](../../docs/api/health.md)。
 
+## SQLite 与迁移
+
+从本目录运行 `python -m alembic upgrade head` 初始化或升级数据库。
+默认路径为 `/data/acbooks/database/acbooks.db`，运行前需在服务端的本地文件系统
+准备可写的父目录。开发与验证可用 `-x db_path` 显式指定临时库或数据副本。
+
+```sh
+python -m alembic -x db_path=./.venv/acbooks-dev.db upgrade head
+python -m alembic -x db_path=./.venv/acbooks-dev.db current
+python -m alembic -x db_path=./.venv/acbooks-dev.db check
+```
+
+迁移由 Alembic 执行。应用启动和 HTTP 存活探针不会触发迁移。
+API 与 Worker 的数据库调用可复用 `app.db.session` 的引擎和会话工厂，
+由业务服务使用 `session_factory.begin()` 管理写事务。
+
+变更模型后，对已升级至当前版本的本地库运行
+`python -m alembic -x db_path=./.venv/acbooks-dev.db revision --autogenerate -m "描述变更"`。
+审查生成的脚本，并在旧数据副本验证升级与完整性。涉及 SQLite batch 重建时，
+特别检查入向外键和级联行为。初始迁移的 `downgrade base` 会删除业务表及其数据，
+仅在可丢弃的测试库验证。真实库升级前使用 SQLite 一致性备份。
+
 ## 检查
 
 ```sh
