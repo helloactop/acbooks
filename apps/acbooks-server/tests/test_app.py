@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from app.core.errors import BusinessError, BusinessErrorCode
 from app.main import create_app
 
 
@@ -43,6 +44,7 @@ def test_environment_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
         ("GET", "/validation?count=private-input", 422, "VALIDATION_ERROR"),
         ("GET", "/http-error", 401, "UNAUTHORIZED"),
         ("GET", "/crash", 500, "INTERNAL_ERROR"),
+        ("GET", "/explicit-500", 500, "INTERNAL_ERROR"),
     ],
 )
 def test_problem_responses(
@@ -62,6 +64,10 @@ def test_problem_responses(
     async def crash() -> None:
         raise RuntimeError("private-input")
 
+    @app.get("/explicit-500")
+    async def explicit_failure() -> None:
+        raise HTTPException(500, "private-input")
+
     with TestClient(app) as client:
         response = client.request(method, path)
     assert response.status_code == status
@@ -78,4 +84,41 @@ def test_problem_responses(
     if status == 401:
         assert response.headers["www-authenticate"] == "Bearer"
     if status == 500:
-        assert body["requestId"] in caplog.text
+        exception, frame = (
+            ("RuntimeError", "crash") if path == "/crash" else ("HTTPException", "explicit_failure")
+        )
+        diagnostics = [record for record in caplog.records if "exception=" in record.getMessage()]
+        assert len(diagnostics) == 1
+        record = diagnostics[0]
+        assert record.exc_info is None
+        assert f"request_id={body['requestId']}" in record.getMessage()
+        assert f"exception={exception}" in record.getMessage()
+        assert f"{frame}:" in record.getMessage()
+        assert __file__ not in record.getMessage()
+
+
+@pytest.mark.parametrize(
+    ("code", "status", "expected_code"),
+    [
+        (BusinessErrorCode.REVISION_CONFLICT, 409, "REVISION_CONFLICT"),
+        (BusinessErrorCode.INVALID_CREDENTIALS, 401, "INVALID_CREDENTIALS"),
+        (BusinessErrorCode.SETUP_CODE_INVALID, 403, "SETUP_CODE_INVALID"),
+        (BusinessErrorCode.SETUP_ALREADY_INITIALIZED, 409, "SETUP_ALREADY_INITIALIZED"),
+        (BusinessErrorCode.RATE_LIMITED, 429, "RATE_LIMITED"),
+    ],
+)
+def test_business_error_contract(code: BusinessErrorCode, status: int, expected_code: str) -> None:
+    app = create_app()
+
+    @app.get("/business-error")
+    async def fail() -> None:
+        raise BusinessError(code)
+
+    with TestClient(app) as client:
+        response = client.get("/business-error")
+    assert response.status_code == status
+    assert response.headers["content-type"] == "application/problem+json"
+    body = response.json()
+    assert body["status"] == status
+    assert body["code"] == expected_code
+    assert body["requestId"] == response.headers["X-Request-ID"]

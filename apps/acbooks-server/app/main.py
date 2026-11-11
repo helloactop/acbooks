@@ -1,13 +1,12 @@
 import logging
 from collections.abc import Awaitable, Callable
-from http import HTTPStatus
 from time import perf_counter
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 
-from app.api.errors import problem_response, register_exception_handlers
+from app.api.errors import internal_error, register_exception_handlers
 from app.api.health import router as health_router
 from app.core.config import Settings
 
@@ -33,13 +32,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         started = perf_counter()
         try:
             response = await call_next(request)
-        except Exception:
-            response = problem_response(
-                request,
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                "INTERNAL_ERROR",
-                "Internal server error.",
-            )
+        except Exception as error:
+            response = internal_error(request, error)
         response.headers["X-Request-ID"] = request_id
         logger.log(
             logging.ERROR if response.status_code >= 500 else logging.INFO,
