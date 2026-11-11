@@ -1,0 +1,38 @@
+# Local configuration and runtime data
+.env
+.env.*
+!.env.example
+!.env.*.example
+/data/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+.coverage
+
+# Web and desktop
+node_modules/
+dist/
+*.tsbuildinfo
+/apps/acbooks-desktop/src-tauri/target/
+
+# Android
+.gradle/
+.kotlin/
+/apps/acbooks-android/**/build/
+/apps/acbooks-android/local.properties
+*.jks
+*.keystore
+
+# OS files
+.DS_Store
+Thumbs.db
