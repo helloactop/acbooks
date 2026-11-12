@@ -1,6 +1,6 @@
 from urllib.parse import urlsplit
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     enable_docs: bool = False
     public_origin: str = "http://127.0.0.1:8000"
+    web_session_ttl_seconds: int = Field(default=604800, ge=1, le=604800)
 
     @field_validator("public_origin")
     @classmethod

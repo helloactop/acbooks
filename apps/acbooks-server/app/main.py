@@ -12,8 +12,8 @@ from app.api.errors import internal_error, register_exception_handlers
 from app.api.health import router as health_router
 from app.core.config import Settings
 from app.db.session import DATABASE_PATH, create_sqlite_engine
-from app.modules.auth.router import setup_router
-from app.modules.auth.service import SetupService
+from app.modules.auth.router import auth_router
+from app.modules.auth.service import SetupService, WebAuthService
 from app.modules.auth.setup_code import SETUP_CODE_PATH
 
 logger = logging.getLogger("uvicorn.error")
@@ -44,7 +44,11 @@ def create_app(
     register_exception_handlers(app)
     app.include_router(health_router, prefix="/api/v1")
     app.include_router(
-        setup_router(SetupService(engine, setup_code_path), settings.public_origin),
+        auth_router(
+            SetupService(engine, setup_code_path),
+            WebAuthService(engine, settings.web_session_ttl_seconds),
+            settings.public_origin,
+        ),
         prefix="/api/v1",
     )
 

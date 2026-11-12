@@ -41,6 +41,7 @@ services:
         condition: service_completed_successfully
     environment:
       ACBOOKS_PUBLIC_ORIGIN: "${ACBOOKS_PUBLIC_ORIGIN:-http://127.0.0.1:8000}"
+      ACBOOKS_WEB_SESSION_TTL_SECONDS: "${ACBOOKS_WEB_SESSION_TTL_SECONDS:-604800}"
       FORWARDED_ALLOW_IPS: "${ACBOOKS_FORWARDED_ALLOW_IPS:-127.0.0.1}"
     ports:
       - "${ACBOOKS_BIND_ADDRESS:-127.0.0.1}:${ACBOOKS_PORT:-8000}:8000"
