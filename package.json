@@ -1,0 +1,29 @@
+{
+  "name": "acbooks",
+  "version": "0.1.0",
+  "private": true,
+  "license": "GPL-3.0-only",
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @acbooks/web dev",
+    "dev:web": "pnpm --filter @acbooks/web dev",
+    "build": "pnpm --filter @acbooks/web build",
+    "preview:web": "pnpm --filter @acbooks/web preview",
+    "lint": "eslint apps/acbooks-web packages/acbooks-ui eslint.config.mjs --max-warnings=0",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.14.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.2"
+  }
+}

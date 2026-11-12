@@ -22,6 +22,7 @@ __pycache__/
 # Web and desktop
 node_modules/
 dist/
+coverage/
 *.tsbuildinfo
 /apps/acbooks-desktop/src-tauri/target/
 
