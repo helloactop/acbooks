@@ -4,6 +4,11 @@ export {
   type ButtonProps,
   type ButtonVariant,
 } from "./components/button";
+export {
+  DropdownMenu,
+  type DropdownMenuAction,
+  type DropdownMenuProps,
+} from "./components/dropdown-menu";
 export { Field, type FieldProps } from "./components/field";
 export { IconButton, type IconButtonProps } from "./components/icon-button";
 export { Input, type InputProps } from "./components/input";
@@ -11,6 +16,10 @@ export {
   PasswordInput,
   type PasswordInputProps,
 } from "./components/password-input";
+export {
+  Select,
+  type SelectProps,
+} from "./components/select";
 export {
   SegmentedControl,
   type SegmentedControlOption,

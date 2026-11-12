@@ -291,6 +291,7 @@ describe("LibraryPage", () => {
       ).toBe("done");
     });
 
+    await user.click(screen.getByRole("button", { name: "更多筛选" }));
     await user.selectOptions(
       screen.getByRole("combobox", { name: "类型" }),
       "physical",
@@ -300,6 +301,38 @@ describe("LibraryPage", () => {
         "physical",
       );
     });
+    expect(
+      screen.getByRole("heading", { level: 1, name: "实体书" }),
+    ).toBeInTheDocument();
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "格式" }),
+      "epub",
+    );
+    await waitFor(() => {
+      expect(latestBookRequest()?.searchParams.get("format")).toBe("epub");
+    });
+
+    await user.type(screen.getByRole("textbox", { name: "标签" }), "文学");
+    await waitFor(() => {
+      expect(latestBookRequest()?.searchParams.get("tag")).toBe("文学");
+    });
+    expect(
+      screen.getByRole("button", { name: /更多筛选，已启用 3 个条件/ }),
+    ).toHaveTextContent("3");
+
+    await user.click(
+      screen.getByRole("button", { name: /更多筛选，已启用 3 个条件/ }),
+    );
+    expect(
+      screen.getByRole("button", { name: "移除筛选：类型：实体" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "移除筛选：格式：EPUB" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "移除筛选：标签：文学" }),
+    ).toBeInTheDocument();
 
     await user.selectOptions(
       screen.getByRole("combobox", { name: "排序" }),
@@ -316,11 +349,13 @@ describe("LibraryPage", () => {
     window.sessionStorage.setItem(
       "acbooks-library-view",
       JSON.stringify({
+        format: "pdf",
         offset: 0,
         query: "旧查询",
         searchTerm: "旧查询",
         sort: "recent",
         status: "done",
+        tag: "旧标签",
         type: "digital",
         view: "grid",
       }),
@@ -345,6 +380,11 @@ describe("LibraryPage", () => {
     expect(request?.searchParams.get("mediaType")).toBe("physical");
     expect(request?.searchParams.get("readingStatus")).toBeNull();
     expect(request?.searchParams.get("q")).toBeNull();
+    expect(request?.searchParams.get("tag")).toBeNull();
+    expect(request?.searchParams.get("format")).toBeNull();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "实体书" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("searchbox", { name: "搜索书库" }),
     ).toHaveValue("");

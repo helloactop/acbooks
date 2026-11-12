@@ -1,18 +1,24 @@
 import {
   Button,
+  cn,
+  Field,
   Input,
   SegmentedControl,
+  Select,
   Spinner,
   useLanguage,
   type SegmentedControlOption,
 } from "@acbooks/ui";
 import {
+  ArrowUpDown,
   BookOpen,
   LayoutGrid,
   List,
   Plus,
   RefreshCw,
   Search,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -30,7 +36,6 @@ import {
   type BookSummary,
 } from "./books-api";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
-import { FilterSelect, type FilterOption } from "./FilterSelect";
 import { LibraryAlert } from "./LibraryAlert";
 import {
   readInitialLibraryView,
@@ -45,10 +50,11 @@ import {
 import { Pagination } from "./Pagination";
 
 const PAGE_SIZE = 12;
-
-function option(value: string, label: string): FilterOption {
-  return { label, value };
-}
+const FILTER_FORMATS = ["epub", "pdf", "mobi", "azw3", "txt", "cbz"] as const;
+const TOOLBAR_SEGMENTED =
+  "h-10 [&>button]:h-8 max-lg:h-11 max-lg:p-0 max-lg:[&>button]:h-11";
+const FILTER_CHIP_CLASS =
+  "inline-flex h-9 max-w-full items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-xs text-foreground transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-lg:min-h-11";
 
 function syncMediaTypeParam(value: TypeFilter): void {
   const params = new URLSearchParams(window.location.search);
@@ -80,21 +86,31 @@ export function LibraryPage() {
   const [searchTerm, setSearchTerm] = useState(initialView.searchTerm);
   const [type, setType] = useState<TypeFilter>(initialView.type);
   const [status, setStatus] = useState<StatusFilter>(initialView.status);
+  const [tag, setTag] = useState(initialView.tag);
+  const [tagDraft, setTagDraft] = useState(initialView.tag);
+  const [format, setFormat] = useState(initialView.format);
   const [sort, setSort] = useState<SortOrder>(initialView.sort);
   const [view, setView] = useState<ViewMode>(initialView.view);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const scrollRestored = useRef(false);
   const searchTimer = useRef<number | undefined>(undefined);
+  const tagTimer = useRef<number | undefined>(undefined);
   const composingRef = useRef(false);
+  const tagComposingRef = useRef(false);
   const searchTermRef = useRef(initialView.searchTerm);
+  const tagRef = useRef(initialView.tag);
 
   useEffect(
     () => () => {
       if (searchTimer.current !== undefined) {
         window.clearTimeout(searchTimer.current);
+      }
+      if (tagTimer.current !== undefined) {
+        window.clearTimeout(tagTimer.current);
       }
     },
     [],
@@ -102,11 +118,16 @@ export function LibraryPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (!params.has("q") && !params.has("reset")) {
+    let changed = false;
+    for (const key of ["format", "q", "reset", "tag"]) {
+      if (params.has(key)) {
+        params.delete(key);
+        changed = true;
+      }
+    }
+    if (!changed) {
       return;
     }
-    params.delete("q");
-    params.delete("reset");
     const search = params.toString();
     window.history.replaceState(
       {},
@@ -118,8 +139,18 @@ export function LibraryPage() {
   }, []);
 
   useEffect(() => {
-    saveLibraryView({ offset, query, searchTerm, sort, status, type, view });
-  }, [offset, query, searchTerm, sort, status, type, view]);
+    saveLibraryView({
+      format,
+      offset,
+      query,
+      searchTerm,
+      sort,
+      status,
+      tag,
+      type,
+      view,
+    });
+  }, [format, offset, query, searchTerm, sort, status, tag, type, view]);
 
   useEffect(() => {
     const handlePageShow = (event: PageTransitionEvent) => {
@@ -158,6 +189,8 @@ export function LibraryPage() {
       q: searchTerm.trim().length > 0 ? searchTerm.trim() : undefined,
       readingStatus: status === "all" ? undefined : status,
       mediaType: type === "all" ? undefined : type,
+      tag: tag.trim().length > 0 ? tag.trim() : undefined,
+      format: format.length > 0 ? format : undefined,
       sort: sort === "recent" ? "createdAt" : sort,
       order: sort === "recent" ? "desc" : "asc",
       limit: PAGE_SIZE,
@@ -188,7 +221,17 @@ export function LibraryPage() {
       });
 
     return () => controller.abort();
-  }, [expireSession, offset, reloadKey, searchTerm, sort, status, type]);
+  }, [
+    expireSession,
+    format,
+    offset,
+    reloadKey,
+    searchTerm,
+    sort,
+    status,
+    tag,
+    type,
+  ]);
 
   const beginRequest = () => {
     setLoading(true);
@@ -225,12 +268,42 @@ export function LibraryPage() {
     }
   };
 
-  const changeType = (value: string) => {
-    const next = value as TypeFilter;
+  const applyTag = (value: string) => {
+    const next = value.trim();
+    if (next === tagRef.current) {
+      return;
+    }
+    tagRef.current = next;
     beginRequest();
-    setType(next);
+    setTag(next);
     setOffset(0);
-    syncMediaTypeParam(next);
+  };
+
+  const scheduleTag = (value: string, immediate = false) => {
+    setTagDraft(value);
+    if (tagComposingRef.current) {
+      return;
+    }
+    if (tagTimer.current !== undefined) {
+      window.clearTimeout(tagTimer.current);
+      tagTimer.current = undefined;
+    }
+    const run = () => {
+      tagTimer.current = undefined;
+      applyTag(value);
+    };
+    if (immediate || value.trim().length === 0) {
+      run();
+    } else {
+      tagTimer.current = window.setTimeout(run, 300);
+    }
+  };
+
+  const changeType = (value: TypeFilter) => {
+    beginRequest();
+    setType(value);
+    setOffset(0);
+    syncMediaTypeParam(value);
   };
 
   const changeStatus = (value: StatusFilter) => {
@@ -239,10 +312,45 @@ export function LibraryPage() {
     setOffset(0);
   };
 
-  const changeSort = (value: string) => {
+  const changeFormat = (value: string) => {
     beginRequest();
-    setSort(value as SortOrder);
+    setFormat(value);
     setOffset(0);
+  };
+
+  const changeSort = (value: SortOrder) => {
+    beginRequest();
+    setSort(value);
+    setOffset(0);
+  };
+
+  const clearTag = () => {
+    if (tagTimer.current !== undefined) {
+      window.clearTimeout(tagTimer.current);
+      tagTimer.current = undefined;
+    }
+    tagComposingRef.current = false;
+    tagRef.current = "";
+    setTag("");
+    setTagDraft("");
+    beginRequest();
+    setOffset(0);
+  };
+
+  const clearAdvanced = () => {
+    if (tagTimer.current !== undefined) {
+      window.clearTimeout(tagTimer.current);
+      tagTimer.current = undefined;
+    }
+    tagComposingRef.current = false;
+    tagRef.current = "";
+    setTag("");
+    setTagDraft("");
+    setType("all");
+    setFormat("");
+    beginRequest();
+    setOffset(0);
+    syncMediaTypeParam("all");
   };
 
   const clearFilters = () => {
@@ -250,13 +358,24 @@ export function LibraryPage() {
       window.clearTimeout(searchTimer.current);
       searchTimer.current = undefined;
     }
-    setQuery("");
+    if (tagTimer.current !== undefined) {
+      window.clearTimeout(tagTimer.current);
+      tagTimer.current = undefined;
+    }
+    composingRef.current = false;
+    tagComposingRef.current = false;
+    tagRef.current = "";
     searchTermRef.current = "";
+    setQuery("");
     setSearchTerm("");
     setType("all");
     setStatus("all");
+    setTag("");
+    setTagDraft("");
+    setFormat("");
     setSort("recent");
     setOffset(0);
+    setFiltersOpen(false);
     beginRequest();
     syncMediaTypeParam("all");
   };
@@ -280,26 +399,26 @@ export function LibraryPage() {
   };
 
   const openBook = () => {
-    saveLibraryView({ offset, query, searchTerm, sort, status, type, view });
+    saveLibraryView({
+      format,
+      offset,
+      query,
+      searchTerm,
+      sort,
+      status,
+      tag,
+      type,
+      view,
+    });
     saveLibraryScroll(mainRef.current?.scrollTop ?? 0);
     rememberDetailReturn();
   };
 
-  const typeOptions: readonly FilterOption[] = [
-    option("all", t("filters.all")),
-    option("physical", t("filters.physical")),
-    option("digital", t("filters.digital")),
-  ];
   const statusOptions: readonly SegmentedControlOption<StatusFilter>[] = [
     { label: t("filters.all"), value: "all" },
     { label: t("filters.unread"), value: "unread" },
     { label: t("filters.reading"), value: "reading" },
     { label: t("filters.done"), value: "done" },
-  ];
-  const sortOptions: readonly FilterOption[] = [
-    option("recent", t("filters.recent")),
-    option("title", t("filters.title")),
-    option("author", t("filters.author")),
   ];
   const viewOptions: readonly SegmentedControlOption<ViewMode>[] = [
     {
@@ -322,8 +441,18 @@ export function LibraryPage() {
     },
   ];
 
+  const advancedCount =
+    (type === "all" ? 0 : 1) +
+    (tag.trim().length > 0 ? 1 : 0) +
+    (format.length > 0 ? 1 : 0);
   const hasFilters =
-    searchTerm.trim().length > 0 || type !== "all" || status !== "all";
+    searchTerm.trim().length > 0 || status !== "all" || advancedCount > 0;
+  const pageTitle =
+    type === "physical"
+      ? t("page.physicalTitle")
+      : type === "digital"
+        ? t("page.digitalTitle")
+        : t("page.title");
   const formattedTotal = new Intl.NumberFormat(resolvedLanguage).format(total);
   const countMessage =
     loading && books.length === 0
@@ -335,6 +464,27 @@ export function LibraryPage() {
   const errorMessage =
     error === null ? undefined : libraryErrorMessage(t, error);
   const errorRequestId = error === null ? undefined : libraryRequestId(error);
+  const typeChipLabel =
+    type === "all"
+      ? ""
+      : t("filters.value", {
+          label: t("filters.type"),
+          value:
+            type === "physical"
+              ? t("filters.physical")
+              : t("filters.digital"),
+        });
+  const formatChipLabel =
+    format.length === 0
+      ? ""
+      : t("filters.value", {
+          label: t("filters.format"),
+          value: format.toLocaleUpperCase(),
+        });
+  const tagChipLabel =
+    tag.trim().length === 0
+      ? ""
+      : t("filters.value", { label: t("filters.tag"), value: tag });
 
   return (
     <>
@@ -358,7 +508,7 @@ export function LibraryPage() {
             ) : null}
           </span>
         }
-        title={t("page.title")}
+        title={pageTitle}
       />
 
       <div className="flex flex-col gap-3">
@@ -371,7 +521,7 @@ export function LibraryPage() {
             />
             <Input
               aria-label={t("header.searchLabel")}
-              className="pl-9 [&::-webkit-search-cancel-button]:appearance-none"
+              className="pl-9 max-lg:h-11 [&::-webkit-search-cancel-button]:appearance-none"
               onChange={(event) => {
                 commitSearch(event.target.value);
               }}
@@ -393,47 +543,217 @@ export function LibraryPage() {
               value={query}
             />
           </div>
+
+          <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+            <ArrowUpDown
+              aria-hidden="true"
+              className="size-4 shrink-0"
+              strokeWidth={2}
+            />
+            <span>{t("filters.sort")}</span>
+            <Select
+              aria-label={t("filters.sort")}
+              className="h-10 w-auto min-w-[132px] max-lg:h-11"
+              onChange={(event) => {
+                changeSort(event.target.value as SortOrder);
+              }}
+              value={sort}
+            >
+              <option value="recent">{t("filters.recent")}</option>
+              <option value="title">{t("filters.title")}</option>
+              <option value="author">{t("filters.author")}</option>
+            </Select>
+          </label>
+
           <SegmentedControl
             ariaLabel={t("view.label")}
+            className={TOOLBAR_SEGMENTED}
             onValueChange={setView}
             options={viewOptions}
             value={view}
           />
         </div>
 
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl
             ariaLabel={t("filters.status")}
-            className="shrink-0 whitespace-nowrap"
+            className={cn(TOOLBAR_SEGMENTED, "shrink-0 whitespace-nowrap")}
             onValueChange={changeStatus}
             options={statusOptions}
             value={status}
           />
-          <FilterSelect
-            label={t("filters.type")}
-            onChange={changeType}
-            options={typeOptions}
-            value={type}
-          />
-          <FilterSelect
-            disabled
-            label={t("filters.shelf")}
-            onChange={() => {}}
-            options={[option("all", t("filters.all"))]}
-            value="all"
-          />
-          <FilterSelect
-            label={t("filters.sort")}
-            onChange={changeSort}
-            options={sortOptions}
-            value={sort}
-          />
+
+          <Button
+            aria-controls="library-filter-panel"
+            aria-expanded={filtersOpen}
+            aria-label={
+              advancedCount > 0
+                ? t("filters.moreActive", { count: advancedCount })
+                : t("filters.more")
+            }
+            aria-pressed={advancedCount > 0}
+            className="h-10 max-lg:min-h-11 aria-pressed:border-accent-border aria-pressed:bg-accent-soft aria-pressed:text-accent-text aria-pressed:hover:bg-accent-hover"
+            onClick={() => {
+              setFiltersOpen((current) => !current);
+            }}
+            variant="outline"
+          >
+            <SlidersHorizontal aria-hidden="true" />
+            {t("filters.more")}
+            {advancedCount > 0 ? (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-text px-1 text-[11px] font-semibold text-background">
+                {advancedCount}
+              </span>
+            ) : null}
+          </Button>
+
           {hasFilters ? (
-            <Button onClick={clearFilters} size="sm" variant="ghost">
+            <Button
+              className="h-10 max-lg:min-h-11"
+              onClick={clearFilters}
+              variant="ghost"
+            >
               {t("empty.clear")}
             </Button>
           ) : null}
         </div>
+
+        {!filtersOpen && advancedCount > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {type !== "all" ? (
+              <button
+                aria-label={t("filters.remove", { label: typeChipLabel })}
+                className={FILTER_CHIP_CLASS}
+                onClick={() => {
+                  changeType("all");
+                }}
+                type="button"
+              >
+                <span className="truncate">{typeChipLabel}</span>
+                <X aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+              </button>
+            ) : null}
+            {format.length > 0 ? (
+              <button
+                aria-label={t("filters.remove", { label: formatChipLabel })}
+                className={FILTER_CHIP_CLASS}
+                onClick={() => {
+                  changeFormat("");
+                }}
+                type="button"
+              >
+                <span className="truncate">{formatChipLabel}</span>
+                <X aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+              </button>
+            ) : null}
+            {tag.trim().length > 0 ? (
+              <button
+                aria-label={t("filters.remove", { label: tagChipLabel })}
+                className={FILTER_CHIP_CLASS}
+                onClick={() => {
+                  clearTag();
+                }}
+                type="button"
+              >
+                <span className="truncate">{tagChipLabel}</span>
+                <X aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {filtersOpen ? (
+          <div
+            aria-label={t("filters.panel")}
+            className="rounded-card border border-border bg-surface p-4"
+            id="library-filter-panel"
+            role="group"
+          >
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Field htmlFor="filter-type" label={t("filters.type")}>
+                <Select
+                  className="max-lg:h-11"
+                  id="filter-type"
+                  onChange={(event) => {
+                    changeType(event.target.value as TypeFilter);
+                  }}
+                  value={type}
+                >
+                  <option value="all">{t("filters.all")}</option>
+                  <option value="physical">{t("filters.physical")}</option>
+                  <option value="digital">{t("filters.digital")}</option>
+                </Select>
+              </Field>
+
+              <Field htmlFor="filter-format" label={t("filters.format")}>
+                <Select
+                  className="max-lg:h-11"
+                  id="filter-format"
+                  onChange={(event) => {
+                    changeFormat(event.target.value);
+                  }}
+                  value={format}
+                >
+                  <option value="">{t("filters.allFormats")}</option>
+                  {FILTER_FORMATS.map((item) => (
+                    <option key={item} value={item}>
+                      {item.toLocaleUpperCase()}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              <Field
+                className="sm:col-span-2 lg:col-span-1"
+                htmlFor="filter-tag"
+                label={t("filters.tag")}
+              >
+                <Input
+                  autoComplete="off"
+                  className="max-lg:h-11"
+                  id="filter-tag"
+                  onBlur={(event) => {
+                    scheduleTag(event.currentTarget.value, true);
+                  }}
+                  onChange={(event) => {
+                    scheduleTag(event.target.value);
+                  }}
+                  onCompositionEnd={(event) => {
+                    tagComposingRef.current = false;
+                    scheduleTag(event.currentTarget.value, true);
+                  }}
+                  onCompositionStart={() => {
+                    tagComposingRef.current = true;
+                  }}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      !event.nativeEvent.isComposing
+                    ) {
+                      event.preventDefault();
+                      scheduleTag(event.currentTarget.value, true);
+                    }
+                  }}
+                  placeholder={t("filters.tagPlaceholder")}
+                  value={tagDraft}
+                />
+              </Field>
+            </div>
+
+            {advancedCount > 0 ? (
+              <div className="mt-4 flex justify-end">
+                <Button
+                  className="max-lg:min-h-11"
+                  onClick={clearAdvanced}
+                  size="sm"
+                  variant="ghost"
+                >
+                  {t("filters.clearAdvanced")}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {errorMessage !== undefined && books.length > 0 ? (

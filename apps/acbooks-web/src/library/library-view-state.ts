@@ -4,11 +4,13 @@ export type SortOrder = "author" | "recent" | "title";
 export type ViewMode = "grid" | "list";
 
 export interface LibraryViewState {
+  format: string;
   offset: number;
   query: string;
   searchTerm: string;
   sort: SortOrder;
   status: StatusFilter;
+  tag: string;
   type: TypeFilter;
   view: ViewMode;
 }
@@ -18,11 +20,13 @@ const SCROLL_KEY = "acbooks-library-scroll";
 const DESCRIPTION_PREFIX = "acbooks-description-expanded:";
 
 export const DEFAULT_LIBRARY_VIEW: LibraryViewState = {
+  format: "",
   offset: 0,
   query: "",
   searchTerm: "",
   sort: "recent",
   status: "all",
+  tag: "",
   type: "all",
   view: "grid",
 };
@@ -71,6 +75,7 @@ export function readLibraryView(): LibraryViewState | null {
   try {
     const value = JSON.parse(raw) as Partial<LibraryViewState>;
     return {
+      format: typeof value.format === "string" ? value.format : "",
       offset:
         typeof value.offset === "number" && Number.isInteger(value.offset)
           ? Math.max(0, value.offset)
@@ -82,6 +87,7 @@ export function readLibraryView(): LibraryViewState | null {
       status: isOneOf(STATUSES, value.status)
         ? value.status
         : DEFAULT_LIBRARY_VIEW.status,
+      tag: typeof value.tag === "string" ? value.tag : "",
       type: isOneOf(TYPES, value.type)
         ? value.type
         : DEFAULT_LIBRARY_VIEW.type,
@@ -99,27 +105,46 @@ export function readInitialLibraryView(): LibraryViewState {
   const params = new URLSearchParams(window.location.search);
   const urlQuery = params.get("q");
   const mediaType = params.get("mediaType");
+  const urlTag = params.get("tag");
+  const urlFormat = params.get("format");
   const reset = params.get("reset") === "1";
-  if (urlQuery === null && mediaType === null && !reset) {
+  if (
+    urlQuery === null &&
+    mediaType === null &&
+    urlTag === null &&
+    urlFormat === null &&
+    !reset
+  ) {
     return saved;
   }
 
   const view: LibraryViewState = { ...saved, offset: 0 };
   if (reset) {
+    view.format = "";
     view.query = "";
     view.searchTerm = "";
     view.status = "all";
+    view.tag = "";
+    view.type = "all";
   }
   if (mediaType === "physical" || mediaType === "digital") {
     view.type = mediaType;
   } else if (mediaType !== null) {
     view.type = "all";
   }
+  if (urlTag !== null) {
+    view.tag = urlTag.trim();
+  }
+  if (urlFormat !== null) {
+    view.format = urlFormat.trim().toLocaleLowerCase();
+  }
   if (urlQuery !== null) {
+    view.format = "";
     view.query = urlQuery;
     view.searchTerm = urlQuery.trim();
-    view.type = "all";
     view.status = "all";
+    view.tag = "";
+    view.type = "all";
   }
   return view;
 }
