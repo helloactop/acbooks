@@ -36,6 +36,27 @@ API 与 Worker 的数据库调用可复用 `app.db.session` 的引擎和会话�
 特别检查入向外键和级联行为。初始迁移的 `downgrade base` 会删除业务表及其数据，
 仅在可丢弃的测试库验证。真实库升级前使用 SQLite 一致性备份。
 
+## 首次管理员初始化
+
+迁移到 `head` 后，在宿主机或受信任的容器中，以后端服务用户执行安装命令。
+命令会在 `/data/acbooks/secrets/setup-code` 生成 256 位随机初始化码，不输出码本身。
+部署管理员从宿主机读取该文件。Linux 上目录须归服务用户所有，权限为 `0700`，
+文件权限为 `0600`。Windows 本地开发须将数据目录放在仅当前用户和系统管理员可访问的
+NTFS 目录下，由新文件继承目录 ACL。
+
+```sh
+python -m app.modules.auth.provision
+```
+
+生产部署将 `ACBOOKS_PUBLIC_ORIGIN` 设为外部 HTTPS 来源，例如 `https://books.example`。
+反向代理终止 TLS 时，应向 Uvicorn 转发 HTTPS 协议信息，并把
+`--forwarded-allow-ips` 限定为受信代理地址。默认 HTTP 来源仅用于本机开发。
+首次初始化期间运行一个 API 进程，预认证挑战与限速状态保存在该进程内。
+
+调用方式见 [API 规范的首次初始化一节](../../docs/api/conventions.md#41-初始化与登录路由)。
+创建成功后，数据库中的管理员记录立即关闭初始化入口，服务端会删除码文件。
+若文件删除失败，修复权限后可重跑安装命令清除残留文件。
+
 ## 检查
 
 本地与 CI 的环境及覆盖范围见[自动化检查](../../docs/testing/strategy.md)。

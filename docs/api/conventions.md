@@ -93,6 +93,16 @@
 - **Web 会话**：Cookie 使用 `HttpOnly; Secure; SameSite=Lax`（可采用 `Strict`）、`Path=/` 且不设置 `Domain`；正式 HTTPS 可使用 `__Host-` 前缀。服务端检查会话摘要、过期和撤销；前端不把任何认证令牌放在 `localStorage`。开发环境仅允许受控 localhost 例外。
 - **CSRF**：`POST /setup`、`POST /auth/login` 及所有基于 Cookie 的写请求，必须同时校验 CSRF 与 `Origin` / `Referer` 来源；使用有绑定的预认证挑战处理“尚未登录”的初始化/登录，不可仅依赖 `SameSite` 或 CORS；缺失/伪造的挑战请求拒绝。原生端只有显式 `Authorization: Bearer`，不能接受会话 Cookie 旁路权限判断。
 - **初始化码**：安装时安全生成并放在 `/data/acbooks/secrets/`（`0600`），仅本地部署管理员可取得；不由公开 API 提供、不写入日志、永不作为日常登录凭据；初始化状态只由唯一管理员记录决定。忘记密码走**本地维护命令**，不可重开公开 setup。
+
+首次初始化已开放上述两个 setup 接口及预认证 `GET /api/v1/auth/csrf`。
+调用时先获取 `csrfToken` 并保留挑战 Cookie，再从配置的可信来源提交
+`POST /api/v1/setup`，把该值放在 `X-CSRF-Token` 请求头。挑战有效期为 10 分钟。
+服务端对用户名执行 Unicode NFKC 规范化并去除首尾空白，要求规范化结果为
+1–128 个字符。密码须为 12–1024 个字符，与确认密码完全一致。
+输入不合规返回 `422 VALIDATION_ERROR`。缺少有效挑战或来源不可信返回
+`403 FORBIDDEN`。初始化码验证采用进程级滚动限额，每分钟最多 5 次，失败后退避，
+限速时返回 `429 RATE_LIMITED` 和 `Retry-After`。安装命令和服务来源配置见
+[后端运行说明](../../apps/acbooks-server/README.md#首次管理员初始化)。
 - **有效期**：建议首版 Web 会话最长 7 天、原生 Bearer 最长 30 天、应用凭据最长 90 天；允许部署方配置更短有效期，严禁永不过期的默认凭据。绝对到期后需要重新登录/重新签发；首版不必设计刷新令牌系统。
 
 ### 4.2 OPDS / WebDAV 凭据管理

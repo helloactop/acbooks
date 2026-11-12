@@ -10,7 +10,9 @@ DATABASE_PATH = Path("/data/acbooks/database/acbooks.db")
 
 
 def create_sqlite_engine(database_path: Path = DATABASE_PATH) -> Engine:
-    engine = create_engine(URL.create("sqlite+pysqlite", database=str(database_path)))
+    engine = create_engine(
+        URL.create("sqlite+pysqlite", database=str(database_path)), hide_parameters=True
+    )
 
     @event.listens_for(engine, "connect")
     def configure_connection(dbapi_connection: sqlite3.Connection, _record: object) -> None:
