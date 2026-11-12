@@ -1,9 +1,9 @@
 import { cn } from "@acbooks/ui";
-import { CircleAlert, CircleCheck } from "lucide-react";
+import { CircleAlert, CircleCheck, Info } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-type AuthAlertTone = "error" | "success";
+type AuthAlertTone = "error" | "info" | "success";
 
 export interface AuthAlertProps {
   children: ReactNode;
@@ -13,11 +13,13 @@ export interface AuthAlertProps {
 
 const TONE_CLASSES: Record<AuthAlertTone, string> = {
   error: "bg-destructive-text/10 text-destructive-text",
+  info: "bg-surface text-foreground",
   success: "bg-accent-soft text-accent-text",
 };
 
 const TONE_ICONS = {
   error: CircleAlert,
+  info: Info,
   success: CircleCheck,
 } as const;
 

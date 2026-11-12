@@ -85,7 +85,9 @@ def _search_condition(value: str) -> ColumnElement[bool]:
         .join(Contributor, Contributor.id == BookContributor.contributor_id)
         .where(
             BookContributor.book_id == Book.id,
-            Contributor.name.ilike(pattern, escape="\\"),
+            func.acbooks_casefold(Contributor.name).like(
+                func.acbooks_casefold(pattern), escape="\\"
+            ),
         )
     )
     identifier_match = exists(
@@ -96,7 +98,9 @@ def _search_condition(value: str) -> ColumnElement[bool]:
         )
     )
     return or_(
-        Book.title.ilike(pattern, escape="\\"),
+        func.acbooks_casefold(Book.title).like(
+            func.acbooks_casefold(pattern), escape="\\"
+        ),
         author_match,
         identifier_match,
     )
@@ -117,7 +121,7 @@ def _conditions(query: BookListQuery) -> list[ColumnElement[bool]]:
                 .join(Tag, Tag.id == BookTag.tag_id)
                 .where(
                     BookTag.book_id == Book.id,
-                    func.lower(Tag.name) == query.tag.casefold(),
+                    func.acbooks_casefold(Tag.name) == query.tag.casefold(),
                 )
             )
         )
@@ -143,7 +147,8 @@ def _conditions(query: BookListQuery) -> list[ColumnElement[bool]]:
             exists(
                 select(1).where(
                     BookFile.book_id == Book.id,
-                    func.lower(BookFile.format) == query.media_format.casefold(),
+                    func.acbooks_casefold(BookFile.format)
+                    == query.media_format.casefold(),
                 )
             )
         )
@@ -210,7 +215,7 @@ def _find_or_create_contributors(
     for name in names:
         contributor = session.scalars(
             select(Contributor)
-            .where(func.lower(Contributor.name) == name.casefold())
+            .where(func.acbooks_casefold(Contributor.name) == name.casefold())
             .order_by(Contributor.id)
             .limit(1)
         ).first()
@@ -227,7 +232,7 @@ def _find_or_create_tags(session: Session, names: list[str]) -> list[Tag]:
     for name in names:
         tag = session.scalars(
             select(Tag)
-            .where(func.lower(Tag.name) == name.casefold())
+            .where(func.acbooks_casefold(Tag.name) == name.casefold())
             .order_by(Tag.id)
             .limit(1)
         ).first()
@@ -244,7 +249,7 @@ def _find_or_create_shelves(session: Session, names: list[str]) -> list[Shelf]:
     for name in names:
         shelf = session.scalars(
             select(Shelf)
-            .where(func.lower(Shelf.name) == name.casefold())
+            .where(func.acbooks_casefold(Shelf.name) == name.casefold())
             .order_by(Shelf.id)
             .limit(1)
         ).first()

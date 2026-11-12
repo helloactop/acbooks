@@ -1,6 +1,7 @@
 {
   "nav": {
     "main": "主导航",
+    "sidebar": "书库侧边栏",
     "library": "图书馆",
     "home": "首页",
     "allBooks": "全部书籍",
@@ -18,7 +19,8 @@
   "header": {
     "searchLabel": "搜索书库",
     "searchPlaceholder": "搜索书名、作者、ISBN",
-    "account": "当前账号：{{username}}"
+    "account": "当前账号：{{username}}",
+    "accountMenu": "账号菜单：{{username}}"
   },
   "page": {
     "title": "全部书籍",
@@ -49,29 +51,100 @@
     "grid": "网格视图",
     "list": "列表视图"
   },
-  "tags": {
-    "physical": "实体",
-    "epub": "EPUB",
-    "pdf": "PDF"
-  },
   "status": {
     "done": "已读",
     "reading": "阅读中",
     "unread": "未读"
   },
-  "progress": {
-    "label": "阅读进度"
+  "labels": {
+    "physicalCopies": "实体 ×{{count}}",
+    "unknownAuthor": "未知作者",
+    "none": "—"
   },
   "list": {
     "tableLabel": "书籍列表",
     "titleAuthor": "书名与作者",
     "format": "格式",
-    "progress": "阅读进度"
+    "status": "阅读状态"
+  },
+  "pagination": {
+    "label": "分页",
+    "previous": "上一页",
+    "next": "下一页",
+    "page": "第 {{page}} 页",
+    "range": "显示 {{start}}–{{end}}，共 {{total}} 本"
+  },
+  "loading": {
+    "books": "正在载入书库",
+    "updating": "正在更新"
+  },
+  "errors": {
+    "notFound": "书籍不存在或已被删除。",
+    "validation": "请检查输入内容后重试。",
+    "forbidden": "请求未通过安全校验，请刷新页面后重试。",
+    "rateLimited": "尝试次数过多，请稍后重试。",
+    "network": "无法连接到服务器，请稍后重试。",
+    "server": "服务器暂时无法完成请求，请稍后重试。",
+    "unknown": "操作未完成，请稍后重试。",
+    "requestId": "请求 ID：{{requestId}}",
+    "retry": "重试"
   },
   "empty": {
     "title": "没有找到匹配的书籍",
     "description": "尝试调整搜索或筛选条件。",
-    "clear": "清除筛选"
+    "clear": "清除筛选",
+    "libraryTitle": "书库还没有书籍",
+    "libraryDescription": "添加第一本书开始整理你的书库。",
+    "addBook": "添加书籍"
+  },
+  "account": {
+    "logout": "退出登录",
+    "loggingOut": "正在退出…"
+  },
+  "detail": {
+    "title": "书籍详情",
+    "loading": "正在载入书籍详情",
+    "open": "查看《{{title}}》详情",
+    "edit": "编辑",
+    "close": "关闭",
+    "authors": "作者",
+    "translators": "译者",
+    "isbn": "ISBN",
+    "createdAt": "创建时间",
+    "updatedAt": "更新时间",
+    "tags": "标签",
+    "shelves": "书架",
+    "description": "简介",
+    "noDescription": "暂无简介",
+    "copies": "实体副本",
+    "noCopies": "暂无实体副本",
+    "unknownLocation": "未分配位置",
+    "files": "电子文件",
+    "noFiles": "暂无电子文件",
+    "filePresent": "可用",
+    "fileMissing": "缺失"
+  },
+  "form": {
+    "addTitle": "添加书籍",
+    "editTitle": "编辑书籍",
+    "title": "书名",
+    "titlePlaceholder": "请输入书名",
+    "titleRequired": "请输入书名。",
+    "description": "简介",
+    "descriptionPlaceholder": "可选",
+    "authors": "作者",
+    "authorsHint": "多个姓名用逗号分隔",
+    "translators": "译者",
+    "translatorsHint": "多个姓名用逗号分隔",
+    "isbn": "ISBN",
+    "isbnPlaceholder": "ISBN-10 或 ISBN-13",
+    "readingStatus": "阅读状态",
+    "tags": "标签",
+    "tagsHint": "多个标签用逗号分隔",
+    "shelves": "书架",
+    "shelvesHint": "多个书架用逗号分隔",
+    "cancel": "取消",
+    "save": "保存"
   },
   "guard": {
     "loading": "正在载入书库",

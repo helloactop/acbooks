@@ -1,14 +1,15 @@
 import { useTranslation } from "react-i18next";
 
 import { BookListItem } from "./BookListItem";
+import type { BookSummary } from "./books-api";
 import { ROW_GRID } from "./presentation";
-import type { LibraryBook } from "./sample-books";
 
 export interface BookListProps {
-  books: readonly LibraryBook[];
+  books: readonly BookSummary[];
+  onOpen: (bookId: string) => void;
 }
 
-export function BookList({ books }: BookListProps) {
+export function BookList({ books, onOpen }: BookListProps) {
   const { t } = useTranslation("library");
 
   return (
@@ -27,13 +28,13 @@ export function BookList({ books }: BookListProps) {
           {t("list.format")}
         </span>
         <span className="max-md:hidden" role="columnheader">
-          {t("list.progress")}
+          {t("list.status")}
         </span>
         <span role="columnheader" />
       </div>
 
       {books.map((book) => (
-        <BookListItem key={book.id} book={book} />
+        <BookListItem key={book.id} book={book} onOpen={onOpen} />
       ))}
     </div>
   );

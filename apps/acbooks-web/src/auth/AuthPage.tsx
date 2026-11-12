@@ -21,7 +21,11 @@ import { LoginForm } from "./LoginForm";
 import { SetupForm } from "./SetupForm";
 
 type Screen = "loading" | "login" | "setup" | "statusError";
-type Notice = "alreadyInitialized" | "setupSuccess" | null;
+type Notice =
+  | "alreadyInitialized"
+  | "sessionExpired"
+  | "setupSuccess"
+  | null;
 
 export interface AuthPageProps {
   onAuthenticated?: (account: Account) => void;
@@ -39,7 +43,11 @@ export function AuthPage({
   const [checkingSession, setCheckingSession] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState<AuthError | null>(null);
-  const [notice, setNotice] = useState<Notice>(null);
+  const [notice, setNotice] = useState<Notice>(() =>
+    new URLSearchParams(window.location.search).get("expired") === "1"
+      ? "sessionExpired"
+      : null,
+  );
   const [loginUsername, setLoginUsername] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -129,7 +137,10 @@ export function AuthPage({
       ? t("login.setupSuccess")
       : notice === "alreadyInitialized"
         ? t("login.alreadyInitialized")
-        : undefined;
+        : notice === "sessionExpired"
+          ? t("login.sessionExpired")
+          : undefined;
+  const noticeTone = notice === "sessionExpired" ? "info" : "success";
 
   if (screen === "loading") {
     const statusText = checkingSession
@@ -205,6 +216,7 @@ export function AuthPage({
         errorRequestId={errorRequestId}
         initialUsername={loginUsername}
         notice={noticeMessage}
+        noticeTone={noticeTone}
         onClearError={() => {
           setError(null);
         }}

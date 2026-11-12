@@ -136,6 +136,24 @@ describe("AuthPage", () => {
     expect(screen.getByRole("button", { name: "登录" })).toBeInTheDocument();
   });
 
+  it("shows a session-expired notice after a library redirect", async () => {
+    window.history.replaceState({}, "", "/?expired=1");
+    mockApi({
+      "GET /api/v1/setup/status": () =>
+        mockResponse({ initialized: true }),
+      "GET /api/v1/auth/me": () => problemResponse(401, "UNAUTHORIZED"),
+    });
+
+    renderAuth();
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "登录 acbooks" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("登录状态已失效，请重新登录。"),
+    ).toBeInTheDocument();
+  });
+
   it("redirects an existing session", async () => {
     mockApi({
       "GET /api/v1/setup/status": () =>

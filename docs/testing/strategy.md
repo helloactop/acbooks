@@ -38,14 +38,14 @@ pnpm build
 | pytest | SQLite 临时文件库上的 Alembic 升降级、模型一致性、异常回滚重试、连接参数、外键和唯一约束、任务和文件状态校验、并发写入及在线备份恢复 |
 | pytest | 首次管理员初始化的码文件生成与权限、来源和 CSRF 验证、密码校验与 Argon2id 存储、限速、双应用实例并发、事务失败重试及清理失败后的重启 |
 | pytest | Web 密码登录与限速、Cookie 属性、会话摘要与过期、重启持久化、会话轮换、CSRF 来源与绑定、单会话注销 |
-| pytest | Books Core V1：创建书目、重复 ISBN 不合并、作者/译者/ISBN/标签/书架关联、数据库级搜索筛选排序分页、部分更新保留副本与阅读数据、会话/CSRF、OpenAPI 契约 |
+| pytest | Books Core V1：创建书目、重复 ISBN 不合并、作者/译者/ISBN/标签/书架关联、Unicode casefold 名称匹配、数据库级搜索筛选排序分页、部分更新保留副本与阅读数据、会话/CSRF、OpenAPI 契约 |
 | ESLint | Web 与共享 UI 的 TypeScript/React 代码、Hooks 规则和导入问题 |
 | tsc | Web 与共享 UI 的 TypeScript strict 类型检查 |
 | i18n:check | 共享与 Web 翻译资源的语言目录、命名空间、键集合和插值参数一致性 |
 | Vitest | 共享 UI 的按钮变体与加载、表单标签/错误关联、禁用输入与密码切换、主题解析/本地保存/浏览器 theme-color、分段选择器键盘操作、浅深色令牌及组件级对比度（Soft/Default/Outline、分段选中、输入框、禁用态）、语言解析/回退/持久化/系统语言变化、Spinner 与密码控件双语文案 |
 | Vitest | Web 预览页中英即时切换、`<html lang>` 与本地存储更新、刷新恢复语言、系统语言跟随及切换不丢失输入 |
 | Vitest | Web 初始化/登录状态机、CSRF 请求头与 Cookie 同源请求、错误码与 `Retry-After` 映射、加载禁用、初始化成功后返回登录、已有会话跳转 `/library`、认证页双语切换 |
-| Vitest | Web 全部书籍界面：会话守卫、示例数据搜索/筛选/排序/视图切换、IME 组合处理、空状态、禁用入口、双语与响应式结构 |
+| Vitest | Web 全部书籍界面：真实 Books API 的会话守卫、服务端搜索/筛选/排序/分页、加载/空库/无结果/失败重试、添加/详情/编辑、CSRF 保存、退出登录/会话失效、标签与格式/副本区分、IME 组合处理、双语与响应式结构 |
 | Vite | Web 生产构建、共享 UI 源码解析与 Tailwind 样式生成 |
 
 测试使用 pytest 的临时目录创建数据库，不需要真实书库、NAS 挂载或服务凭据。

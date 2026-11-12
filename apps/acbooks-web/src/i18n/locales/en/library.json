@@ -1,6 +1,7 @@
 {
   "nav": {
     "main": "Main navigation",
+    "sidebar": "Library sidebar",
     "library": "Library",
     "home": "Home",
     "allBooks": "All books",
@@ -18,7 +19,8 @@
   "header": {
     "searchLabel": "Search library",
     "searchPlaceholder": "Search title, author or ISBN",
-    "account": "Signed in as {{username}}"
+    "account": "Signed in as {{username}}",
+    "accountMenu": "Account menu for {{username}}"
   },
   "page": {
     "title": "All books",
@@ -49,29 +51,100 @@
     "grid": "Grid view",
     "list": "List view"
   },
-  "tags": {
-    "physical": "Physical",
-    "epub": "EPUB",
-    "pdf": "PDF"
-  },
   "status": {
     "done": "Read",
     "reading": "Reading",
     "unread": "Unread"
   },
-  "progress": {
-    "label": "Reading progress"
+  "labels": {
+    "physicalCopies": "Physical ×{{count}}",
+    "unknownAuthor": "Unknown author",
+    "none": "—"
   },
   "list": {
     "tableLabel": "Book list",
     "titleAuthor": "Title and author",
     "format": "Format",
-    "progress": "Reading progress"
+    "status": "Status"
+  },
+  "pagination": {
+    "label": "Pagination",
+    "previous": "Previous page",
+    "next": "Next page",
+    "page": "Page {{page}}",
+    "range": "Showing {{start}}–{{end}} of {{total}}"
+  },
+  "loading": {
+    "books": "Loading library",
+    "updating": "Updating"
+  },
+  "errors": {
+    "notFound": "This book no longer exists.",
+    "validation": "Check the form and try again.",
+    "forbidden": "This request did not pass the security check. Refresh the page and try again.",
+    "rateLimited": "Too many attempts. Try again later.",
+    "network": "Cannot reach the server. Try again later.",
+    "server": "The server could not complete the request. Try again later.",
+    "unknown": "The request did not complete. Try again later.",
+    "requestId": "Request ID: {{requestId}}",
+    "retry": "Retry"
   },
   "empty": {
     "title": "No matching books",
     "description": "Try adjusting the search or filters.",
-    "clear": "Clear filters"
+    "clear": "Clear filters",
+    "libraryTitle": "Your library is empty",
+    "libraryDescription": "Add your first book to start building your library.",
+    "addBook": "Add book"
+  },
+  "account": {
+    "logout": "Sign out",
+    "loggingOut": "Signing out…"
+  },
+  "detail": {
+    "title": "Book details",
+    "loading": "Loading book details",
+    "open": "View details for {{title}}",
+    "edit": "Edit",
+    "close": "Close",
+    "authors": "Authors",
+    "translators": "Translators",
+    "isbn": "ISBN",
+    "createdAt": "Created",
+    "updatedAt": "Updated",
+    "tags": "Tags",
+    "shelves": "Shelves",
+    "description": "Description",
+    "noDescription": "No description",
+    "copies": "Physical copies",
+    "noCopies": "No physical copies",
+    "unknownLocation": "No location assigned",
+    "files": "Electronic files",
+    "noFiles": "No electronic files",
+    "filePresent": "Available",
+    "fileMissing": "Missing"
+  },
+  "form": {
+    "addTitle": "Add book",
+    "editTitle": "Edit book",
+    "title": "Title",
+    "titlePlaceholder": "Enter a title",
+    "titleRequired": "Enter a title.",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional",
+    "authors": "Authors",
+    "authorsHint": "Separate multiple names with commas",
+    "translators": "Translators",
+    "translatorsHint": "Separate multiple names with commas",
+    "isbn": "ISBN",
+    "isbnPlaceholder": "ISBN-10 or ISBN-13",
+    "readingStatus": "Reading status",
+    "tags": "Tags",
+    "tagsHint": "Separate multiple tags with commas",
+    "shelves": "Shelves",
+    "shelvesHint": "Separate multiple shelves with commas",
+    "cancel": "Cancel",
+    "save": "Save"
   },
   "guard": {
     "loading": "Loading library",

@@ -6,6 +6,7 @@ import {
   type SegmentedControlOption,
 } from "@acbooks/ui";
 import {
+  BookOpen,
   CircleAlert,
   LayoutGrid,
   List,
@@ -13,29 +14,49 @@ import {
   RefreshCw,
   Search,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { getCurrentAccount, type Account } from "../auth/auth-api";
+import { isAbortError, toApiError, type ApiError } from "../api/client";
+import { getCurrentAccount, logout, type Account } from "../auth/auth-api";
 import { AppShell } from "../layout/AppShell";
 import { BookCard } from "./BookCard";
+import { BookDetailDialog } from "./BookDetailDialog";
+import { BookFormDialog, type BookFormMode } from "./BookFormDialog";
 import { BookList } from "./BookList";
+import {
+  getBooks,
+  type BookDetail,
+  type BookListQuery,
+  type BookSummary,
+} from "./books-api";
+import { libraryErrorMessage, libraryRequestId } from "./errors";
 import { FilterSelect, type FilterOption } from "./FilterSelect";
+import { LibraryAlert } from "./LibraryAlert";
 import { LibrarySidebar } from "./LibrarySidebar";
 import { LibraryTopbar } from "./LibraryTopbar";
-import { SAMPLE_BOOKS } from "./sample-books";
+import { Pagination } from "./Pagination";
 
 type TypeFilter = "all" | "digital" | "physical";
 type StatusFilter = "all" | "done" | "reading" | "unread";
 type SortOrder = "author" | "recent" | "title";
 type ViewMode = "grid" | "list";
 
+type DialogState =
+  | { mode: "create" }
+  | { mode: "detail"; bookId: string }
+  | { mode: "edit"; book: BookDetail };
+
 type GuardState =
   | { status: "error" }
   | { status: "loading" }
   | { account: Account; status: "ready" };
 
+const PAGE_SIZE = 12;
+
 export interface LibraryPageProps {
+  onLoggedOut?: () => void;
+  onSessionExpired?: () => void;
   onUnauthenticated?: () => void;
 }
 
@@ -43,79 +64,202 @@ function redirectToLogin(): void {
   window.location.replace("/");
 }
 
+function redirectToExpiredLogin(): void {
+  window.location.replace("/?expired=1");
+}
+
+function redirectHome(): void {
+  window.location.assign("/");
+}
+
 function option(value: string, label: string): FilterOption {
   return { label, value };
 }
 
-function LibraryContent({ accountName }: { accountName: string }) {
+interface LibraryContentProps {
+  accountName: string;
+  onLoggedOut: () => void;
+  onSessionExpired: () => void;
+}
+
+function LibraryContent({
+  accountName,
+  onLoggedOut,
+  onSessionExpired,
+}: LibraryContentProps) {
   const { t } = useTranslation("library");
   const { resolvedLanguage } = useLanguage();
+  const [books, setBooks] = useState<BookSummary[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [query, setQuery] = useState("");
-  const [committedQuery, setCommittedQuery] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [type, setType] = useState<TypeFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [sort, setSort] = useState<SortOrder>("recent");
   const [view, setView] = useState<ViewMode>("grid");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | undefined>(
+    undefined,
+  );
+  const searchTimer = useRef<number | undefined>(undefined);
   const composingRef = useRef(false);
+  const searchTermRef = useRef("");
 
-  const collator = useMemo(
-    () => new Intl.Collator(resolvedLanguage, { sensitivity: "base" }),
-    [resolvedLanguage],
-  );
-  const numberFormat = useMemo(
-    () => new Intl.NumberFormat(resolvedLanguage),
-    [resolvedLanguage],
+  useEffect(
+    () => () => {
+      if (searchTimer.current !== undefined) {
+        window.clearTimeout(searchTimer.current);
+      }
+    },
+    [],
   );
 
-  const visibleBooks = useMemo(() => {
-    const normalizedQuery = committedQuery
-      .trim()
-      .toLocaleLowerCase(resolvedLanguage);
-    let books = SAMPLE_BOOKS.filter((book) => {
-      if (type === "physical" && !book.tags.includes("physical")) {
-        return false;
-      }
-      if (
-        type === "digital" &&
-        !book.tags.includes("epub") &&
-        !book.tags.includes("pdf")
-      ) {
-        return false;
-      }
-      if (status !== "all" && book.status !== status) {
-        return false;
-      }
-      if (normalizedQuery.length > 0) {
-        const title = book.title.toLocaleLowerCase(resolvedLanguage);
-        const author = book.author.toLocaleLowerCase(resolvedLanguage);
-        if (
-          !title.includes(normalizedQuery) &&
-          !author.includes(normalizedQuery)
-        ) {
-          return false;
+  useEffect(() => {
+    const controller = new AbortController();
+    const queryParams: BookListQuery = {
+      q: searchTerm.trim().length > 0 ? searchTerm.trim() : undefined,
+      readingStatus: status === "all" ? undefined : status,
+      mediaType: type === "all" ? undefined : type,
+      sort: sort === "recent" ? "createdAt" : sort,
+      order: sort === "recent" ? "desc" : "asc",
+      limit: PAGE_SIZE,
+      offset,
+    };
+
+    getBooks(queryParams, controller.signal)
+      .then((page) => {
+        setBooks(page.items);
+        setTotal(page.total);
+        setError(null);
+      })
+      .catch((cause) => {
+        if (isAbortError(cause)) {
+          return;
         }
-      }
-      return true;
-    });
+        const apiError = toApiError(cause);
+        if (apiError.status === 401) {
+          onSessionExpired();
+          return;
+        }
+        setError(apiError);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
 
-    if (sort === "title") {
-      books = [...books].sort((left, right) =>
-        collator.compare(left.title, right.title),
-      );
-    } else if (sort === "author") {
-      books = [...books].sort((left, right) =>
-        collator.compare(left.author, right.author),
-      );
+    return () => controller.abort();
+  }, [offset, onSessionExpired, reloadKey, searchTerm, sort, status, type]);
+
+  const beginRequest = () => {
+    setLoading(true);
+    setError(null);
+  };
+
+  const applySearchTerm = (value: string) => {
+    if (value === searchTermRef.current) {
+      return;
     }
+    searchTermRef.current = value;
+    beginRequest();
+    setSearchTerm(value);
+    setOffset(0);
+  };
 
-    return books;
-  }, [collator, committedQuery, resolvedLanguage, sort, status, type]);
+  const commitSearch = (value: string, immediate = false) => {
+    setQuery(value);
+    if (composingRef.current) {
+      return;
+    }
+    if (searchTimer.current !== undefined) {
+      window.clearTimeout(searchTimer.current);
+      searchTimer.current = undefined;
+    }
+    const run = () => {
+      searchTimer.current = undefined;
+      applySearchTerm(value);
+    };
+    if (immediate) {
+      run();
+    } else {
+      searchTimer.current = window.setTimeout(run, 300);
+    }
+  };
 
-  const formattedCount = numberFormat.format(visibleBooks.length);
-  const countMessage = t("page.count", {
-    count: visibleBooks.length,
-    formattedCount,
-  });
+  const changeType = (value: string) => {
+    beginRequest();
+    setType(value as TypeFilter);
+    setOffset(0);
+  };
+
+  const changeStatus = (value: string) => {
+    beginRequest();
+    setStatus(value as StatusFilter);
+    setOffset(0);
+  };
+
+  const changeSort = (value: string) => {
+    beginRequest();
+    setSort(value as SortOrder);
+    setOffset(0);
+  };
+
+  const clearFilters = () => {
+    if (searchTimer.current !== undefined) {
+      window.clearTimeout(searchTimer.current);
+      searchTimer.current = undefined;
+    }
+    setQuery("");
+    searchTermRef.current = "";
+    setSearchTerm("");
+    setType("all");
+    setStatus("all");
+    setSort("recent");
+    setOffset(0);
+    beginRequest();
+  };
+
+  const retry = () => {
+    beginRequest();
+    setReloadKey((current) => current + 1);
+  };
+
+  const refreshLibrary = (resetPage: boolean) => {
+    beginRequest();
+    if (resetPage) {
+      setOffset(0);
+    }
+    setReloadKey((current) => current + 1);
+  };
+
+  const handleSaved = (_book: BookDetail, mode: BookFormMode) => {
+    setDialog(null);
+    refreshLibrary(mode === "create");
+  };
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    setLogoutError(undefined);
+    try {
+      await logout();
+      setLoggingOut(false);
+      onLoggedOut();
+    } catch (cause) {
+      const apiError = toApiError(cause);
+      setLoggingOut(false);
+      if (apiError.status === 401) {
+        onSessionExpired();
+        return;
+      }
+      setLogoutError(libraryErrorMessage(t, apiError));
+    }
+  };
 
   const typeOptions: readonly FilterOption[] = [
     option("all", t("filters.all")),
@@ -154,31 +298,39 @@ function LibraryContent({ accountName }: { accountName: string }) {
     },
   ];
 
-  const clearFilters = () => {
-    setQuery("");
-    setCommittedQuery("");
-    setType("all");
-    setStatus("all");
-    setSort("recent");
-  };
+  const hasFilters =
+    searchTerm.trim().length > 0 || type !== "all" || status !== "all";
+  const formattedTotal = new Intl.NumberFormat(resolvedLanguage).format(total);
+  const countMessage =
+    loading && books.length === 0
+      ? t("loading.books")
+      : t("page.count", {
+          count: total,
+          formattedCount: formattedTotal,
+        });
+  const errorMessage =
+    error === null ? undefined : libraryErrorMessage(t, error);
+  const errorRequestId = error === null ? undefined : libraryRequestId(error);
 
   return (
     <AppShell
       header={
         <LibraryTopbar
           accountName={accountName}
+          loggingOut={loggingOut}
+          logoutError={logoutError}
           onCompositionEnd={(value) => {
             composingRef.current = false;
-            setCommittedQuery(value);
+            commitSearch(value, true);
           }}
           onCompositionStart={() => {
             composingRef.current = true;
           }}
+          onLogout={() => {
+            void handleLogout();
+          }}
           onSearchChange={(value) => {
-            setQuery(value);
-            if (!composingRef.current) {
-              setCommittedQuery(value);
-            }
+            commitSearch(value);
           }}
           query={query}
         />
@@ -190,29 +342,35 @@ function LibraryContent({ accountName }: { accountName: string }) {
           <h1 className="text-[28px] leading-[1.25] font-semibold">
             {t("page.title")}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{countMessage}</p>
+          <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+            <span>{countMessage}</span>
+            {loading && books.length > 0 ? (
+              <Spinner label={t("loading.updating")} />
+            ) : null}
+          </p>
         </div>
-        <Button disabled title={t("nav.notAvailable")} variant="soft">
+        <Button
+          onClick={() => {
+            setDialog({ mode: "create" });
+          }}
+          variant="soft"
+        >
           <Plus aria-hidden="true" />
           {t("actions.addBook")}
         </Button>
       </div>
 
       <div className="flex items-center justify-between gap-3 max-md:gap-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-1">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 [scrollbar-width:none] max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-1 [&::-webkit-scrollbar]:hidden">
           <FilterSelect
             label={t("filters.type")}
-            onChange={(value) => {
-              setType(value as TypeFilter);
-            }}
+            onChange={changeType}
             options={typeOptions}
             value={type}
           />
           <FilterSelect
             label={t("filters.status")}
-            onChange={(value) => {
-              setStatus(value as StatusFilter);
-            }}
+            onChange={changeStatus}
             options={statusOptions}
             value={status}
           />
@@ -225,9 +383,7 @@ function LibraryContent({ accountName }: { accountName: string }) {
           />
           <FilterSelect
             label={t("filters.sort")}
-            onChange={(value) => {
-              setSort(value as SortOrder);
-            }}
+            onChange={changeSort}
             options={sortOptions}
             value={sort}
           />
@@ -241,35 +397,151 @@ function LibraryContent({ accountName }: { accountName: string }) {
         />
       </div>
 
-      {visibleBooks.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-16 text-center">
-          <Search
-            aria-hidden="true"
-            className="size-8 text-muted-foreground"
-            strokeWidth={2}
-          />
-          <h2 className="text-xl font-semibold">{t("empty.title")}</h2>
-          <p className="text-sm text-muted-foreground">
-            {t("empty.description")}
-          </p>
-          <Button className="mt-2" onClick={clearFilters} variant="outline">
-            {t("empty.clear")}
+      {errorMessage !== undefined && books.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <LibraryAlert requestId={errorRequestId}>
+            {errorMessage}
+          </LibraryAlert>
+          <div>
+            <Button onClick={retry} size="sm" variant="outline">
+              <RefreshCw aria-hidden="true" />
+              {t("errors.retry")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {loading && books.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center gap-3 py-16 text-sm text-muted-foreground">
+          <Spinner label={t("loading.books")} />
+          <span>{t("loading.books")}</span>
+        </div>
+      ) : errorMessage !== undefined && books.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16">
+          <LibraryAlert requestId={errorRequestId}>
+            {errorMessage}
+          </LibraryAlert>
+          <Button onClick={retry} variant="soft">
+            <RefreshCw aria-hidden="true" />
+            {t("errors.retry")}
           </Button>
+        </div>
+      ) : books.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-16 text-center">
+          {hasFilters ? (
+            <Search
+              aria-hidden="true"
+              className="size-8 text-muted-foreground"
+              strokeWidth={2}
+            />
+          ) : (
+            <BookOpen
+              aria-hidden="true"
+              className="size-8 text-muted-foreground"
+              strokeWidth={2}
+            />
+          )}
+          <h2 className="text-xl font-semibold">
+            {hasFilters ? t("empty.title") : t("empty.libraryTitle")}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {hasFilters
+              ? t("empty.description")
+              : t("empty.libraryDescription")}
+          </p>
+          {hasFilters ? (
+            <Button className="mt-2" onClick={clearFilters} variant="outline">
+              {t("empty.clear")}
+            </Button>
+          ) : (
+            <Button
+              className="mt-2"
+              onClick={() => {
+                setDialog({ mode: "create" });
+              }}
+              variant="soft"
+            >
+              <Plus aria-hidden="true" />
+              {t("empty.addBook")}
+            </Button>
+          )}
         </div>
       ) : view === "grid" ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(152px,1fr))] gap-6 max-md:grid-cols-2 max-md:gap-x-4 max-md:gap-y-6">
-          {visibleBooks.map((book) => (
-            <BookCard key={book.id} book={book} />
+          {books.map((book) => (
+            <BookCard
+              key={book.id}
+              book={book}
+              onOpen={(bookId) => {
+                setDialog({ mode: "detail", bookId });
+              }}
+            />
           ))}
         </div>
       ) : (
-        <BookList books={visibleBooks} />
+        <BookList
+          books={books}
+          onOpen={(bookId) => {
+            setDialog({ mode: "detail", bookId });
+          }}
+        />
       )}
+
+      <Pagination
+        disabled={loading}
+        limit={PAGE_SIZE}
+        offset={offset}
+        onOffsetChange={(nextOffset) => {
+          beginRequest();
+          setOffset(nextOffset);
+        }}
+        total={total}
+      />
+
+      {dialog?.mode === "create" ? (
+        <BookFormDialog
+          mode="create"
+          onClose={() => {
+            setDialog(null);
+          }}
+          onSaved={handleSaved}
+          onSessionExpired={onSessionExpired}
+        />
+      ) : null}
+
+      {dialog?.mode === "edit" ? (
+        <BookFormDialog
+          key={dialog.book.id}
+          book={dialog.book}
+          mode="edit"
+          onClose={() => {
+            setDialog(null);
+          }}
+          onSaved={handleSaved}
+          onSessionExpired={onSessionExpired}
+        />
+      ) : null}
+
+      {dialog?.mode === "detail" ? (
+        <BookDetailDialog
+          key={dialog.bookId}
+          bookId={dialog.bookId}
+          onClose={() => {
+            setDialog(null);
+          }}
+          onEdit={(book) => {
+            setDialog({ mode: "edit", book });
+          }}
+          onSessionExpired={onSessionExpired}
+        />
+      ) : null}
     </AppShell>
   );
 }
 
 export function LibraryPage({
+  onLoggedOut = redirectHome,
+  onSessionExpired = redirectToExpiredLogin,
   onUnauthenticated = redirectToLogin,
 }: LibraryPageProps) {
   const { t } = useTranslation("library");
@@ -346,5 +618,11 @@ export function LibraryPage({
     );
   }
 
-  return <LibraryContent accountName={guard.account.username} />;
+  return (
+    <LibraryContent
+      accountName={guard.account.username}
+      onLoggedOut={onLoggedOut}
+      onSessionExpired={onSessionExpired}
+    />
+  );
 }

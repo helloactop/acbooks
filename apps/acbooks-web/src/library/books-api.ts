@@ -1,0 +1,75 @@
+import type {
+  components,
+  operations,
+} from "../../../../packages/acbooks-api-client/schema";
+
+import {
+  apiRequest,
+  patchWithCsrf,
+  postWithCsrf,
+} from "../api/client";
+
+export type BookSummary = components["schemas"]["BookSummary"];
+export type BookDetail = components["schemas"]["BookDetail"];
+export type BookPage = components["schemas"]["BookPage"];
+export type BookCreate = components["schemas"]["BookCreate"];
+export type BookUpdate = components["schemas"]["BookUpdate"];
+export type BookListQuery = NonNullable<
+  operations["listBooks"]["parameters"]["query"]
+>;
+export type ReadingStatus = BookSummary["readingStatus"];
+
+function appendParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | number | null | undefined,
+): void {
+  if (value !== undefined && value !== null) {
+    params.set(key, String(value));
+  }
+}
+
+export function getBooks(
+  query: BookListQuery,
+  signal?: AbortSignal,
+): Promise<BookPage> {
+  const params = new URLSearchParams();
+  appendParam(params, "q", query.q);
+  appendParam(params, "readingStatus", query.readingStatus);
+  appendParam(params, "tag", query.tag);
+  appendParam(params, "shelfId", query.shelfId);
+  appendParam(params, "mediaType", query.mediaType);
+  appendParam(params, "format", query.format);
+  appendParam(params, "sort", query.sort);
+  appendParam(params, "order", query.order);
+  appendParam(params, "limit", query.limit);
+  appendParam(params, "offset", query.offset);
+  const search = params.toString();
+
+  return apiRequest<BookPage>(`/books${search.length > 0 ? `?${search}` : ""}`, {
+    signal,
+  });
+}
+
+export function getBook(
+  bookId: string,
+  signal?: AbortSignal,
+): Promise<BookDetail> {
+  return apiRequest<BookDetail>(`/books/${encodeURIComponent(bookId)}`, {
+    signal,
+  });
+}
+
+export function createBook(body: BookCreate): Promise<BookDetail> {
+  return postWithCsrf<BookDetail>("/books", body);
+}
+
+export function updateBook(
+  bookId: string,
+  body: BookUpdate,
+): Promise<BookDetail> {
+  return patchWithCsrf<BookDetail>(
+    `/books/${encodeURIComponent(bookId)}`,
+    body,
+  );
+}

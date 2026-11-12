@@ -494,6 +494,42 @@ def test_search_treats_like_wildcards_as_literals(browser: TestClient) -> None:
     assert response.json()["items"][0]["title"] == "100% Real"
 
 
+def test_unicode_names_use_casefold_matching(
+    paths: tuple[Path, Path], browser: TestClient
+) -> None:
+    create_book(
+        browser,
+        title="One",
+        authors=["Straße"],
+        translators=["Übersetzer"],
+        tags=["Straße"],
+        shelves=["Straße"],
+        isbn=None,
+    )
+    create_book(
+        browser,
+        title="Two",
+        authors=["STRASSE"],
+        translators=["üBERSETZER"],
+        tags=["strasse"],
+        shelves=["strasse"],
+        isbn=None,
+    )
+
+    assert browser.get(BOOKS, params={"q": "STRASSE"}).json()["total"] == 2
+    assert browser.get(BOOKS, params={"q": "übersetzer"}).json()["total"] == 2
+    assert browser.get(BOOKS, params={"tag": "STRASSE"}).json()["total"] == 2
+
+    engine = create_sqlite_engine(paths[0])
+    try:
+        with Session(engine) as session:
+            assert session.scalar(select(func.count()).select_from(Contributor)) == 2
+            assert session.scalar(select(func.count()).select_from(Tag)) == 1
+            assert session.scalar(select(func.count()).select_from(Shelf)) == 1
+    finally:
+        engine.dispose()
+
+
 def test_books_openapi_contract(browser: TestClient) -> None:
     schema = browser.get("/openapi.json").json()
     paths = schema["paths"]

@@ -52,7 +52,10 @@ export function LibrarySidebar() {
   const { t } = useTranslation("library");
 
   return (
-    <aside className="w-60 shrink-0 overflow-y-auto px-4 py-3 max-lg:w-16 max-lg:px-2 max-md:hidden">
+    <aside
+      aria-label={t("nav.sidebar")}
+      className="w-60 shrink-0 overflow-y-auto px-4 py-3 max-lg:w-16 max-lg:px-2 max-md:hidden"
+    >
       <a
         aria-label="acbooks"
         className="flex h-14 items-center gap-2.5 rounded-control px-3 font-semibold max-lg:justify-center max-lg:px-0"

@@ -18,6 +18,12 @@ def create_sqlite_engine(database_path: Path = DATABASE_PATH) -> Engine:
     def configure_connection(dbapi_connection: sqlite3.Connection, _record: object) -> None:
         # SQLAlchemy starts transactions explicitly, including for SQLite DDL.
         dbapi_connection.isolation_level = None
+        dbapi_connection.create_function(
+            "acbooks_casefold",
+            1,
+            lambda value: value.casefold() if isinstance(value, str) else value,
+            deterministic=True,
+        )
         cursor = dbapi_connection.cursor()
         try:
             cursor.execute("PRAGMA busy_timeout=5000")

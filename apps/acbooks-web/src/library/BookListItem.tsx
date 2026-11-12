@@ -1,20 +1,33 @@
-import { IconButton } from "@acbooks/ui";
+import { IconButton, useLanguage } from "@acbooks/ui";
 import { Ellipsis } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { COVER_FONT, ROW_GRID, TAG_LABEL_KEYS } from "./presentation";
-import type { LibraryBook } from "./sample-books";
+import {
+  FormatBadges,
+  PhysicalCopiesBadge,
+  ReadingStatusBadge,
+  TagBadges,
+} from "./BookMeta";
+import type { BookSummary } from "./books-api";
+import {
+  COVER_FONT,
+  ROW_GRID,
+  coverFor,
+  initialOf,
+  joinNames,
+} from "./presentation";
 
 export interface BookListItemProps {
-  book: LibraryBook;
+  book: BookSummary;
+  onOpen: (bookId: string) => void;
 }
 
-function initialOf(title: string): string {
-  return Array.from(title).slice(0, 2).join("");
-}
-
-export function BookListItem({ book }: BookListItemProps) {
+export function BookListItem({ book, onOpen }: BookListItemProps) {
   const { t } = useTranslation("library");
+  const { resolvedLanguage } = useLanguage();
+  const cover = coverFor(book);
+  const authors =
+    joinNames(book.authors, resolvedLanguage) || t("labels.unknownAuthor");
 
   return (
     <div
@@ -25,8 +38,8 @@ export function BookListItem({ book }: BookListItemProps) {
         <div
           className="flex h-[60px] w-10 items-center justify-center overflow-hidden rounded text-xs font-bold shadow-cover"
           style={{
-            backgroundColor: book.cover.background,
-            color: book.cover.foreground,
+            backgroundColor: cover.background,
+            color: cover.foreground,
             fontFamily: COVER_FONT,
           }}
         >
@@ -35,54 +48,41 @@ export function BookListItem({ book }: BookListItemProps) {
       </div>
 
       <div className="min-w-0" role="cell">
-        <span className="block truncate text-sm font-medium">{book.title}</span>
+        <button
+          aria-label={t("detail.open", { title: book.title })}
+          className="block max-w-full truncate text-left text-sm font-medium hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+          onClick={() => {
+            onOpen(book.id);
+          }}
+          type="button"
+        >
+          {book.title}
+        </button>
         <span className="block truncate text-[13px] text-muted-foreground">
-          {book.author}
+          {authors}
         </span>
+        <div className="mt-1 flex flex-wrap gap-1">
+          <TagBadges tags={book.tags} />
+        </div>
+        <div className="mt-1 flex flex-wrap gap-1 md:hidden">
+          <FormatBadges formats={book.formats} />
+          <PhysicalCopiesBadge count={book.copyCount} />
+          <ReadingStatusBadge status={book.readingStatus} />
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-1 max-md:hidden" role="cell">
-        {book.tags.map((tag) => (
-          <span
-            key={tag}
-            className="rounded bg-surface px-1.5 py-0.5 text-xs leading-4 text-muted-foreground"
-          >
-            {t(TAG_LABEL_KEYS[tag])}
+        <FormatBadges formats={book.formats} />
+        <PhysicalCopiesBadge count={book.copyCount} />
+        {book.formats.length === 0 && book.copyCount === 0 ? (
+          <span className="text-xs text-muted-foreground">
+            {t("labels.none")}
           </span>
-        ))}
+        ) : null}
       </div>
 
       <div className="flex items-center gap-2 max-md:hidden" role="cell">
-        {book.status === "reading" && book.progress !== undefined ? (
-          <>
-            <div
-              aria-label={t("progress.label")}
-              aria-valuemax={100}
-              aria-valuemin={0}
-              aria-valuenow={book.progress}
-              className="h-1 flex-1 overflow-hidden rounded-full bg-surface-active"
-              role="progressbar"
-            >
-              <div
-                className="h-full rounded-full bg-accent-text"
-                style={{ width: `${book.progress}%` }}
-              />
-            </div>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {book.progress}%
-            </span>
-          </>
-        ) : null}
-        {book.status === "done" ? (
-          <span className="rounded bg-accent-soft px-1.5 py-0.5 text-xs leading-4 text-accent-text">
-            {t("status.done")}
-          </span>
-        ) : null}
-        {book.status === "unread" ? (
-          <span className="text-xs text-muted-foreground">
-            {t("status.unread")}
-          </span>
-        ) : null}
+        <ReadingStatusBadge status={book.readingStatus} />
       </div>
 
       <div role="cell">

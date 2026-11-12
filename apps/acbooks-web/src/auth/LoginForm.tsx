@@ -12,6 +12,7 @@ export interface LoginFormProps {
   errorRequestId?: string;
   initialUsername?: string;
   notice?: string;
+  noticeTone?: "info" | "success";
   onClearError: () => void;
   onSubmit: (credentials: { password: string; username: string }) => void;
 }
@@ -22,6 +23,7 @@ export function LoginForm({
   errorRequestId,
   initialUsername,
   notice,
+  noticeTone = "success",
   onClearError,
   onSubmit,
 }: LoginFormProps) {
@@ -73,7 +75,7 @@ export function LoginForm({
       {alertMessage ? (
         <AuthAlert requestId={alertRequestId}>{alertMessage}</AuthAlert>
       ) : notice ? (
-        <AuthAlert tone="success">{notice}</AuthAlert>
+        <AuthAlert tone={noticeTone}>{notice}</AuthAlert>
       ) : null}
 
       <Field
