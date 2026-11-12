@@ -57,6 +57,10 @@ python -m app.modules.auth.provision
 创建成功后，数据库中的管理员记录立即关闭初始化入口，服务端会删除码文件。
 若文件删除失败，修复权限后可重跑安装命令清除残留文件。
 
+Web Cookie 会话默认在签发 7 天后到期。可通过 `ACBOOKS_WEB_SESSION_TTL_SECONDS`
+配置新会话有效期，范围为 1–604800 秒。使用 Docker Compose 时可在项目的 `.env`
+中设置该变量。
+
 ## 检查
 
 本地与 CI 的环境及覆盖范围见[自动化检查](../../docs/testing/strategy.md)。

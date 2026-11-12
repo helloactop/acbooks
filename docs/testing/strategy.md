@@ -25,6 +25,7 @@ python -m pytest
 | pytest | FastAPI 配置、健康检查、OpenAPI、业务错误码、500 脱敏诊断和请求 ID |
 | pytest | SQLite 临时文件库上的 Alembic 升降级、模型一致性、异常回滚重试、连接参数、外键和唯一约束、任务和文件状态校验、并发写入及在线备份恢复 |
 | pytest | 首次管理员初始化的码文件生成与权限、来源和 CSRF 验证、密码校验与 Argon2id 存储、限速、双应用实例并发、事务失败重试及清理失败后的重启 |
+| pytest | Web 密码登录与限速、Cookie 属性、会话摘要与过期、重启持久化、会话轮换、CSRF 来源与绑定、单会话注销 |
 
 测试使用 pytest 的临时目录创建数据库，不需要真实书库、NAS 挂载或服务凭据。
 Web、Windows 客户端和 Android 工程初始化后，再接入各自的构建与检查。
@@ -51,7 +52,7 @@ python apps/acbooks-server/tests/compose/smoke.py
 ```
 
 - 验证迁移权限错误阻止 API 和 Worker 启动，修复权限后检查 Alembic 版本、非 root 用户和 SQLite WAL。
-- 通过启用证书校验的 Caddy HTTPS 代理创建管理员，验证 Cookie、一次性初始化码和代理信任边界。
+- 通过启用证书校验的 Caddy HTTPS 代理完成管理员初始化、登录及登出，验证 Cookie、一次性初始化码和代理信任边界。
 - 用共享数据卷启动第二个 Worker，验证排他锁和正常关闭，并验证未就绪的 Worker 无法通过 `up --wait`。
 - 重建容器后验证管理员 ID 保留，已使用的初始化码没有重新生成。
 

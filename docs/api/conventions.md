@@ -103,6 +103,20 @@
 `403 FORBIDDEN`。初始化码验证采用进程级滚动限额，每分钟最多 5 次，失败后退避，
 限速时返回 `429 RATE_LIMITED` 和 `Retry-After`。安装命令和服务来源配置见
 [后端运行说明](../../apps/acbooks-server/README.md#首次管理员初始化)。
+
+Web 登录先调用 `GET /api/v1/auth/csrf` 获取预认证挑战，再携带挑战 Cookie 和
+`X-CSRF-Token` 调用 `POST /api/v1/auth/login`。成功后保存服务端设置的
+`__Host-acbooks-session` Cookie，并重新获取与当前会话绑定的 CSRF 令牌。
+受控的本机 HTTP 开发环境使用 `acbooks-session`。登录失败对未知账号和错误密码
+均返回 `401 INVALID_CREDENTIALS`。每个 API 进程每分钟最多接受 10 次密码校验，
+失败会退避，超限返回 `429 RATE_LIMITED` 和 `Retry-After`。
+
+`GET /api/v1/auth/me` 使用会话 Cookie 查询当前账号。
+`POST /api/v1/auth/logout` 同时要求会话 Cookie、会话绑定的 `X-CSRF-Token`
+和可信来源，成功后清除 Cookie 并撤销当前会话。会话到期或撤销后，两接口返回
+`401 UNAUTHORIZED`。有效会话重新登录时会轮换当前 Cookie 并撤销旧会话。
+API 进程重启后，现有会话继续有效，客户端通过 `GET /api/v1/auth/csrf` 获取新的 CSRF 令牌。
+
 - **有效期**：建议首版 Web 会话最长 7 天、原生 Bearer 最长 30 天、应用凭据最长 90 天；允许部署方配置更短有效期，严禁永不过期的默认凭据。绝对到期后需要重新登录/重新签发；首版不必设计刷新令牌系统。
 
 ### 4.2 OPDS / WebDAV 凭据管理
