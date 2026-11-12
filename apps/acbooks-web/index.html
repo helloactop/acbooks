@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -13,6 +13,38 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <title>acbooks</title>
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem("acbooks-language");
+          const preference =
+            stored === "zh-CN" || stored === "en" || stored === "system"
+              ? stored
+              : "system";
+          const languages =
+            preference === "system"
+              ? navigator.languages.length > 0
+                ? navigator.languages
+                : [navigator.language]
+              : [preference];
+          const match = languages
+            .map((language) => language.toLowerCase())
+            .find(
+              (language) =>
+                language === "zh" ||
+                language.startsWith("zh-") ||
+                language === "en" ||
+                language.startsWith("en-"),
+            );
+          document.documentElement.lang =
+            match !== undefined && (match === "zh" || match.startsWith("zh-"))
+              ? "zh-CN"
+              : "en";
+        } catch {
+          document.documentElement.lang = "en";
+        }
+      })();
+    </script>
     <script>
       (() => {
         try {

@@ -13,10 +13,11 @@
     "dev:web": "pnpm --filter @acbooks/web dev",
     "build": "pnpm --filter @acbooks/web build",
     "preview:web": "pnpm --filter @acbooks/web preview",
-    "lint": "eslint apps/acbooks-web packages/acbooks-ui eslint.config.mjs --max-warnings=0",
+    "lint": "eslint apps/acbooks-web packages/acbooks-ui scripts eslint.config.mjs --max-warnings=0",
     "typecheck": "pnpm -r --if-present typecheck",
+    "i18n:check": "node scripts/check-i18n.mjs",
     "test": "pnpm -r --if-present test",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm lint && pnpm typecheck && pnpm i18n:check && pnpm test && pnpm build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

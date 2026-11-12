@@ -1,0 +1,71 @@
+{
+  "page": {
+    "title": "Component preview",
+    "description": "For development checks only, not a business page; business pages will be implemented in later tasks."
+  },
+  "currentTheme": "Appearance: {{mode}} ({{resolved}})",
+  "currentLanguage": "Language: {{language}} ({{code}})",
+  "sections": {
+    "buttons": {
+      "title": "Buttons",
+      "description": "Soft is the single primary action in each region; Default is for save, confirm and apply; Outline is for filtering, secondary navigation and other actions that need a clear boundary."
+    },
+    "forms": {
+      "title": "Forms",
+      "description": "Labels, descriptions, errors, required and disabled states."
+    },
+    "icons": {
+      "title": "Icons",
+      "description": "Lucide React throughout: 18px by default, 20px for navigation; colors inherit semantic text tokens."
+    },
+    "feedback": {
+      "title": "Feedback",
+      "description": "Use Spinner for local operations and keep accessible status text."
+    }
+  },
+  "buttons": {
+    "primary": "Primary action",
+    "save": "Save",
+    "filter": "Filter",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "deleteConfirm": "Confirm delete",
+    "small": "Small",
+    "medium": "Standard",
+    "large": "Large",
+    "disabled": "Disabled",
+    "loading": "Submitting",
+    "settings": "Settings",
+    "jumpToForms": "Jump to form preview"
+  },
+  "forms": {
+    "authDescription": "Auth forms use a 44px control height",
+    "username": "Username",
+    "password": "Password",
+    "initializationCode": "Setup code",
+    "initializationCodeDescription": "Obtain it from the trusted host",
+    "initializationCodeError": "Invalid setup code",
+    "disabledDescription": "Disabled states keep their size, border and readable text",
+    "disabledLabel": "Disabled input",
+    "disabledValue": "Read only"
+  },
+  "icons": {
+    "samples": {
+      "home": "Home (navigation 20)",
+      "search": "Search",
+      "add": "Add",
+      "filter": "Filter",
+      "grid": "Grid view",
+      "list": "List view",
+      "settings": "Settings",
+      "language": "Language",
+      "success": "Success",
+      "warning": "Warning",
+      "error": "Error",
+      "loading": "Loading"
+    }
+  },
+  "feedback": {
+    "loading": "Loading preview data"
+  }
+}

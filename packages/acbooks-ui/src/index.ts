@@ -17,6 +17,27 @@ export {
   type SegmentedControlProps,
 } from "./components/segmented-control";
 export { Spinner, type SpinnerProps } from "./components/spinner";
+export {
+  createI18n,
+  type CreateI18nOptions,
+  type TranslationResources,
+} from "./i18n/create-i18n";
+export {
+  I18nProvider,
+  type I18nProviderProps,
+} from "./i18n/i18n-provider";
+export {
+  FALLBACK_LANGUAGE,
+  getBrowserLanguages,
+  isLanguageMode,
+  LANGUAGE_STORAGE_KEY,
+  resolveLanguage,
+  SUPPORTED_LANGUAGES,
+  type LanguageMode,
+  type SupportedLanguage,
+} from "./i18n/language";
+export { sharedResources } from "./i18n/resources";
+export { useLanguage } from "./i18n/use-language";
 export { cn } from "./lib/utils";
 export {
   ThemeProvider,

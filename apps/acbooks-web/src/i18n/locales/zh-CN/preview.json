@@ -1,0 +1,71 @@
+{
+  "page": {
+    "title": "公共组件预览",
+    "description": "仅用于开发检查，不是业务页面；业务页面将在后续任务中实现。"
+  },
+  "currentTheme": "当前外观：{{mode}}（{{resolved}}）",
+  "currentLanguage": "当前语言：{{language}}（{{code}}）",
+  "sections": {
+    "buttons": {
+      "title": "按钮",
+      "description": "Soft 是每个操作区唯一主操作；Default 用于保存/确认/应用；Outline 用于筛选、次要导航等需要明确边界的操作。"
+    },
+    "forms": {
+      "title": "表单",
+      "description": "标签、说明、错误、必填和禁用状态。"
+    },
+    "icons": {
+      "title": "图标",
+      "description": "统一使用 Lucide React；普通 18px、导航 20px，颜色继承语义文字令牌。"
+    },
+    "feedback": {
+      "title": "反馈",
+      "description": "局部操作使用 Spinner，并保留可访问状态文本。"
+    }
+  },
+  "buttons": {
+    "primary": "主要操作",
+    "save": "保存",
+    "filter": "筛选",
+    "cancel": "取消",
+    "delete": "删除",
+    "deleteConfirm": "确认删除",
+    "small": "小按钮",
+    "medium": "标准按钮",
+    "large": "大按钮",
+    "disabled": "禁用",
+    "loading": "提交中",
+    "settings": "设置",
+    "jumpToForms": "跳转到表单预览"
+  },
+  "forms": {
+    "authDescription": "认证表单统一使用 44px 高",
+    "username": "用户名",
+    "password": "密码",
+    "initializationCode": "初始化码",
+    "initializationCodeDescription": "从受信任的宿主机获取",
+    "initializationCodeError": "初始化码无效",
+    "disabledDescription": "禁用状态保留尺寸、边框和可读文字",
+    "disabledLabel": "禁用输入",
+    "disabledValue": "不可编辑"
+  },
+  "icons": {
+    "samples": {
+      "home": "首页（导航 20）",
+      "search": "搜索",
+      "add": "添加",
+      "filter": "筛选",
+      "grid": "网格视图",
+      "list": "列表视图",
+      "settings": "设置",
+      "language": "语言",
+      "success": "成功",
+      "warning": "警告",
+      "error": "错误",
+      "loading": "加载"
+    }
+  },
+  "feedback": {
+    "loading": "正在加载预览数据"
+  }
+}

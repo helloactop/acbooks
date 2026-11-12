@@ -1,5 +1,6 @@
 import { Eye, EyeOff } from "lucide-react";
 import { forwardRef, useId, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "../lib/utils";
 import { IconButton } from "./icon-button";
@@ -11,8 +12,9 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
   function PasswordInput({ className, id, ...props }, ref) {
     const generatedId = useId();
     const inputId = id ?? generatedId;
+    const { t } = useTranslation();
     const [visible, setVisible] = useState(false);
-    const label = visible ? "隐藏密码" : "显示密码";
+    const label = visible ? t("password.hide") : t("password.show");
 
     return (
       <div className="relative">

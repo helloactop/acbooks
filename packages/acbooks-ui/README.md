@@ -16,11 +16,14 @@ shadcn/ui 风格基础组件。业务页面不放在此包内。
 - `SegmentedControl`：主题等互斥选项的中性胶囊选择器，使用 radiogroup
   语义并支持方向键、Home/End 和 roving focus
 - `Spinner`
+- `I18nProvider` / `useLanguage` / `createI18n`：简体中文与英语共享实例，
+  支持跟随系统、显式选择、本地持久化、即时切换并同步 `<html lang>`
+- `Spinner` / `PasswordInput`：内置可访问文案来自共享 `common` 资源，随语言更新
 
 组件只消费 `ui.md` 的语义令牌，不请求业务 API。当前使用
 Radix Slot（`asChild`）、Tailwind CSS、class-variance-authority、clsx、
-tailwind-merge 与 Lucide React。依赖均为 MIT、ISC 或 Apache-2.0 许可，
-与项目的 GPL-3.0-only 许可证兼容。
+tailwind-merge、Lucide React、i18next 与 react-i18next。依赖均为 MIT、ISC
+或 Apache-2.0 许可，与项目的 GPL-3.0-only 许可证兼容。
 
 ## 使用
 
@@ -35,6 +38,21 @@ Web 应用在入口 CSS 中导入主题：
 并在根节点包裹 `ThemeProvider`。首屏主题由 `apps/acbooks-web/index.html`
 中的内联脚本在 React 挂载前设置，避免主题闪烁。
 
+在同一棵根节点内包裹 `I18nProvider`，由应用传入业务资源；共享词条位于
+`src/i18n/locales/<language>/common.json`：
+
+```tsx
+<ThemeProvider>
+  <I18nProvider resources={appResources}>
+    <App />
+  </I18nProvider>
+</ThemeProvider>
+```
+
+语言模式为 `system`、`zh-CN`、`en`，偏好保存在 `acbooks-language`。
+组件内置文案通过 `common` 命名空间读取，业务文案使用应用自己的命名空间。
+新增或修改词条必须同时更新两种语言。
+
 ## 检查
 
 在仓库根目录执行：
@@ -42,7 +60,8 @@ Web 应用在入口 CSS 中导入主题：
 ```sh
 pnpm --filter @acbooks/ui typecheck
 pnpm --filter @acbooks/ui test
+pnpm i18n:check
 ```
 
 测试包含浅色/深色语义令牌的正文 4.5:1 与控件边界/焦点 3:1 对比度检查，
-以及主题、键盘、禁用状态回归。
+以及主题、键盘、禁用状态、语言解析、持久化和双语文案回归。

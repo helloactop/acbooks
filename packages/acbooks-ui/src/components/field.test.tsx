@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import { renderWithI18n } from "../test/render-with-i18n";
 import { Field } from "./field";
 import { Input } from "./input";
 import { PasswordInput } from "./password-input";
@@ -30,7 +31,9 @@ describe("form components", () => {
   });
 
   it("toggles password visibility without changing the input value", async () => {
-    render(<PasswordInput aria-label="密码" defaultValue="secret-value" />);
+    renderWithI18n(
+      <PasswordInput aria-label="密码" defaultValue="secret-value" />,
+    );
 
     const input = screen.getByLabelText("密码");
     expect(input).toHaveAttribute("type", "password");
@@ -45,12 +48,26 @@ describe("form components", () => {
   });
 
   it("disables the visibility control together with the password input", () => {
-    render(<PasswordInput aria-label="密码" defaultValue="secret" disabled />);
+    renderWithI18n(
+      <PasswordInput aria-label="密码" defaultValue="secret" disabled />,
+    );
 
     expect(screen.getByLabelText("密码")).toBeDisabled();
     expect(
       screen.getByRole("button", { name: "显示密码" }),
     ).toBeDisabled();
+  });
+
+  it("localizes password visibility controls", async () => {
+    renderWithI18n(
+      <PasswordInput aria-label="Password" defaultValue="secret" />,
+      "en",
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(
+      screen.getByRole("button", { name: "Hide password" }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   it("preserves the auth control height in the disabled state", () => {

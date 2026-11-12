@@ -85,6 +85,9 @@ jobs:
       - name: Type check with tsc
         run: pnpm typecheck
 
+      - name: Check translation resources
+        run: pnpm i18n:check
+
       - name: Run frontend tests
         run: pnpm test
 

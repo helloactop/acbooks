@@ -23,6 +23,7 @@ Web 与共享 UI 从仓库根目录执行：
 pnpm install --frozen-lockfile
 pnpm lint
 pnpm typecheck
+pnpm i18n:check
 pnpm test
 pnpm build
 ```
@@ -39,7 +40,9 @@ pnpm build
 | pytest | Web 密码登录与限速、Cookie 属性、会话摘要与过期、重启持久化、会话轮换、CSRF 来源与绑定、单会话注销 |
 | ESLint | Web 与共享 UI 的 TypeScript/React 代码、Hooks 规则和导入问题 |
 | tsc | Web 与共享 UI 的 TypeScript strict 类型检查 |
-| Vitest | 共享 UI 的按钮变体与加载、表单标签/错误关联、禁用输入与密码切换、主题解析/本地保存/浏览器 theme-color、分段选择器键盘操作、浅深色令牌及组件级对比度（Soft/Default/Outline、分段选中、输入框、禁用态） |
+| i18n:check | 共享与 Web 翻译资源的语言目录、命名空间、键集合和插值参数一致性 |
+| Vitest | 共享 UI 的按钮变体与加载、表单标签/错误关联、禁用输入与密码切换、主题解析/本地保存/浏览器 theme-color、分段选择器键盘操作、浅深色令牌及组件级对比度（Soft/Default/Outline、分段选中、输入框、禁用态）、语言解析/回退/持久化/系统语言变化、Spinner 与密码控件双语文案 |
+| Vitest | Web 预览页中英即时切换、`<html lang>` 与本地存储更新、刷新恢复语言、系统语言跟随及切换不丢失输入 |
 | Vite | Web 生产构建、共享 UI 源码解析与 Tailwind 样式生成 |
 
 测试使用 pytest 的临时目录创建数据库，不需要真实书库、NAS 挂载或服务凭据。

@@ -1,0 +1,21 @@
+{
+  "language": {
+    "ariaLabel": "语言",
+    "system": "跟随系统",
+    "zhCN": "简体中文",
+    "en": "English"
+  },
+  "theme": {
+    "ariaLabel": "外观模式",
+    "system": "跟随系统",
+    "light": "浅色",
+    "dark": "深色"
+  },
+  "spinner": {
+    "loading": "加载中"
+  },
+  "password": {
+    "show": "显示密码",
+    "hide": "隐藏密码"
+  }
+}

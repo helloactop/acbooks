@@ -1,0 +1,21 @@
+{
+  "language": {
+    "ariaLabel": "Language",
+    "system": "Follow system",
+    "zhCN": "简体中文",
+    "en": "English"
+  },
+  "theme": {
+    "ariaLabel": "Appearance",
+    "system": "Follow system",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "spinner": {
+    "loading": "Loading"
+  },
+  "password": {
+    "show": "Show password",
+    "hide": "Hide password"
+  }
+}
