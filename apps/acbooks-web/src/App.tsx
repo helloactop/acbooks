@@ -10,7 +10,22 @@ import {
   type SegmentedControlOption,
   type ThemeMode,
 } from "@acbooks/ui";
-import { Settings2, Trash2 } from "lucide-react";
+import {
+  CircleAlert,
+  CircleCheck,
+  House,
+  Languages,
+  LayoutGrid,
+  List,
+  LoaderCircle,
+  Plus,
+  Search,
+  Settings2,
+  SlidersHorizontal,
+  Trash2,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 
 const THEME_LABELS: Record<ThemeMode, string> = {
@@ -24,6 +39,56 @@ const THEME_OPTIONS: readonly SegmentedControlOption<ThemeMode>[] = [
   { value: "light", label: THEME_LABELS.light },
   { value: "dark", label: THEME_LABELS.dark },
 ];
+
+interface IconSample {
+  className?: string;
+  icon: LucideIcon;
+  label: string;
+}
+
+const ICON_SAMPLES: readonly IconSample[] = [
+  { icon: House, label: "首页（导航 20）", className: "size-5" },
+  { icon: Search, label: "搜索" },
+  { icon: Plus, label: "添加" },
+  { icon: SlidersHorizontal, label: "筛选" },
+  { icon: LayoutGrid, label: "网格视图" },
+  { icon: List, label: "列表视图" },
+  { icon: Settings2, label: "设置" },
+  { icon: Languages, label: "语言" },
+  {
+    icon: CircleCheck,
+    label: "成功",
+    className: "size-[18px] text-success",
+  },
+  {
+    icon: TriangleAlert,
+    label: "警告",
+    className: "size-[18px] text-warning",
+  },
+  {
+    icon: CircleAlert,
+    label: "错误",
+    className: "size-[18px] text-destructive-text",
+  },
+  {
+    icon: LoaderCircle,
+    label: "加载",
+    className: "size-[18px] animate-spin motion-reduce:animate-none",
+  },
+];
+
+function IconLabel({ icon: Icon, label, className }: IconSample) {
+  return (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Icon
+        aria-hidden="true"
+        className={className ?? "size-[18px] text-foreground"}
+        strokeWidth={2}
+      />
+      <span>{label}</span>
+    </div>
+  );
+}
 
 interface PreviewSectionProps {
   children: ReactNode;
@@ -89,14 +154,14 @@ export default function App() {
         </header>
 
         <PreviewSection
-          description="变体、尺寸、禁用、加载和图标按钮。"
+          description="Soft 是每个操作区唯一主操作；Default 用于保存/确认/应用；Outline 用于筛选、次要导航等需要明确边界的操作。"
           id="buttons"
           title="按钮"
         >
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="soft">主要操作</Button>
-            <Button>确认</Button>
-            <Button variant="outline">次要操作</Button>
+            <Button>保存</Button>
+            <Button variant="outline">筛选</Button>
             <Button variant="ghost">取消</Button>
             <Button variant="danger">删除</Button>
             <Button variant="danger-confirm">确认删除</Button>
@@ -147,6 +212,18 @@ export default function App() {
             >
               <Input defaultValue="不可编辑" controlSize="auth" disabled />
             </Field>
+          </div>
+        </PreviewSection>
+
+        <PreviewSection
+          description="统一使用 Lucide React；普通 18px、导航 20px，颜色继承语义文字令牌。"
+          id="icons"
+          title="图标"
+        >
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {ICON_SAMPLES.map((sample) => (
+              <IconLabel key={sample.label} {...sample} />
+            ))}
           </div>
         </PreviewSection>
 

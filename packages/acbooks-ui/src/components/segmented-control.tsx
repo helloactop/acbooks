@@ -83,10 +83,10 @@ export function SegmentedControl<T extends string>({
             }}
             aria-checked={selected}
             className={cn(
-              "inline-flex h-7 items-center justify-center rounded-full px-3 text-sm font-medium transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none max-md:h-11",
+              "inline-flex h-7 items-center justify-center rounded-full border px-3 text-sm font-medium transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none max-md:h-11",
               selected
-                ? "bg-background text-foreground"
-                : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
+                ? "border-segment-selected-border bg-background text-foreground"
+                : "border-transparent text-muted-foreground hover:bg-surface-hover hover:text-foreground",
             )}
             onClick={() => {
               onValueChange(option.value);

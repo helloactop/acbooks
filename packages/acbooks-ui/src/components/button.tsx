@@ -5,22 +5,27 @@ import { forwardRef, type ButtonHTMLAttributes, type Ref } from "react";
 
 import { cn } from "../lib/utils";
 
+/**
+ * `soft` is the single visual primary action in a region.
+ * `default` is a neutral filled action for save/confirm/apply.
+ * `outline` is a bordered secondary action such as filtering or navigation.
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control border border-transparent text-sm font-medium transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 max-md:min-h-11",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control border text-sm transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:pointer-events-none max-md:min-h-11 data-[disabled=true]:border-disabled-border data-[disabled=true]:bg-disabled-surface data-[disabled=true]:text-disabled-foreground [&_svg:not([class*='size-'])]:size-[18px] [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:
-          "bg-surface text-foreground hover:bg-surface-hover active:bg-surface-active",
-        soft: "bg-accent-soft text-accent-text hover:bg-accent-hover active:bg-accent-active",
+          "border-transparent bg-surface font-medium text-foreground hover:bg-surface-hover active:bg-surface-active",
+        soft: "border-accent-border bg-accent-soft font-semibold text-accent-text hover:bg-accent-hover active:bg-accent-active",
         outline:
-          "border-control-border bg-transparent text-foreground hover:bg-surface-hover active:bg-surface-active",
+          "border-control-border bg-transparent font-medium text-foreground hover:bg-surface-hover active:bg-surface-active",
         ghost:
-          "bg-transparent text-foreground hover:bg-surface-hover active:bg-surface-active",
+          "border-transparent bg-transparent font-medium text-foreground hover:bg-surface-hover active:bg-surface-active",
         danger:
-          "bg-transparent text-destructive-text hover:bg-destructive/10 active:bg-destructive/15",
+          "border-transparent bg-transparent font-medium text-destructive-text hover:bg-destructive/10 active:bg-destructive/15",
         "danger-confirm":
-          "border-destructive bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80",
+          "border-destructive bg-destructive font-medium text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80",
       },
       size: {
         sm: "h-8 px-3",
@@ -68,7 +73,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       <Slot
         ref={ref as Ref<HTMLElement>}
         aria-busy={loading || undefined}
+        aria-disabled={disabled || loading || undefined}
         className={classes}
+        data-disabled={disabled ? "true" : undefined}
         {...props}
       >
         {children}
@@ -83,6 +90,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={classes}
+      data-disabled={disabled ? "true" : undefined}
       {...props}
     >
       <span className="relative inline-flex items-center justify-center">

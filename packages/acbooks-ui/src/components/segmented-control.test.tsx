@@ -31,13 +31,15 @@ describe("SegmentedControl", () => {
     render(<Harness />);
 
     expect(screen.getByRole("radiogroup", { name: "外观模式" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "跟随系统" })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
+    const selected = screen.getByRole("radio", { name: "跟随系统" });
+    expect(selected).toHaveAttribute("aria-checked", "true");
+    expect(selected).toHaveClass("border-segment-selected-border");
     expect(screen.getByRole("radio", { name: "深色" })).toHaveAttribute(
       "aria-checked",
       "false",
+    );
+    expect(screen.getByRole("radio", { name: "深色" })).toHaveClass(
+      "border-transparent",
     );
 
     await userEvent.click(screen.getByRole("radio", { name: "深色" }));

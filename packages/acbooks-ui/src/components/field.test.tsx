@@ -66,6 +66,8 @@ describe("form components", () => {
     const input = screen.getByLabelText("禁用输入");
     expect(input).toBeDisabled();
     expect(input).toHaveClass("h-11");
-    expect(input).toHaveClass("disabled:bg-surface");
+    expect(input).toHaveClass("border-control-border");
+    expect(input).toHaveClass("disabled:bg-disabled-surface");
+    expect(input).toHaveClass("disabled:border-disabled-border");
   });
 });

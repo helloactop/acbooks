@@ -13,16 +13,21 @@
   --border: #d4dde9;
   --control-border: #7c8fa8;
   --accent-text: #285fc1;
-  --accent-soft: #eaf2ff;
-  --accent-hover: #ddebff;
-  --accent-active: #d4e5ff;
+  --accent-soft: #dcebff;
+  --accent-hover: #d4e5ff;
+  --accent-active: #cfe1ff;
+  --accent-border: #4c7ccf;
   --ring: #285fc1;
   --destructive: #b42318;
   --destructive-text: #b42318;
   --destructive-foreground: #ffffff;
   --success: #1a7f4b;
   --warning: #8a5a00;
-  --selection: #eaf2ff;
+  --selection: #dcebff;
+  --segment-selected-border: #7c8fa8;
+  --disabled-surface: #f5f7fa;
+  --disabled-foreground: #536277;
+  --disabled-border: #b8c7d8;
 
   /* shadcn/ui variables mapped onto the acbooks semantic tokens. */
   --card: var(--surface);
@@ -56,6 +61,7 @@
   --accent-soft: #243a58;
   --accent-hover: #27405f;
   --accent-active: #203550;
+  --accent-border: #6f9fe8;
   --ring: #8ab4f8;
   --destructive: #b42318;
   --destructive-text: #ff9c96;
@@ -63,6 +69,10 @@
   --success: #4ade80;
   --warning: #fbbf24;
   --selection: #243a58;
+  --segment-selected-border: #64758a;
+  --disabled-surface: #1b212a;
+  --disabled-foreground: #9aa8ba;
+  --disabled-border: #3a4558;
 }
 
 @theme {
@@ -98,7 +108,12 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-hover: var(--accent-hover);
   --color-accent-active: var(--accent-active);
+  --color-accent-border: var(--accent-border);
   --color-ring: var(--ring);
+  --color-segment-selected-border: var(--segment-selected-border);
+  --color-disabled-surface: var(--disabled-surface);
+  --color-disabled-foreground: var(--disabled-foreground);
+  --color-disabled-border: var(--disabled-border);
   --color-destructive: var(--destructive);
   --color-destructive-text: var(--destructive-text);
   --color-destructive-foreground: var(--destructive-foreground);

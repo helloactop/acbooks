@@ -68,6 +68,8 @@ const textPairs: ReadonlyArray<readonly [string, string]> = [
   ["muted-foreground", "background"],
   ["muted-foreground", "surface"],
   ["muted-foreground", "surface-hover"],
+  ["accent-text", "background"],
+  ["accent-text", "surface"],
   ["accent-text", "accent-soft"],
   ["accent-text", "accent-hover"],
   ["accent-text", "accent-active"],
@@ -78,11 +80,19 @@ const textPairs: ReadonlyArray<readonly [string, string]> = [
   ["success", "surface"],
   ["warning", "background"],
   ["warning", "surface"],
+  ["disabled-foreground", "disabled-surface"],
 ];
 
 const nonTextPairs: ReadonlyArray<readonly [string, string]> = [
   ["control-border", "background"],
   ["control-border", "surface"],
+  ["accent-border", "background"],
+  ["accent-border", "surface"],
+  ["accent-border", "accent-soft"],
+  ["accent-border", "accent-hover"],
+  ["accent-border", "accent-active"],
+  ["segment-selected-border", "background"],
+  ["segment-selected-border", "surface"],
   ["ring", "background"],
   ["ring", "surface"],
 ];
