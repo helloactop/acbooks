@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { ThemeContext, type ThemeContextValue } from "./theme-context";
 import {
   isThemeMode,
+  THEME_BROWSER_COLORS,
   THEME_STORAGE_KEY,
   type ResolvedTheme,
   type ThemeMode,
@@ -40,6 +41,13 @@ function applyTheme(theme: ResolvedTheme): void {
   const root = document.documentElement;
   root.dataset.theme = theme;
   root.style.colorScheme = theme;
+
+  const browserColor = document.querySelector<HTMLMetaElement>(
+    'meta[name="theme-color"]',
+  );
+  if (browserColor !== null) {
+    browserColor.content = THEME_BROWSER_COLORS[theme];
+  }
 }
 
 export function ThemeProvider({

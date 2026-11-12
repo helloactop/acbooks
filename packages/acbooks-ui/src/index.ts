@@ -23,6 +23,7 @@ export {
   type ThemeProviderProps,
 } from "./theme/theme-provider";
 export {
+  THEME_BROWSER_COLORS,
   THEME_STORAGE_KEY,
   type ResolvedTheme,
   type ThemeMode,
