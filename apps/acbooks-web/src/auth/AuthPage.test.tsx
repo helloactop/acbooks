@@ -136,7 +136,7 @@ describe("AuthPage", () => {
     expect(screen.getByRole("button", { name: "登录" })).toBeInTheDocument();
   });
 
-  it("redirects an existing session to the preview", async () => {
+  it("redirects an existing session", async () => {
     mockApi({
       "GET /api/v1/setup/status": () =>
         mockResponse({ initialized: true }),

@@ -27,12 +27,12 @@ export interface AuthPageProps {
   onAuthenticated?: (account: Account) => void;
 }
 
-function redirectToPreview(): void {
-  window.location.assign("/preview");
+function redirectToLibrary(): void {
+  window.location.assign("/library");
 }
 
 export function AuthPage({
-  onAuthenticated = redirectToPreview,
+  onAuthenticated = redirectToLibrary,
 }: AuthPageProps) {
   const { t } = useTranslation("auth");
   const [screen, setScreen] = useState<Screen>("loading");

@@ -1,0 +1,82 @@
+{
+  "nav": {
+    "main": "Main navigation",
+    "library": "Library",
+    "home": "Home",
+    "allBooks": "All books",
+    "shelves": "Shelves",
+    "reading": "Reading",
+    "history": "Reading log",
+    "statistics": "Reading statistics",
+    "management": "Management",
+    "storage": "Storage & import",
+    "jobs": "Jobs",
+    "settings": "Settings",
+    "openMenu": "Open navigation menu",
+    "notAvailable": "Not available yet"
+  },
+  "header": {
+    "searchLabel": "Search library",
+    "searchPlaceholder": "Search title, author or ISBN",
+    "account": "Signed in as {{username}}"
+  },
+  "page": {
+    "title": "All books",
+    "count_one": "{{formattedCount}} book · physical and digital editions managed together",
+    "count_other": "{{formattedCount}} books · physical and digital editions managed together"
+  },
+  "actions": {
+    "addBook": "Add book",
+    "more": "More actions"
+  },
+  "filters": {
+    "type": "Type",
+    "status": "Status",
+    "shelf": "Shelf",
+    "sort": "Sort",
+    "all": "All",
+    "physical": "Physical",
+    "digital": "Digital",
+    "done": "Read",
+    "reading": "Reading",
+    "unread": "Unread",
+    "recent": "Recently added",
+    "title": "Title",
+    "author": "Author"
+  },
+  "view": {
+    "label": "View",
+    "grid": "Grid view",
+    "list": "List view"
+  },
+  "tags": {
+    "physical": "Physical",
+    "epub": "EPUB",
+    "pdf": "PDF"
+  },
+  "status": {
+    "done": "Read",
+    "reading": "Reading",
+    "unread": "Unread"
+  },
+  "progress": {
+    "label": "Reading progress"
+  },
+  "list": {
+    "tableLabel": "Book list",
+    "titleAuthor": "Title and author",
+    "format": "Format",
+    "progress": "Reading progress"
+  },
+  "empty": {
+    "title": "No matching books",
+    "description": "Try adjusting the search or filters.",
+    "clear": "Clear filters"
+  },
+  "guard": {
+    "loading": "Loading library",
+    "errorTitle": "Cannot load the library",
+    "errorDescription": "Make sure the server is running and try again.",
+    "retry": "Retry"
+  }
+}

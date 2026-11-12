@@ -55,4 +55,23 @@ describe("App routes", () => {
       screen.getByRole("heading", { level: 1, name: "公共组件预览" }),
     ).toBeInTheDocument();
   });
+
+  it("renders the library at /library", async () => {
+    window.history.replaceState({}, "", "/library");
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => ({
+        id: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
+        username: "admin",
+      }),
+    });
+
+    renderApp();
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "全部书籍" }),
+    ).toBeInTheDocument();
+  });
 });
