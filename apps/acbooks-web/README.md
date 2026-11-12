@@ -31,6 +31,9 @@ pnpm build
 开发服务器默认监听 `http://127.0.0.1:5173`，预览构建产物使用
 `pnpm preview:web`。
 
+品牌图标位于 `public/`：`favicon.ico`、`icons/` 下的多尺寸 PNG、
+`apple-touch-icon.png` 及 `site.webmanifest`，由 `index.html` 引用。
+
 ## 技术栈
 
 - React 19、TypeScript strict、Vite
