@@ -1,6 +1,7 @@
 import { IconButton, useLanguage } from "@acbooks/ui";
 import { Ellipsis } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import {
   FormatBadges,
@@ -49,16 +50,16 @@ export function BookListItem({ book, onOpen }: BookListItemProps) {
       </div>
 
       <div className="min-w-0" role="cell">
-        <a
+        <Link
           aria-label={t("detail.open", { title: book.title })}
           className="block max-w-full truncate text-left text-sm font-medium hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
-          href={bookDetailHref(book.id)}
           onClick={() => {
             onOpen(book.id);
           }}
+          to={bookDetailHref(book.id)}
         >
           {book.title}
-        </a>
+        </Link>
         <span className="block truncate text-[13px] text-muted-foreground">
           {authors}
         </span>

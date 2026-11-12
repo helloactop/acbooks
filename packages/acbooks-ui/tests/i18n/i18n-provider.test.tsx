@@ -3,9 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { useTranslation } from "react-i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { I18nProvider } from "./i18n-provider";
-import { LANGUAGE_STORAGE_KEY } from "./language";
-import { useLanguage } from "./use-language";
+import { I18nProvider } from "../../src/i18n/i18n-provider";
+import { LANGUAGE_STORAGE_KEY } from "../../src/i18n/language";
+import { useLanguage } from "../../src/i18n/use-language";
 
 function Probe() {
   const { language, resolvedLanguage, setLanguage } = useLanguage();

@@ -2,6 +2,7 @@ import { Button, Spinner, buttonVariants } from "@acbooks/ui";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { isAbortError, toApiError, type ApiError } from "../api/client";
 import { useAppShell } from "../layout/app-shell-context";
@@ -120,13 +121,13 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
       <div className="flex items-center gap-2">
         <MobileNavigationTrigger className="-ml-1 lg:hidden" />
         <nav aria-label={t("detail.breadcrumb")}>
-          <a
+          <Link
             className="inline-flex items-center gap-1.5 rounded-control text-[13px] font-medium text-muted-foreground transition-colors duration-150 ease-out hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
-            href={backHref}
+            to={backHref}
           >
             <ArrowLeft aria-hidden="true" className="size-4" />
             {backLabel}
-          </a>
+          </Link>
         </nav>
       </div>
 
@@ -142,16 +143,16 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
           <p className="max-w-[42ch] text-sm text-muted-foreground">
             {t("detail.notFoundDescription")}
           </p>
-          <a
+          <Link
             className={buttonVariants({
               className: "mt-2",
               size: "lg",
               variant: "soft",
             })}
-            href={backHref}
+            to={backHref}
           >
             {backLabel}
-          </a>
+          </Link>
         </div>
       ) : errorMessage !== undefined ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16">

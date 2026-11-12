@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { THEME_BROWSER_COLORS } from "./theme-types";
+import { THEME_BROWSER_COLORS } from "../../src/theme/theme-types";
 
 const css = readFileSync(
   resolve(process.cwd(), "src/styles/theme.css"),

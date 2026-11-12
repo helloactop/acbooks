@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   SegmentedControl,
   type SegmentedControlOption,
-} from "./segmented-control";
+} from "../../src/components/segmented-control";
 
 const OPTIONS: readonly SegmentedControlOption<"system" | "light" | "dark">[] = [
   { value: "system", label: "跟随系统" },

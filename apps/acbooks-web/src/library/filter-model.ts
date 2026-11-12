@@ -28,6 +28,7 @@ export type FilterConditionStatus = "incomplete" | "invalid" | "valid";
 export type FilterConditionReason =
   | "date"
   | "field"
+  | "length"
   | "number"
   | "operator"
   | "range"
@@ -191,6 +192,9 @@ function validateScalar(
 ): FilterConditionValidation {
   if (value.trim().length === 0) {
     return { status: "incomplete" };
+  }
+  if (field.type === "text" && value.length > 500) {
+    return { reason: "length", status: "invalid" };
   }
   if (field.type === "number" && parseNumber(value) === null) {
     return { reason: "number", status: "invalid" };

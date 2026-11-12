@@ -1,18 +1,30 @@
 import { I18nProvider } from "@acbooks/ui";
 import {
+  fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useEffect } from "react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { appResources } from "../i18n/resources";
-import { AppShell } from "./AppShell";
-import { PageHeader } from "./PageHeader";
+import { appResources } from "../../src/i18n/resources";
+import { AppShell } from "../../src/layout/AppShell";
+import { PageHeader } from "../../src/layout/PageHeader";
 
 const fetchMock = vi.fn();
+let currentLocation = "";
+
+function LocationProbe() {
+  const location = useLocation();
+  useEffect(() => {
+    currentLocation = `${location.pathname}${location.search}`;
+  }, [location.pathname, location.search]);
+  return null;
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {
@@ -23,20 +35,28 @@ function jsonResponse(body: unknown, status = 200): Response {
   } as unknown as Response;
 }
 
+function bookSearchCalls(): number {
+  return fetchMock.mock.calls.filter(([input]) =>
+    String(input).startsWith("/api/v1/books"),
+  ).length;
+}
+
 function renderShell(currentPath: string, title = "全部书籍") {
   const onLogout = vi.fn();
   const expireSession = vi.fn();
   render(
     <I18nProvider defaultLanguage="zh-CN" resources={appResources}>
-      <AppShell
-        accountName="admin"
-        currentPath={currentPath}
-        expireSession={expireSession}
-        loggingOut={false}
-        onLogout={onLogout}
-      >
-        <PageHeader title={title} />
-      </AppShell>
+      <MemoryRouter initialEntries={[currentPath]}>
+        <LocationProbe />
+        <AppShell
+          accountName="admin"
+          expireSession={expireSession}
+          loggingOut={false}
+          onLogout={onLogout}
+        >
+          <PageHeader title={title} />
+        </AppShell>
+      </MemoryRouter>
     </I18nProvider>,
   );
   return { expireSession, onLogout };
@@ -46,6 +66,7 @@ beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
   window.history.replaceState({}, "", "/library");
+  currentLocation = "";
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -187,6 +208,59 @@ describe("AppShell", () => {
     expect(
       within(sidebar).queryByRole("option", { name: /三体/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("deduplicates repeated search, ignores IME Enter and navigates on Enter", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        items: [
+          {
+            id: "11111111-1111-4111-8111-111111111111",
+            title: "三体",
+            authors: ["刘慈欣"],
+            translators: [],
+            isbn: null,
+            readingStatus: "reading",
+            tags: [],
+            shelves: [],
+            copyCount: 1,
+            fileCount: 1,
+            formats: ["epub"],
+            createdAt: 1_700_000_000_000,
+            updatedAt: 1_700_000_000_000,
+          },
+        ],
+        total: 1,
+        limit: 5,
+        offset: 0,
+      }),
+    );
+    const user = userEvent.setup();
+    renderShell("/library");
+    const sidebar = screen.getByRole("complementary", {
+      name: "应用侧边栏",
+    });
+    const search = within(sidebar).getByRole("combobox", {
+      name: "全局搜索",
+    });
+
+    await user.type(search, "三体");
+    await within(sidebar).findByRole("option", { name: /三体/ });
+    const requestsBefore = bookSearchCalls();
+
+    fireEvent.compositionStart(search);
+    fireEvent.compositionEnd(search, { target: { value: "三体" } });
+    expect(bookSearchCalls()).toBe(requestsBefore);
+
+    fireEvent.keyDown(search, { key: "Enter", isComposing: true });
+    expect(currentLocation).toBe("/library");
+
+    fireEvent.keyDown(search, { key: "Enter" });
+    await waitFor(() => {
+      expect(currentLocation).toBe(
+        `/library?q=${encodeURIComponent("三体")}`,
+      );
+    });
   });
 
   it("switches the sidebar to settings categories", () => {

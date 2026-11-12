@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateTime } from "./presentation";
+import { formatDateTime } from "../../src/library/presentation";
 
 describe("formatDateTime", () => {
   it("formats created and updated timestamps in UTC", () => {

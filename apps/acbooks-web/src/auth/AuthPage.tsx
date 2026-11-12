@@ -1,7 +1,8 @@
 import { Button, Spinner } from "@acbooks/ui";
 import { RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 import {
   getCurrentAccount,
@@ -19,7 +20,6 @@ import { AuthAlert } from "./AuthAlert";
 import { AuthPanel } from "./AuthPanel";
 import { LoginForm } from "./LoginForm";
 import { SetupForm } from "./SetupForm";
-import { redirectToHome } from "../layout/routes";
 
 type Screen = "loading" | "login" | "setup" | "statusError";
 type Notice =
@@ -32,10 +32,19 @@ export interface AuthPageProps {
   onAuthenticated?: (account: Account) => void;
 }
 
-export function AuthPage({
-  onAuthenticated = redirectToHome,
-}: AuthPageProps) {
+export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const { t } = useTranslation("auth");
+  const navigate = useNavigate();
+  const handleAuthenticated = useCallback(
+    (account: Account) => {
+      if (onAuthenticated !== undefined) {
+        onAuthenticated(account);
+        return;
+      }
+      navigate("/home", { replace: true });
+    },
+    [navigate, onAuthenticated],
+  );
   const [screen, setScreen] = useState<Screen>("loading");
   const [checkingSession, setCheckingSession] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -68,7 +77,7 @@ export function AuthPage({
           return;
         }
         if (account !== null) {
-          onAuthenticated(account);
+          handleAuthenticated(account);
           return;
         }
         setScreen("login");
@@ -89,7 +98,7 @@ export function AuthPage({
     return () => {
       cancelled = true;
     };
-  }, [attempt, onAuthenticated]);
+  }, [attempt, handleAuthenticated]);
 
   const handleLogin = async ({ password, username }: LoginRequest) => {
     setBusy(true);
@@ -97,7 +106,7 @@ export function AuthPage({
     setNotice(null);
     try {
       const response = await login({ password, username });
-      onAuthenticated(response.account);
+      handleAuthenticated(response.account);
     } catch (cause) {
       setError(toAuthError(cause));
     } finally {

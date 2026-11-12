@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 
 import { SidebarContent } from "./AppSidebar";
 import { AppShellContext } from "./app-shell-context";
@@ -16,7 +17,6 @@ import { useMediaQuery } from "./use-media-query";
 export interface AppShellProps {
   accountName: string;
   children: ReactNode;
-  currentPath: string;
   expireSession: () => void;
   loggingOut: boolean;
   logoutError?: string;
@@ -26,25 +26,20 @@ export interface AppShellProps {
 export function AppShell({
   accountName,
   children,
-  currentPath,
   expireSession,
   loggingOut,
   logoutError,
   onLogout,
 }: AppShellProps) {
   const { t } = useTranslation("app");
-  const [current, setCurrent] = useState(currentPath);
+  const location = useLocation();
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [focusSearchOnOpen, setFocusSearchOnOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const desktopSearchRef = useRef<HTMLInputElement>(null);
   const isDesktop = useMediaQuery("(min-width: 1024px)");
-  const url = useMemo(
-    () => new URL(current, window.location.origin),
-    [current],
-  );
-  const pathname = url.pathname;
-  const search = url.search;
+  const pathname = location.pathname;
+  const search = location.search;
   const settingsMode = pathname === "/settings";
 
   const dismissNavigation = useCallback(() => {
@@ -78,20 +73,13 @@ export function AppShell({
   }, []);
 
   useEffect(() => {
-    const syncCurrent = () => {
-      setCurrent(`${window.location.pathname}${window.location.search}`);
-    };
     const closeDrawer = () => {
       setNavigationOpen(false);
       setFocusSearchOnOpen(false);
     };
-    window.addEventListener("popstate", syncCurrent);
     window.addEventListener("popstate", closeDrawer);
-    window.addEventListener("acbooks:locationchange", syncCurrent);
     return () => {
-      window.removeEventListener("popstate", syncCurrent);
       window.removeEventListener("popstate", closeDrawer);
-      window.removeEventListener("acbooks:locationchange", syncCurrent);
     };
   }, []);
 

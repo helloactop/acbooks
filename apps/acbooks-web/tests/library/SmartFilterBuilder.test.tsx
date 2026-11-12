@@ -4,12 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
-import { appResources } from "../i18n/resources";
+import { appResources } from "../../src/i18n/resources";
 import type {
   BookFilterField,
   SmartFilterRules,
-} from "./filter-model";
-import { SmartFilterBuilder } from "./SmartFilterBuilder";
+} from "../../src/library/filter-model";
+import { SmartFilterBuilder } from "../../src/library/SmartFilterBuilder";
 
 const FIELDS: readonly BookFilterField[] = [
   {

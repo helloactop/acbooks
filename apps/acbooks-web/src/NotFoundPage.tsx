@@ -1,6 +1,7 @@
 import { buttonVariants } from "@acbooks/ui";
 import { CircleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 export function NotFoundPage() {
   const { t } = useTranslation("app");
@@ -17,16 +18,16 @@ export function NotFoundPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           {t("notFound.description")}
         </p>
-        <a
+        <Link
           className={buttonVariants({
             className: "mt-5 w-full",
             size: "lg",
             variant: "soft",
           })}
-          href="/"
+          to="/"
         >
           {t("notFound.back")}
-        </a>
+        </Link>
       </div>
     </div>
   );

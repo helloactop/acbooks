@@ -9,8 +9,8 @@ import {
   type LanguageMode,
 } from "@acbooks/ui";
 
-import { PreviewPage } from "./PreviewPage";
-import { appResources } from "../i18n/resources";
+import { PreviewPage } from "../../src/preview/PreviewPage";
+import { appResources } from "../../src/i18n/resources";
 
 let browserLanguages: string[];
 

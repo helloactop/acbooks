@@ -2,10 +2,10 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Button } from "../components/button";
-import { ThemeProvider } from "./theme-provider";
-import { THEME_BROWSER_COLORS, THEME_STORAGE_KEY } from "./theme-types";
-import { useTheme } from "./use-theme";
+import { Button } from "../../src/components/button";
+import { ThemeProvider } from "../../src/theme/theme-provider";
+import { THEME_BROWSER_COLORS, THEME_STORAGE_KEY } from "../../src/theme/theme-types";
+import { useTheme } from "../../src/theme/use-theme";
 
 function ThemeProbe() {
   const { resolvedTheme, setTheme, theme } = useTheme();

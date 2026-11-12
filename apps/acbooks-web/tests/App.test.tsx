@@ -1,14 +1,26 @@
 import { I18nProvider, ThemeProvider } from "@acbooks/ui";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useEffect } from "react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import App from "./App";
-import { appResources } from "./i18n/resources";
+import App from "../src/App";
+import { appResources } from "../src/i18n/resources";
 
 const fetchMock = vi.fn();
+let currentLocation = "";
+
+function LocationProbe() {
+  const location = useLocation();
+  useEffect(() => {
+    currentLocation = `${location.pathname}${location.search}`;
+  }, [location.pathname, location.search]);
+  return null;
+}
 
 beforeEach(() => {
+  currentLocation = "";
   window.localStorage.clear();
   window.sessionStorage.clear();
   fetchMock.mockReset();
@@ -24,10 +36,14 @@ afterEach(() => {
 });
 
 function renderApp() {
+  const entry = `${window.location.pathname}${window.location.search}`;
   render(
     <ThemeProvider>
       <I18nProvider defaultLanguage="zh-CN" resources={appResources}>
-        <App />
+        <MemoryRouter initialEntries={[entry]}>
+          <LocationProbe />
+          <App />
+        </MemoryRouter>
       </I18nProvider>
     </ThemeProvider>,
   );
@@ -276,5 +292,109 @@ describe("App routes", () => {
     expect(
       screen.getAllByRole("link", { name: "全部书籍" }).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("restores library state after returning from a book detail", async () => {
+    const bookId = "11111111-1111-4111-8111-111111111111";
+    const filters = encodeURIComponent(
+      JSON.stringify({
+        combinator: "ANY",
+        conditions: [{ field: "tag", operator: "equals", value: "文学" }],
+      }),
+    );
+    const libraryPath = `/library?readingStatus=reading&sort=title&view=list&offset=12&filters=${filters}`;
+    window.history.replaceState({}, "", libraryPath);
+    const book = {
+      id: bookId,
+      title: "呐喊",
+      authors: ["鲁迅"],
+      translators: [],
+      isbn: null,
+      readingStatus: "reading",
+      tags: ["文学"],
+      shelves: [],
+      copyCount: 0,
+      fileCount: 0,
+      formats: [],
+      createdAt: 1_700_000_000_000,
+      updatedAt: 1_700_000_000_000,
+      description: null,
+      identifiers: [],
+      copies: [],
+      files: [],
+    };
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), "http://localhost");
+      let body: unknown;
+      if (url.pathname === "/api/v1/auth/me") {
+        body = {
+          id: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
+          username: "admin",
+        };
+      } else if (url.pathname === "/api/v1/books/filter-schema") {
+        body = {
+          fields: [
+            {
+              key: "tag",
+              group: "metadata",
+              type: "select",
+              operators: ["equals", "not_equals"],
+              optionSource: "tags",
+              allowCustom: true,
+              options: [],
+            },
+          ],
+          maxConditions: 30,
+        };
+      } else if (url.pathname === "/api/v1/books/filter-options") {
+        body = {
+          source: url.searchParams.get("source"),
+          query: url.searchParams.get("query") ?? "",
+          options: [],
+          hasMore: false,
+          indexReady: true,
+        };
+      } else if (url.pathname === `/api/v1/books/${bookId}`) {
+        body = book;
+      } else if (url.pathname === "/api/v1/books") {
+        body = {
+          items: [book],
+          total: 30,
+          limit: 12,
+          offset: 12,
+        };
+      } else {
+        body = {};
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => body,
+      };
+    });
+    const user = userEvent.setup();
+    renderApp();
+
+    await screen.findByRole("table", { name: "书籍列表" });
+    await user.click(
+      screen.getByRole("link", { name: "查看《呐喊》详情" }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "呐喊" }),
+    ).toBeInTheDocument();
+
+    const main = screen.getByRole("main");
+    await user.click(
+      within(main).getByRole("link", { name: "全部书籍" }),
+    );
+    await screen.findByRole("table", { name: "书籍列表" });
+    await waitFor(() => {
+      expect(currentLocation).toContain("readingStatus=reading");
+      expect(currentLocation).toContain("sort=title");
+      expect(currentLocation).toContain("view=list");
+      expect(currentLocation).toContain("offset=12");
+      expect(currentLocation).toContain("filters=");
+    });
   });
 });

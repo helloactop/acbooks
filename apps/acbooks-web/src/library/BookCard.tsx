@@ -1,5 +1,6 @@
 import { useLanguage } from "@acbooks/ui";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { BookCover } from "./BookCover";
 import { BookMeta } from "./BookMeta";
@@ -21,13 +22,13 @@ export function BookCard({ book, onOpen }: BookCardProps) {
 
   return (
     <article aria-labelledby={titleId} className="min-w-0">
-      <a
+      <Link
         aria-label={t("detail.open", { title: book.title })}
         className="group block w-full rounded-cover text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
-        href={bookDetailHref(book.id)}
         onClick={() => {
           onOpen(book.id);
         }}
+        to={bookDetailHref(book.id)}
       >
         <BookCover
           authorClassName="text-[11px]"
@@ -43,7 +44,7 @@ export function BookCard({ book, onOpen }: BookCardProps) {
           {book.title}
         </h3>
         <p className="truncate text-[13px] text-muted-foreground">{authors}</p>
-      </a>
+      </Link>
 
       <div className="mt-1.5">
         <BookMeta book={book} />

@@ -2,6 +2,7 @@ import { Button, Spinner } from "@acbooks/ui";
 import { BookOpen, Plus, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { isAbortError, toApiError, type ApiError } from "../api/client";
 import { BookCard } from "../library/BookCard";
@@ -149,12 +150,12 @@ export function DashboardPage() {
         <section className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-xl font-semibold">{t("recentTitle")}</h2>
-            <a
+            <Link
               className="text-sm font-medium text-accent-text hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-              href={libraryMediaHref("all")}
+              to={libraryMediaHref("all")}
             >
               {t("viewAll")}
-            </a>
+            </Link>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 [scrollbar-width:thin]">
             {books.map((book) => (

@@ -2,10 +2,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { renderWithI18n } from "../test/render-with-i18n";
-import { Field } from "./field";
-import { Input } from "./input";
-import { PasswordInput } from "./password-input";
+import { renderWithI18n } from "../render-with-i18n";
+import { Field } from "../../src/components/field";
+import { Input } from "../../src/components/input";
+import { PasswordInput } from "../../src/components/password-input";
 
 describe("form components", () => {
   it("associates Field labels, descriptions and errors with the control", () => {

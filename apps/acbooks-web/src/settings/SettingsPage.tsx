@@ -1,6 +1,7 @@
 import { Button, useLanguage, useTheme } from "@acbooks/ui";
 import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { useAppShell } from "../layout/app-shell-context";
 import {
@@ -135,13 +136,13 @@ export function SettingsPage() {
       />
 
       {section !== null ? (
-        <a
+        <Link
           className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none lg:hidden"
-          href={settingsHref()}
+          to={settingsHref()}
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           {t("settings.title")}
-        </a>
+        </Link>
       ) : null}
 
       {section === null ? (
@@ -150,11 +151,11 @@ export function SettingsPage() {
             const Icon = item.icon;
             const label = t(item.labelKey);
             return (
-              <a
+              <Link
                 aria-label={t("settings.openSection", { name: label })}
                 className="flex min-h-28 flex-col gap-2 rounded-card border border-border bg-surface p-4 transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                href={settingsHref(item.section)}
                 key={item.section}
+                to={settingsHref(item.section)}
               >
                 <Icon
                   aria-hidden="true"
@@ -165,7 +166,7 @@ export function SettingsPage() {
                 <span className="text-xs text-muted-foreground">
                   {t(item.descriptionKey)}
                 </span>
-              </a>
+              </Link>
             );
           })}
         </div>

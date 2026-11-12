@@ -4,7 +4,7 @@ import {
   getBrowserLanguages,
   isLanguageMode,
   resolveLanguage,
-} from "./language";
+} from "../../src/i18n/language";
 
 describe("resolveLanguage", () => {
   it("honors explicit language choices over browser preferences", () => {

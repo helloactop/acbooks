@@ -2,6 +2,7 @@ import { Button, Spinner, useLanguage } from "@acbooks/ui";
 import { BookOpen, Plus, RefreshCw, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { isAbortError, toApiError, type ApiError } from "../api/client";
 import { useAppShell } from "../layout/app-shell-context";
@@ -25,9 +26,11 @@ import {
 import { LibraryAlert } from "./LibraryAlert";
 import { LibraryFilterToolbar } from "./LibraryFilterToolbar";
 import {
-  readInitialLibraryView,
+  libraryUrlSearch,
+  readLibraryUrlState,
+} from "./library-url-state";
+import {
   saveLibraryScroll,
-  saveLibraryView,
   takeLibraryScroll,
   type SortOrder,
   type StatusFilter,
@@ -43,12 +46,16 @@ export function LibraryPage() {
   const { t } = useTranslation("library");
   const { resolvedLanguage } = useLanguage();
   const { expireSession, mainRef } = useAppShell();
-  const [initialView] = useState(readInitialLibraryView);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [initialView] = useState(() =>
+    readLibraryUrlState(location.search),
+  );
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(initialView.offset);
   const [searchTerm, setSearchTerm] = useState(initialView.searchTerm);
-  const [type] = useState(initialView.type);
+  const [type, setType] = useState(initialView.type);
   const [status, setStatus] = useState<StatusFilter>(initialView.status);
   const [rules, setRules] = useState<SmartFilterRules>(initialView.filters);
   const [appliedRules, setAppliedRules] = useState<SmartFilterRules>(
@@ -62,6 +69,7 @@ export function LibraryPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const scrollRestored = useRef(false);
+  const skipUrlSync = useRef(false);
   const filterTimer = useRef<number | undefined>(undefined);
   const filterSchema = useBookFilterSchema(true, expireSession);
   const fields = filterSchema.schema?.fields ?? [];
@@ -87,30 +95,28 @@ export function LibraryPage() {
   );
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    let changed = false;
-    for (const key of ["filters", "format", "q", "reset", "tag"]) {
-      if (params.has(key)) {
-        params.delete(key);
-        changed = true;
-      }
-    }
-    if (!changed) {
-      return;
-    }
-    const search = params.toString();
-    window.history.replaceState(
-      {},
-      "",
-      `${window.location.pathname}${search.length > 0 ? `?${search}` : ""}${
-        window.location.hash
-      }`,
-    );
-  }, []);
+    skipUrlSync.current = true;
+    const parsed = readLibraryUrlState(location.search);
+    // Router history is an external store; mirror it into the page's editable state.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setSearchTerm(parsed.searchTerm);
+    setType(parsed.type);
+    setStatus(parsed.status);
+    setRules(parsed.filters);
+    setAppliedRules(parsed.filters);
+    setSort(parsed.sort);
+    setView(parsed.view);
+    setOffset(parsed.offset);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [location.search]);
 
   useEffect(() => {
-    saveLibraryView({
-      filters: rules,
+    if (skipUrlSync.current) {
+      skipUrlSync.current = false;
+      return;
+    }
+    const next = libraryUrlSearch({
+      filters: appliedRules,
       offset,
       searchTerm,
       sort,
@@ -118,7 +124,30 @@ export function LibraryPage() {
       type,
       view,
     });
-  }, [offset, rules, searchTerm, sort, status, type, view]);
+    const current = location.search.startsWith("?")
+      ? location.search.slice(1)
+      : location.search;
+    if (next === current) {
+      return;
+    }
+    navigate(
+      {
+        pathname: "/library",
+        search: next.length > 0 ? `?${next}` : "",
+      },
+      { replace: true },
+    );
+  }, [
+    appliedRules,
+    location.search,
+    navigate,
+    offset,
+    searchTerm,
+    sort,
+    status,
+    type,
+    view,
+  ]);
 
   useEffect(() => {
     const handlePageShow = (event: PageTransitionEvent) => {
@@ -317,17 +346,20 @@ export function LibraryPage() {
   };
 
   const openBook = () => {
-    saveLibraryView({
-      filters: rules,
-      offset,
-      searchTerm,
-      sort,
-      status,
-      type,
-      view,
-    });
     saveLibraryScroll(mainRef.current?.scrollTop ?? 0);
     rememberDetailReturn();
+  };
+
+  const changePage = (nextOffset: number) => {
+    if (nextOffset === offset) {
+      return;
+    }
+    beginRequest();
+    setOffset(nextOffset);
+    const main = mainRef.current;
+    if (main !== null && typeof main.scrollTo === "function") {
+      main.scrollTo({ top: 0 });
+    }
   };
 
   const activeCount = summary.validCount;
@@ -415,6 +447,7 @@ export function LibraryPage() {
           />
         ) : summary.total > 0 ? (
           <ActiveFilterSummary
+            combinator={rules.combinator}
             fields={fields}
             onOpenFilters={() => {
               setFiltersOpen(true);
@@ -512,10 +545,7 @@ export function LibraryPage() {
         disabled={loading}
         limit={PAGE_SIZE}
         offset={offset}
-        onOffsetChange={(nextOffset) => {
-          beginRequest();
-          setOffset(nextOffset);
-        }}
+        onOffsetChange={changePage}
         total={total}
       />
 

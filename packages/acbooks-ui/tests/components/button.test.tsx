@@ -3,8 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { Settings2 } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 
-import { Button } from "./button";
-import { IconButton } from "./icon-button";
+import { Button } from "../../src/components/button";
+import { IconButton } from "../../src/components/icon-button";
 
 describe("Button", () => {
   it("defaults to type=button and calls onClick", async () => {

@@ -1,7 +1,8 @@
 import { Button, Spinner } from "@acbooks/ui";
 import { CircleAlert, RefreshCw } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Outlet } from "react-router-dom";
 
 import { toApiError, type ApiError } from "../api/client";
 import { getCurrentAccount, type Account } from "../auth/auth-api";
@@ -16,16 +17,12 @@ type GuardState =
   | { account: Account; status: "ready" };
 
 export interface AuthenticatedLayoutProps {
-  children: ReactNode;
-  currentPath: string;
   onLoggedOut?: () => void;
   onSessionExpired?: () => void;
   onUnauthenticated?: () => void;
 }
 
 export function AuthenticatedLayout({
-  children,
-  currentPath,
   onLoggedOut = redirectToLogin,
   onSessionExpired = redirectToExpiredLogin,
   onUnauthenticated = redirectToLogin,
@@ -111,7 +108,6 @@ export function AuthenticatedLayout({
   return (
     <AppShell
       accountName={guard.account.username}
-      currentPath={currentPath}
       expireSession={onSessionExpired}
       loggingOut={loggingOut}
       logoutError={logoutError}
@@ -119,7 +115,7 @@ export function AuthenticatedLayout({
         void handleLogout();
       }}
     >
-      {children}
+      <Outlet />
     </AppShell>
   );
 }

@@ -2,6 +2,7 @@ import { IconButton } from "@acbooks/ui";
 import { ArrowLeft, ChevronRight, LogOut, X } from "lucide-react";
 import type { RefObject } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { GlobalSearch } from "./GlobalSearch";
 import {
@@ -54,11 +55,11 @@ export function SidebarContent({
   return (
     <div className="flex h-full min-h-0 flex-col px-4 py-3">
       <div className="flex h-14 shrink-0 items-center gap-2.5">
-        <a
+        <Link
           aria-label="acbooks"
           className="flex min-w-0 items-center gap-2.5 rounded-control focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-frame focus-visible:outline-none"
-          href={homeHref()}
           onClick={onNavigate}
+          to={homeHref()}
         >
           <img
             alt=""
@@ -68,7 +69,7 @@ export function SidebarContent({
             width={32}
           />
           <span className="truncate font-semibold">acbooks</span>
-        </a>
+        </Link>
         {variant === "mobile" && onCloseNavigation !== undefined ? (
           <IconButton
             className="ml-auto"
@@ -82,14 +83,14 @@ export function SidebarContent({
 
       {settingsMode ? (
         <>
-          <a
+          <Link
             className="flex h-10 shrink-0 items-center gap-2 rounded-control px-3 text-sm text-muted-foreground transition-colors duration-150 ease-out hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            href={settingsReturnHref()}
             onClick={onNavigate}
+            to={settingsReturnHref()}
           >
             <ArrowLeft aria-hidden="true" className="size-[18px]" />
             {t("settings.back")}
-          </a>
+          </Link>
 
           <nav
             aria-label={t("settings.title")}
@@ -109,16 +110,16 @@ export function SidebarContent({
                   );
                   const label = t(item.labelKey);
                   return (
-                    <a
+                    <Link
                       aria-current={active ? "page" : undefined}
                       className={`${itemClass} h-10 ${
                         active
                           ? "bg-accent-soft font-medium text-accent-text"
                           : "text-foreground hover:bg-surface-hover"
                       }`}
-                      href={settingsHref(item.section)}
                       key={item.section}
                       onClick={onNavigate}
+                      to={settingsHref(item.section)}
                     >
                       <Icon
                         aria-hidden="true"
@@ -126,7 +127,7 @@ export function SidebarContent({
                         strokeWidth={2}
                       />
                       <span className="truncate">{label}</span>
-                    </a>
+                    </Link>
                   );
                 })}
               </div>
@@ -184,16 +185,16 @@ export function SidebarContent({
                   }
                   const active = isNavItemActive(item, pathname, search);
                   return (
-                    <a
+                    <Link
                       aria-current={active ? "page" : undefined}
                       className={`${itemClass} h-10 max-md:min-h-11 ${
                         active
                           ? "bg-accent-soft font-medium text-accent-text"
                           : "text-foreground hover:bg-surface-hover"
                       }`}
-                      href={item.href}
                       key={item.labelKey}
                       onClick={onNavigate}
+                      to={item.href}
                     >
                       <Icon
                         aria-hidden="true"
@@ -201,7 +202,7 @@ export function SidebarContent({
                         strokeWidth={2}
                       />
                       <span className="truncate">{label}</span>
-                    </a>
+                    </Link>
                   );
                 })}
               </div>
@@ -212,16 +213,16 @@ export function SidebarContent({
 
       <div className="mt-auto shrink-0 border-t border-border pt-3">
         <div className="flex items-center gap-2">
-          <a
+          <Link
             aria-label={t("account.settingsFor", { username: accountName })}
             className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-control px-2 py-1.5 transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-frame focus-visible:outline-none"
-            href={settingsMode ? settingsHref("account") : settingsHref()}
             onClick={() => {
               if (!settingsMode) {
                 rememberSettingsReturn(`${pathname}${search}`);
               }
               onNavigate?.();
             }}
+            to={settingsMode ? settingsHref("account") : settingsHref()}
           >
             <span
               aria-hidden="true"
@@ -241,7 +242,7 @@ export function SidebarContent({
               aria-hidden="true"
               className="size-4 shrink-0 text-muted-foreground"
             />
-          </a>
+          </Link>
           <IconButton
             label={loggingOut ? t("account.loggingOut") : t("account.logout")}
             loading={loggingOut}

@@ -1,8 +1,8 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { Spinner } from "./spinner";
-import { renderWithI18n } from "../test/render-with-i18n";
+import { Spinner } from "../../src/components/spinner";
+import { renderWithI18n } from "../render-with-i18n";
 
 describe("Spinner", () => {
   it("uses the shared loading label in Chinese", () => {

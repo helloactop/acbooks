@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { getBooks, type BookSummary } from "../library/books-api";
 import { BookCover } from "../library/BookCover";
@@ -30,7 +31,9 @@ export function GlobalSearch({
 }: GlobalSearchProps) {
   const { t } = useTranslation("app");
   const { resolvedLanguage } = useLanguage();
-  const { expireSession, pathname, search } = useAppShell();
+  const { expireSession } = useAppShell();
+  const location = useLocation();
+  const routerNavigate = useNavigate();
   const [value, setValue] = useState("");
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<BookSummary[]>([]);
@@ -122,29 +125,49 @@ export function GlobalSearch({
   }, []);
 
   const schedule = (nextValue: string, immediate = false) => {
+    const trimmed = nextValue.trim();
+    if (trimmed.length === 0) {
+      if (timerRef.current !== undefined) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = undefined;
+      }
+      controllerRef.current?.abort();
+      controllerRef.current = null;
+      setTerm("");
+      setResults([]);
+      setTotal(0);
+      setError(null);
+      setOpen(false);
+      setLoading(false);
+      setActiveIndex(-1);
+      return;
+    }
+    if (trimmed === term) {
+      if (timerRef.current !== undefined) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = undefined;
+      }
+      controllerRef.current?.abort();
+      controllerRef.current = null;
+      setLoading(false);
+      setOpen(true);
+      return;
+    }
+
     if (timerRef.current !== undefined) {
       window.clearTimeout(timerRef.current);
       timerRef.current = undefined;
     }
     controllerRef.current?.abort();
     controllerRef.current = null;
-    setResults([]);
-    setTotal(0);
     setError(null);
     setActiveIndex(-1);
-
-    const trimmed = nextValue.trim();
-    if (trimmed.length === 0) {
-      setTerm("");
-      setOpen(false);
-      setLoading(false);
-      return;
-    }
-
     setOpen(true);
     setLoading(true);
     const run = () => {
       timerRef.current = undefined;
+      setResults([]);
+      setTotal(0);
       setTerm(trimmed);
     };
     if (immediate) {
@@ -161,11 +184,13 @@ export function GlobalSearch({
     }
   };
 
-  const navigate = (href: string, detail: boolean) => {
+  const goTo = (href: string, detail: boolean) => {
     if (detail) {
-      rememberDetailReturn(`${pathname}${search}`);
+      rememberDetailReturn(`${location.pathname}${location.search}`);
     }
-    window.location.assign(href);
+    setOpen(false);
+    setActiveIndex(-1);
+    routerNavigate(href);
   };
 
   const currentResult = results[activeIndex];
@@ -192,16 +217,17 @@ export function GlobalSearch({
       return;
     }
     if (event.key === "Enter") {
-      if (!open) {
+      if (event.nativeEvent.isComposing) {
         return;
       }
       event.preventDefault();
-      if (currentResult !== undefined) {
-        navigate(bookDetailHref(currentResult.id), true);
+      if (open && currentResult !== undefined) {
+        goTo(bookDetailHref(currentResult.id), true);
         return;
       }
-      if (term.length > 0) {
-        navigate(libraryHref(term), false);
+      const query = value.trim();
+      if (query.length > 0) {
+        goTo(libraryHref(query), false);
       }
       return;
     }
@@ -312,7 +338,7 @@ export function GlobalSearch({
                       }`}
                       id={`${listId}-option-${index}`}
                       onClick={() => {
-                        navigate(bookDetailHref(book.id), true);
+                        goTo(bookDetailHref(book.id), true);
                       }}
                       onMouseEnter={() => {
                         setActiveIndex(index);
@@ -341,12 +367,16 @@ export function GlobalSearch({
           ) : null}
 
           {total > 0 ? (
-            <a
+            <Link
               className="mt-1 flex items-center justify-between rounded px-3 py-2 text-sm font-medium text-accent-text transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-              href={libraryHref(term)}
+              onClick={() => {
+                setOpen(false);
+                setActiveIndex(-1);
+              }}
+              to={libraryHref(term)}
             >
               <span>{t("search.viewAll", { count: total })}</span>
-            </a>
+            </Link>
           ) : null}
         </div>
       ) : null}

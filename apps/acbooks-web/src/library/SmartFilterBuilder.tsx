@@ -88,6 +88,8 @@ export function SmartFilterBuilder({
         return t("filters.ruleInvalidDate");
       case "field":
         return t("filters.ruleInvalidField");
+      case "length":
+        return t("filters.ruleInvalidLength");
       case "number":
         return t("filters.ruleInvalidNumber");
       case "operator":
@@ -263,6 +265,7 @@ export function SmartFilterBuilder({
           aria-invalid={invalid || undefined}
           aria-label={t("filters.valueLabel", { field: fieldLabel(field) })}
           className={cn("max-lg:h-11", field.unit ? "pr-12" : undefined)}
+          maxLength={field.type === "text" ? 500 : undefined}
           onChange={(event) => {
             updateCondition(condition.id, { value: event.target.value });
           }}

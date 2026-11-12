@@ -58,6 +58,11 @@ export function Pagination({
   const numberFormat = new Intl.NumberFormat(resolvedLanguage);
   const rangeStart = offset + 1;
   const rangeEnd = Math.min(offset + limit, total);
+  const requestPage = (nextOffset: number) => {
+    if (nextOffset !== offset) {
+      onOffsetChange(nextOffset);
+    }
+  };
 
   return (
     <nav
@@ -77,44 +82,55 @@ export function Pagination({
           disabled={disabled || currentPage === 1}
           label={t("pagination.previous")}
           onClick={() => {
-            onOffsetChange(Math.max(0, offset - limit));
+            requestPage(Math.max(0, offset - limit));
           }}
         >
           <ChevronLeft aria-hidden="true" />
         </IconButton>
 
-        {pageItems(currentPage, pageCount).map((item, index) =>
-          item === "ellipsis" ? (
-            <span
-              key={`ellipsis-${index}`}
-              aria-hidden="true"
-              className="px-1 text-muted-foreground"
-            >
-              …
-            </span>
-          ) : (
-            <Button
-              key={item}
-              aria-current={item === currentPage ? "page" : undefined}
-              aria-label={t("pagination.page", { page: item })}
-              className="min-w-9 px-2"
-              disabled={disabled}
-              onClick={() => {
-                onOffsetChange((item - 1) * limit);
-              }}
-              size="md"
-              variant={item === currentPage ? "soft" : "ghost"}
-            >
-              {item}
-            </Button>
-          ),
-        )}
+        <span className="min-w-24 text-center text-sm whitespace-nowrap tabular-nums text-muted-foreground md:hidden">
+          {t("pagination.pageOf", {
+            page: currentPage,
+            total: pageCount,
+          })}
+        </span>
+
+        <div className="hidden items-center gap-1 md:flex">
+          {pageItems(currentPage, pageCount).map((item, index) =>
+            item === "ellipsis" ? (
+              <span
+                key={`ellipsis-${index}`}
+                aria-hidden="true"
+                className="px-1 text-muted-foreground"
+              >
+                …
+              </span>
+            ) : (
+              <Button
+                key={item}
+                aria-current={item === currentPage ? "page" : undefined}
+                aria-label={t("pagination.page", { page: item })}
+                className="min-w-9 px-2"
+                disabled={disabled}
+                onClick={() => {
+                  requestPage((item - 1) * limit);
+                }}
+                size="md"
+                variant={item === currentPage ? "soft" : "ghost"}
+              >
+                {item}
+              </Button>
+            ),
+          )}
+        </div>
 
         <IconButton
           disabled={disabled || currentPage === pageCount}
           label={t("pagination.next")}
           onClick={() => {
-            onOffsetChange(Math.min((pageCount - 1) * limit, offset + limit));
+            requestPage(
+              Math.min((pageCount - 1) * limit, offset + limit),
+            );
           }}
         >
           <ChevronRight aria-hidden="true" />

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
-import { Select } from "./select";
+import { Select } from "../../src/components/select";
 
 function Harness() {
   const [value, setValue] = useState("recent");

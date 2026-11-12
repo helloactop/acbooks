@@ -70,11 +70,14 @@
     "ruleIncomplete": "待完善：请填写完整的筛选值",
     "ruleInvalidDate": "无效：请输入有效日期",
     "ruleInvalidField": "无效：不支持的筛选字段",
+    "ruleInvalidLength": "无效：文本不能超过 500 个字符",
     "ruleInvalidNumber": "无效：请输入有效数字",
     "ruleInvalidOperator": "无效：当前字段不支持该运算符",
     "ruleInvalidRange": "无效：起始值不能大于结束值",
     "ruleInvalidValue": "无效：请选择或填写有效值",
     "summaryLabel": "当前有效筛选",
+    "summaryAnd": "AND · 同时满足全部条件",
+    "summaryOr": "OR · 满足任意一条即可",
     "summaryCondition": "{{field}} {{operator}} {{value}}",
     "summaryConditionNoValue": "{{field}} {{operator}}",
     "summaryRemove": "移除筛选：{{condition}}",
@@ -176,6 +179,7 @@
     "previous": "上一页",
     "next": "下一页",
     "page": "第 {{page}} 页",
+    "pageOf": "{{page}} / {{total}} 页",
     "range": "显示 {{start}}–{{end}}，共 {{total}} 本"
   },
   "loading": {

@@ -1,6 +1,7 @@
 import { useLanguage } from "@acbooks/ui";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { BookCover } from "./BookCover";
 import { BookDescription } from "./BookDescription";
@@ -56,14 +57,14 @@ export function BookDetailHeader({
           <p className="mt-2 text-sm text-muted-foreground @min-[640px]:text-[15px]">
             {authorParts.map((part, index) =>
               part.type === "element" ? (
-                <a
+                <Link
                   aria-label={t("detail.searchByAuthor", { name: part.value })}
                   className="rounded-sm underline-offset-2 transition-colors duration-150 ease-out hover:text-accent-text hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
-                  href={libraryHref(part.value)}
                   key={`author-${part.value}-${index}`}
+                  to={libraryHref(part.value)}
                 >
                   {part.value}
-                </a>
+                </Link>
               ) : (
                 <Fragment key={`author-separator-${index}`}>
                   {part.value}

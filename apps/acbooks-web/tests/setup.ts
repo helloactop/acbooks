@@ -16,6 +16,16 @@ if (typeof HTMLDialogElement !== "undefined") {
   }
 }
 
+if (typeof HTMLElement !== "undefined") {
+  if (typeof HTMLElement.prototype.scrollTo !== "function") {
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: () => undefined,
+      writable: true,
+    });
+  }
+}
+
 afterEach(() => {
   cleanup();
 });

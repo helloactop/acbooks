@@ -7,12 +7,13 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { appResources } from "../i18n/resources";
-import { AuthenticatedLayout } from "../layout/AuthenticatedLayout";
-import type { BookDetail } from "./books-api";
-import { BookDetailPage } from "./BookDetailPage";
+import { appResources } from "../../src/i18n/resources";
+import { AuthenticatedLayout } from "../../src/layout/AuthenticatedLayout";
+import type { BookDetail } from "../../src/library/books-api";
+import { BookDetailPage } from "../../src/library/BookDetailPage";
 
 const ACCOUNT = {
   id: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
@@ -139,14 +140,24 @@ function renderDetail(
   const onUnauthenticated = vi.fn();
   render(
     <I18nProvider defaultLanguage={language} resources={appResources}>
-      <AuthenticatedLayout
-        currentPath={`/library/books/${bookId}`}
-        onLoggedOut={onLoggedOut}
-        onSessionExpired={onSessionExpired}
-        onUnauthenticated={onUnauthenticated}
-      >
-        <BookDetailPage bookId={bookId} />
-      </AuthenticatedLayout>
+      <MemoryRouter initialEntries={[`/library/books/${bookId}`]}>
+        <Routes>
+          <Route
+            element={
+              <AuthenticatedLayout
+                onLoggedOut={onLoggedOut}
+                onSessionExpired={onSessionExpired}
+                onUnauthenticated={onUnauthenticated}
+              />
+            }
+          >
+            <Route
+              element={<BookDetailPage bookId={bookId} />}
+              path="/library/books/:bookId"
+            />
+          </Route>
+        </Routes>
+      </MemoryRouter>
     </I18nProvider>,
   );
   return { onLoggedOut, onSessionExpired, onUnauthenticated };
@@ -339,9 +350,16 @@ describe("BookDetailPage", () => {
     );
     const { unmount } = render(
       <I18nProvider defaultLanguage="zh-CN" resources={appResources}>
-        <AuthenticatedLayout currentPath={`/library/books/${BOOK_ID}`}>
-          <BookDetailPage bookId={BOOK_ID} />
-        </AuthenticatedLayout>
+        <MemoryRouter initialEntries={[`/library/books/${BOOK_ID}`]}>
+          <Routes>
+            <Route element={<AuthenticatedLayout />}>
+              <Route
+                element={<BookDetailPage bookId={BOOK_ID} />}
+                path="/library/books/:bookId"
+              />
+            </Route>
+          </Routes>
+        </MemoryRouter>
       </I18nProvider>,
     );
     await screen.findByRole("heading", { level: 1, name: BOOK.title });

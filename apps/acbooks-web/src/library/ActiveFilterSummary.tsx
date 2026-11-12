@@ -4,11 +4,13 @@ import { useTranslation } from "react-i18next";
 import {
   needsConditionValue,
   type BookFilterField,
+  type FilterCombinator,
   type SmartFilterCondition,
   type SmartFilterSummary,
 } from "./filter-model";
 
 export interface ActiveFilterSummaryProps {
+  combinator: FilterCombinator;
   fields: readonly BookFilterField[];
   onOpenFilters: () => void;
   onRemove: (id: string) => void;
@@ -19,6 +21,7 @@ const CHIP_CLASS =
   "inline-flex h-9 max-w-full items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-xs text-foreground transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-lg:min-h-11";
 
 export function ActiveFilterSummary({
+  combinator,
   fields,
   onOpenFilters,
   onRemove,
@@ -83,6 +86,14 @@ export function ActiveFilterSummary({
       className="flex flex-wrap items-center gap-2"
       role="group"
     >
+      <span className="inline-flex h-9 max-lg:min-h-11 items-center rounded-full bg-surface px-3 text-xs font-medium text-muted-foreground">
+        {t(
+          combinator === "ALL"
+            ? "filters.summaryAnd"
+            : "filters.summaryOr",
+        )}
+      </span>
+
       {summary.validRules.conditions.map((condition) => {
         const label = conditionLabel(condition);
         return (

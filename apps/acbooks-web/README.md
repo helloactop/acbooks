@@ -57,6 +57,9 @@ pnpm i18n:check
 pnpm build
 ```
 
+Web 测试位于 `tests/`，按源码目录镜像组织；共享 UI 测试位于
+`packages/acbooks-ui/tests/`。生产源码目录不存放测试文件。
+
 开发服务器默认监听 `http://localhost:5173`，预览构建产物使用
 `pnpm preview:web`。开发服务器将 `/api` 代理到 `http://127.0.0.1:8000`。
 
@@ -89,6 +92,7 @@ ACBOOKS_PUBLIC_ORIGIN=http://localhost:5173 python -m uvicorn app.main:create_ap
 ## 技术栈
 
 - React 19、TypeScript strict、Vite
+- React Router（持久化 AppShell、认证布局与嵌套路由）
 - Tailwind CSS v4（`@tailwindcss/vite`）
 - shadcn/ui 组件约定（`components.json`、`cn`、cva）
 - Radix Primitives（当前使用 Slot 支持 `asChild`）

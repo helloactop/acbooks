@@ -8,12 +8,19 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useEffect } from "react";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { appResources } from "../i18n/resources";
-import { AuthenticatedLayout } from "../layout/AuthenticatedLayout";
-import type { BookDetail, BookPage, BookSummary } from "./books-api";
-import { LibraryPage } from "./LibraryPage";
+import { appResources } from "../../src/i18n/resources";
+import { AuthenticatedLayout } from "../../src/layout/AuthenticatedLayout";
+import type { BookDetail, BookPage, BookSummary } from "../../src/library/books-api";
+import { LibraryPage } from "../../src/library/LibraryPage";
 
 const ACCOUNT = {
   id: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
@@ -323,6 +330,8 @@ function findCall(method: string, pathname: string) {
 beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
+  window.history.replaceState({}, "", "/library");
+  currentLocation = "";
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
   vi.spyOn(window.navigator, "languages", "get").mockReturnValue(["zh-CN"]);
@@ -334,20 +343,39 @@ afterEach(() => {
   window.history.replaceState({}, "", "/");
 });
 
+let currentLocation = "";
+
+function LocationProbe() {
+  const location = useLocation();
+  useEffect(() => {
+    currentLocation = `${location.pathname}${location.search}`;
+  }, [location.pathname, location.search]);
+  return null;
+}
+
 function renderLibrary(language: "zh-CN" | "en" = "zh-CN") {
   const onLoggedOut = vi.fn();
   const onSessionExpired = vi.fn();
   const onUnauthenticated = vi.fn();
+  const entry = `${window.location.pathname}${window.location.search}`;
   render(
     <I18nProvider defaultLanguage={language} resources={appResources}>
-      <AuthenticatedLayout
-        currentPath="/library"
-        onLoggedOut={onLoggedOut}
-        onSessionExpired={onSessionExpired}
-        onUnauthenticated={onUnauthenticated}
-      >
-        <LibraryPage />
-      </AuthenticatedLayout>
+      <MemoryRouter initialEntries={[entry]}>
+        <LocationProbe />
+        <Routes>
+          <Route
+            element={
+              <AuthenticatedLayout
+                onLoggedOut={onLoggedOut}
+                onSessionExpired={onSessionExpired}
+                onUnauthenticated={onUnauthenticated}
+              />
+            }
+          >
+            <Route element={<LibraryPage />} path="/library" />
+          </Route>
+        </Routes>
+      </MemoryRouter>
     </I18nProvider>,
   );
   return { onLoggedOut, onSessionExpired, onUnauthenticated };
@@ -409,11 +437,20 @@ describe("LibraryPage", () => {
 
     expect(latestBookRequest()?.searchParams.get("limit")).toBe("12");
     expect(latestBookRequest()?.searchParams.get("offset")).toBe("0");
+    expect(screen.getByText("1 / 3 页")).toBeInTheDocument();
+    const scrollTo = vi.spyOn(HTMLElement.prototype, "scrollTo");
 
     await user.click(screen.getByRole("button", { name: "下一页" }));
     await waitFor(() => {
       expect(latestBookRequest()?.searchParams.get("offset")).toBe("12");
     });
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
+    expect(await screen.findByText("2 / 3 页")).toBeInTheDocument();
+    expect(currentLocation).toContain("offset=12");
+
+    const beforeCurrentPage = bookRequests().length;
+    await user.click(screen.getByRole("button", { name: "第 2 页" }));
+    expect(bookRequests()).toHaveLength(beforeCurrentPage);
 
     const search = screen.getByRole("searchbox", { name: "搜索书库" });
     await user.type(search, "三体");
@@ -513,29 +550,19 @@ describe("LibraryPage", () => {
     });
   });
 
-  it("restores smart filters, sorting and pagination from the session", async () => {
-    window.sessionStorage.setItem(
-      "acbooks-library-view",
-      JSON.stringify({
-        filters: {
-          combinator: "ANY",
-          conditions: [
-            {
-              field: "tag",
-              id: "saved-tag",
-              operator: "equals",
-              value: "文学",
-            },
-          ],
-        },
-        offset: 12,
-        searchTerm: "",
-        sort: "title",
-        status: "all",
-        type: "all",
-        view: "list",
+  it("restores smart filters, sorting and pagination from the URL", async () => {
+    const params = new URLSearchParams({
+      filters: JSON.stringify({
+        combinator: "ANY",
+        conditions: [
+          { field: "tag", operator: "equals", value: "文学" },
+        ],
       }),
-    );
+      offset: "12",
+      sort: "title",
+      view: "list",
+    });
+    window.history.replaceState({}, "", `/library?${params.toString()}`);
     installApi(
       baseHandler((url, init) => {
         if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
@@ -556,6 +583,9 @@ describe("LibraryPage", () => {
       combinator: "ANY",
       conditions: [{ field: "tag", operator: "equals", value: "文学" }],
     });
+    expect(currentLocation).toContain("offset=12");
+    expect(currentLocation).toContain("sort=title");
+    expect(currentLocation).toContain("view=list");
     expect(
       screen.getByRole("button", { name: /更多筛选，已启用 1 个条件/ }),
     ).toBeInTheDocument();
@@ -583,34 +613,17 @@ describe("LibraryPage", () => {
   });
 
   it("shows a collapsed summary and removes one filter rule", async () => {
-    window.sessionStorage.setItem(
-      "acbooks-library-view",
-      JSON.stringify({
-        filters: {
-          combinator: "ALL",
-          conditions: [
-            {
-              field: "tag",
-              id: "saved-tag",
-              operator: "equals",
-              value: "文学",
-            },
-            {
-              field: "format",
-              id: "saved-format",
-              operator: "equals",
-              value: "epub",
-            },
-          ],
-        },
-        offset: 0,
-        searchTerm: "",
-        sort: "title",
-        status: "all",
-        type: "all",
-        view: "grid",
+    const params = new URLSearchParams({
+      filters: JSON.stringify({
+        combinator: "ALL",
+        conditions: [
+          { field: "tag", operator: "equals", value: "文学" },
+          { field: "format", operator: "equals", value: "epub" },
+        ],
       }),
-    );
+      sort: "title",
+    });
+    window.history.replaceState({}, "", `/library?${params.toString()}`);
     installApi(
       baseHandler((url, init) => {
         if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
@@ -623,6 +636,9 @@ describe("LibraryPage", () => {
     renderLibrary();
     await screen.findByRole("article", { name: "呐喊" });
 
+    expect(
+      await screen.findByText("AND · 同时满足全部条件"),
+    ).toBeInTheDocument();
     const tagChip = await screen.findByRole("button", {
       name: "移除筛选：标签 等于 文学",
     });
@@ -653,28 +669,18 @@ describe("LibraryPage", () => {
   });
 
   it("separates clearing search, smart conditions and all filters", async () => {
-    window.sessionStorage.setItem(
-      "acbooks-library-view",
-      JSON.stringify({
-        filters: {
-          combinator: "ALL",
-          conditions: [
-            {
-              field: "tag",
-              id: "saved-tag",
-              operator: "equals",
-              value: "文学",
-            },
-          ],
-        },
-        offset: 0,
-        searchTerm: "三体",
-        sort: "title",
-        status: "done",
-        type: "all",
-        view: "grid",
+    const params = new URLSearchParams({
+      filters: JSON.stringify({
+        combinator: "ALL",
+        conditions: [
+          { field: "tag", operator: "equals", value: "文学" },
+        ],
       }),
-    );
+      q: "三体",
+      readingStatus: "done",
+      sort: "title",
+    });
+    window.history.replaceState({}, "", `/library?${params.toString()}`);
     installApi(
       baseHandler((url, init) => {
         if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
@@ -696,6 +702,8 @@ describe("LibraryPage", () => {
       expect(
         latestBookRequest()?.searchParams.get("readingStatus"),
       ).toBe("done");
+      expect(currentLocation).not.toContain("q=");
+      expect(currentLocation).toContain("readingStatus=done");
     });
 
     await user.click(
@@ -726,32 +734,22 @@ describe("LibraryPage", () => {
       expect(request?.searchParams.get("readingStatus")).toBeNull();
       expect(request?.searchParams.get("offset")).toBe("0");
       expect(request?.searchParams.get("sort")).toBe("title");
+      expect(currentLocation).not.toContain("q=");
+      expect(currentLocation).not.toContain("readingStatus=");
+      expect(currentLocation).not.toContain("filters=");
     });
   });
 
   it("cancels a pending filter update when a value is restored", async () => {
-    window.sessionStorage.setItem(
-      "acbooks-library-view",
-      JSON.stringify({
-        filters: {
-          combinator: "ALL",
-          conditions: [
-            {
-              field: "tag",
-              id: "saved-tag",
-              operator: "equals",
-              value: "文学",
-            },
-          ],
-        },
-        offset: 0,
-        searchTerm: "",
-        sort: "recent",
-        status: "all",
-        type: "all",
-        view: "grid",
+    const params = new URLSearchParams({
+      filters: JSON.stringify({
+        combinator: "ALL",
+        conditions: [
+          { field: "tag", operator: "equals", value: "文学" },
+        ],
       }),
-    );
+    });
+    window.history.replaceState({}, "", `/library?${params.toString()}`);
     installApi(
       baseHandler((url, init) => {
         if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
@@ -785,20 +783,6 @@ describe("LibraryPage", () => {
   });
 
   it("resets transient filters for sidebar media views", async () => {
-    window.sessionStorage.setItem(
-      "acbooks-library-view",
-      JSON.stringify({
-        format: "pdf",
-        offset: 0,
-        query: "旧查询",
-        searchTerm: "旧查询",
-        sort: "recent",
-        status: "done",
-        tag: "旧标签",
-        type: "digital",
-        view: "grid",
-      }),
-    );
     window.history.replaceState(
       {},
       "",
@@ -828,6 +812,10 @@ describe("LibraryPage", () => {
       screen.getByRole("searchbox", { name: "搜索书库" }),
     ).toHaveValue("");
     expect(screen.getByRole("radio", { name: "全部" })).toBeChecked();
+    await waitFor(() => {
+      expect(currentLocation).toContain("mediaType=physical");
+      expect(currentLocation).not.toContain("reset=1");
+    });
   });
 
   it("shows a loading state before the first page arrives", async () => {
@@ -1071,10 +1059,7 @@ describe("LibraryPage", () => {
 
     await user.click(screen.getByRole("radio", { name: "阅读中" }));
     await waitFor(() => {
-      const saved = JSON.parse(
-        window.sessionStorage.getItem("acbooks-library-view") ?? "{}",
-      ) as { status?: string };
-      expect(saved.status).toBe("reading");
+      expect(currentLocation).toContain("readingStatus=reading");
     });
   });
 

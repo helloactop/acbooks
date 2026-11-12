@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { Ellipsis } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 
-import { DropdownMenu } from "./dropdown-menu";
+import { DropdownMenu } from "../../src/components/dropdown-menu";
 
 describe("DropdownMenu", () => {
   it("opens, moves focus, selects an action and restores trigger focus", async () => {

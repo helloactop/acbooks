@@ -1,10 +1,11 @@
 import { I18nProvider } from "@acbooks/ui";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { appResources } from "../i18n/resources";
-import { AuthPage } from "./AuthPage";
+import { appResources } from "../../src/i18n/resources";
+import { AuthPage } from "../../src/auth/AuthPage";
 
 const ACCOUNT = { id: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f", username: "Admin" };
 const PASSWORD = "correct horse battery staple";
@@ -79,7 +80,9 @@ function renderAuth() {
   const onAuthenticated = vi.fn();
   render(
     <I18nProvider defaultLanguage="zh-CN" resources={appResources}>
-      <AuthPage onAuthenticated={onAuthenticated} />
+      <MemoryRouter>
+        <AuthPage onAuthenticated={onAuthenticated} />
+      </MemoryRouter>
     </I18nProvider>,
   );
   return { onAuthenticated };

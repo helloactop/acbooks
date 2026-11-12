@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { Combobox, type ComboboxOption } from "./combobox";
+import { Combobox, type ComboboxOption } from "../../src/components/combobox";
 
 const OPTIONS: readonly ComboboxOption[] = [
   { value: "Alpha", label: "Alpha", count: 2 },
