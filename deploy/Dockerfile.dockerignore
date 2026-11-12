@@ -1,0 +1,11 @@
+**
+!LICENSE
+!apps/
+!apps/acbooks-server/
+!apps/acbooks-server/pyproject.toml
+!apps/acbooks-server/alembic.ini
+!apps/acbooks-server/app/
+!apps/acbooks-server/app/**/
+!apps/acbooks-server/app/**/*.py
+!apps/acbooks-server/app/db/alembic/script.py.mako
+**/__pycache__/

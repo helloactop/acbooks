@@ -1,0 +1,68 @@
+name: acbooks
+
+x-server: &server
+  image: ${COMPOSE_PROJECT_NAME}-server
+  pull_policy: never
+  init: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  volumes:
+    - "${ACBOOKS_DATA_DIR:-acbooks-data}:/data/acbooks"
+
+services:
+  migrate:
+    <<: *server
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command:
+      - /bin/sh
+      - -ec
+      - python -m alembic upgrade head && exec python -m app.modules.auth.provision
+    restart: "no"
+
+  api:
+    <<: *server
+    command:
+      - python
+      - -m
+      - uvicorn
+      - app.main:create_app
+      - --factory
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --workers
+      - "1"
+      - --no-access-log
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      ACBOOKS_PUBLIC_ORIGIN: "${ACBOOKS_PUBLIC_ORIGIN:-http://127.0.0.1:8000}"
+      FORWARDED_ALLOW_IPS: "${ACBOOKS_FORWARDED_ALLOW_IPS:-127.0.0.1}"
+    ports:
+      - "${ACBOOKS_BIND_ADDRESS:-127.0.0.1}:${ACBOOKS_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/api/v1/health', timeout=2).close()
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  worker:
+    <<: *server
+    command: [python, -m, app.workers.main]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  acbooks-data:

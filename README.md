@@ -21,4 +21,6 @@ acbooks 是一款面向个人的自托管图书馆应用，优先面向 NAS 部�
 
 后端启动及检查命令见[后端开发说明](apps/acbooks-server/README.md)。各端按[系统架构](docs/architecture/system.md)中的开发顺序加入，iOS 留待后续阶段。开发前请阅读[开发规范](docs/development/standards.md)。
 
+NAS 和 Linux 上的 API、Worker 与数据库迁移见 [Docker Compose 部署](docs/deployment/docker.md)。
+
 项目采用 GPL-3.0-only 许可证。[许可证说明](LICENSE.md)
