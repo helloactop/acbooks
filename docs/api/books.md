@@ -70,6 +70,7 @@ Books Core V1 提供书目创建、列表、详情和部分更新。所有端点
 | `shelfId` | 书架 UUID |
 | `mediaType` | `physical`（存在实体副本）或 `digital`（存在电子文件） |
 | `format` | 电子文件格式，例如 `epub`、`pdf` |
+| `filters` | 智能组合筛选规则 JSON，见 3.3 |
 | `sort` | `title` / `author` / `createdAt` / `updatedAt` |
 | `order` | `asc` / `desc` |
 | `limit` | 1–100，默认 20 |
@@ -104,7 +105,49 @@ Books Core V1 提供书目创建、列表、详情和部分更新。所有端点
 
 搜索中的 `%`、`_` 和 `\` 按字面量处理，不作为 SQL 通配符。
 
-### 3.3 书目详情
+### 3.3 智能组合筛选
+
+`GET /api/v1/books?filters=<JSON>` 在数据库层执行全库组合筛选。规则由
+`combinator` 与 `conditions` 组成，最多 30 条条件：
+
+```json
+{
+  "combinator": "ALL",
+  "conditions": [
+    { "field": "tag", "operator": "equals", "value": "文学" },
+    { "field": "copyCount", "operator": "greater_or_equal", "value": "1" }
+  ]
+}
+```
+
+- `combinator`：`ALL` 同时满足全部条件，`ANY` 满足任意一条。
+- 字段定义固定为：`title`、`author`、`translator`、`tag`、`shelf`、
+  `isbn`、`description`、`format`、`readingStatus`、`copyCount`、
+  `fileCount`、`createdAt`、`updatedAt`、`hasCover`。
+- 文本运算符：`contains`、`not_contains`、`equals`、`not_equals`、
+  `starts_with`、`ends_with`、`is_empty`、`is_not_empty`。
+- 选择运算符：`equals`、`not_equals`、`is_empty`、`is_not_empty`。
+- 数值运算符：`equals`、`not_equals`、`greater_than`、`greater_or_equal`、
+  `less_than`、`less_or_equal`、`between`、`is_empty`、`is_not_empty`。
+- 日期运算符：`equals`、`not_equals`、`after`、`on_or_after`、`before`、
+  `on_or_before`、`between`、`is_empty`、`is_not_empty`。日期使用
+  `YYYY-MM-DD`，按 UTC 日界解释。
+- 布尔运算符：`is_true`、`is_false`，用于 `hasCover`。
+- `between` 的 `value` 为两个字符串组成的数组；无值运算符不提交 `value`。
+- 名称、标题、标签、书架、格式匹配使用 Unicode casefold；否定关系条件表示
+  书目不存在匹配行。`copyCount`/`fileCount` 基于关联表真实计数。
+- 规则非法或字段/运算符不支持时返回 `422 INVALID_BOOK_FILTER`。
+
+`GET /api/v1/books/filter-schema` 返回前端渲染条件所需的字段、类型、运算符、
+静态选项和 `maxConditions`。动态选项通过：
+
+`GET /api/v1/books/filter-options?source=authors&query=...&limit=20`
+
+`source` 取 `authors`、`translators`、`tags`、`shelves`、`formats`，
+返回带书库计数的选项；`query` 最长 100 字符，`limit` 为 1–50。
+这些元数据端点仅用于读取，不表示新的数据表。
+
+### 3.4 书目详情
 
 `GET /api/v1/books/{bookId}` → `200 BookDetail`
 
@@ -116,7 +159,7 @@ Books Core V1 提供书目创建、列表、详情和部分更新。所有端点
 
 不存在时返回 `404 BOOK_NOT_FOUND`。
 
-### 3.4 部分更新
+### 3.5 部分更新
 
 `PATCH /api/v1/books/{bookId}` → `200 BookDetail`
 
@@ -137,6 +180,7 @@ Books Core V1 提供书目创建、列表、详情和部分更新。所有端点
 | 404 | `BOOK_NOT_FOUND` | 书目不存在 |
 | 405 | `METHOD_NOT_ALLOWED` | 使用 V1 未提供的删除方法 |
 | 422 | `VALIDATION_ERROR` | 输入、查询参数或空 PATCH 不合法 |
+| 422 | `INVALID_BOOK_FILTER` | `filters` JSON、字段或运算符不合法 |
 | 500 | `INTERNAL_ERROR` | 服务端异常；通过 `requestId` 关联日志 |
 
 ## 5. 删除策略
@@ -152,7 +196,8 @@ V1 不开放书目删除。后续实现删除时必须满足：
 
 实现由 FastAPI `/openapi.json` 发布，操作 ID：
 
-- `listBooks`、`createBook`、`getBook`、`updateBook`
+- `listBooks`、`createBook`、`getBookFilterSchema`、`getBookFilterOptions`、
+  `getBook`、`updateBook`
 
 TypeScript 类型由生成工具写入 `packages/acbooks-api-client/schema.d.ts`，不得手改：
 

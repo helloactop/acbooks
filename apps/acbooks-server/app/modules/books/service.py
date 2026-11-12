@@ -1,3 +1,4 @@
+import json
 from time import time_ns
 from typing import cast
 from uuid import UUID, uuid4
@@ -8,12 +9,25 @@ from app.core.errors import BusinessError, BusinessErrorCode
 from app.db.models.books import Book
 from app.db.session import create_session_factory
 from app.modules.books import repository
+from app.modules.books.filtering import (
+    FILTER_FIELDS,
+    MAX_FILTER_CONDITIONS,
+    STATIC_FILTER_OPTIONS,
+    BookFilterExpression,
+    BookFilterOptionSource,
+    InvalidBookFilter,
+    parse_filter_expression,
+)
 from app.modules.books.repository import BookListQuery, BookRecord
 from app.modules.books.schemas import (
     BookCopy,
     BookCreate,
     BookDetail,
     BookFile,
+    BookFilterField,
+    BookFilterOption,
+    BookFilterOptionPage,
+    BookFilterSchema,
     BookIdentifier,
     BookPage,
     BookSummary,
@@ -88,6 +102,70 @@ class BooksService:
             ],
         )
 
+    @staticmethod
+    def _filter_expression(filters: str | None) -> BookFilterExpression | None:
+        if filters is None or not filters.strip():
+            return None
+        try:
+            return parse_filter_expression(json.loads(filters))
+        except (json.JSONDecodeError, InvalidBookFilter) as error:
+            raise BusinessError(BusinessErrorCode.INVALID_BOOK_FILTER) from error
+
+    def get_filter_schema(self) -> BookFilterSchema:
+        return BookFilterSchema(
+            fields=[
+                BookFilterField(
+                    key=field.key,
+                    group=field.group,
+                    type=field.field_type,
+                    operators=list(field.operators),
+                    option_source=field.option_source,
+                    allow_custom=field.allow_custom,
+                    unit=field.unit,
+                    options=[
+                        BookFilterOption(
+                            value=option.value,
+                            label=option.label,
+                            count=option.count,
+                        )
+                        for option in STATIC_FILTER_OPTIONS.get(field.key, ())
+                    ],
+                )
+                for field in FILTER_FIELDS
+            ],
+            max_conditions=MAX_FILTER_CONDITIONS,
+        )
+
+    def get_filter_options(
+        self,
+        *,
+        source: BookFilterOptionSource,
+        query: str,
+        limit: int,
+    ) -> BookFilterOptionPage:
+        normalized = query.strip()
+        with self.read_sessions() as session:
+            options, has_more = repository.list_filter_options(
+                session,
+                source=source,
+                query=normalized,
+                limit=limit,
+            )
+        return BookFilterOptionPage(
+            source=source,
+            query=normalized,
+            options=[
+                BookFilterOption(
+                    value=option.value,
+                    label=option.label,
+                    count=option.count,
+                )
+                for option in options
+            ],
+            has_more=has_more,
+            index_ready=True,
+        )
+
     def list_books(
         self,
         *,
@@ -99,6 +177,7 @@ class BooksService:
         shelf_id: UUID | None,
         media_type: MediaType | None,
         media_format: str | None,
+        filters: str | None,
         sort: BookSort,
         order: BookOrder,
     ) -> BookPage:
@@ -113,6 +192,7 @@ class BooksService:
                 if media_format is not None and media_format.strip()
                 else None
             ),
+            filter_expression=self._filter_expression(filters),
             sort=sort,
             order=order,
             limit=limit,

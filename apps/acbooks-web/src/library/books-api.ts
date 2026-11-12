@@ -8,6 +8,11 @@ import {
   patchWithCsrf,
   postWithCsrf,
 } from "../api/client";
+import type {
+  BookFilterOptionPage,
+  BookFilterOptionSource,
+  BookFilterSchema,
+} from "./filter-model";
 
 export type BookSummary = components["schemas"]["BookSummary"];
 export type BookDetail = components["schemas"]["BookDetail"];
@@ -40,6 +45,7 @@ export function getBooks(
   appendParam(params, "shelfId", query.shelfId);
   appendParam(params, "mediaType", query.mediaType);
   appendParam(params, "format", query.format);
+  appendParam(params, "filters", query.filters);
   appendParam(params, "sort", query.sort);
   appendParam(params, "order", query.order);
   appendParam(params, "limit", query.limit);
@@ -49,6 +55,29 @@ export function getBooks(
   return apiRequest<BookPage>(`/books${search.length > 0 ? `?${search}` : ""}`, {
     signal,
   });
+}
+
+export function getBookFilterSchema(
+  signal?: AbortSignal,
+): Promise<BookFilterSchema> {
+  return apiRequest<BookFilterSchema>("/books/filter-schema", { signal });
+}
+
+export function getBookFilterOptions(
+  source: BookFilterOptionSource,
+  query: string,
+  signal?: AbortSignal,
+  limit = 20,
+): Promise<BookFilterOptionPage> {
+  const params = new URLSearchParams({
+    source,
+    query,
+    limit: String(limit),
+  });
+  return apiRequest<BookFilterOptionPage>(
+    `/books/filter-options?${params.toString()}`,
+    { signal },
+  );
 }
 
 export function getBook(

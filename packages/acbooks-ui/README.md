@@ -14,8 +14,11 @@ shadcn/ui 风格基础组件。业务页面不放在此包内。
   `danger-confirm` 变体及 loading 状态
 - `Input` / `PasswordInput` / `Field`：认证表单基础控件与标签、说明、错误关联；
   `Field` 可通过 `invalid` 标记表单级错误，而不额外显示行内错误文案
-- `SegmentedControl`：主题等互斥选项的中性胶囊选择器，使用 radiogroup
-  语义并支持方向键、Home/End 和 roving focus
+- `Select`：保留原生选择语义的表单控件；`Combobox`：支持本地过滤、键盘选择、
+  自定义输入和异步建议的搜索选择器
+- `DropdownMenu`：锚定触发器的可访问操作菜单
+- `SegmentedControl`：互斥选项选择器，提供默认胶囊与矩形圆角 `boxed` 变体，
+  使用 radiogroup 语义并支持方向键、Home/End 和 roving focus
 - `Spinner`
 - `I18nProvider` / `useLanguage` / `createI18n`：简体中文与英语共享实例，
   支持跟随系统、显式选择、本地持久化、即时切换并同步 `<html lang>`

@@ -1,4 +1,6 @@
+import json
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from time import sleep
 from typing import Any
@@ -296,6 +298,308 @@ def test_list_books_searches_filters_sorts_and_paginates(
     ]
 
 
+def filter_query(*conditions: dict[str, Any], combinator: str = "ALL") -> str:
+    return json.dumps(
+        {"combinator": combinator, "conditions": list(conditions)}
+    )
+
+
+def test_smart_filters_compile_all_any_and_typed_operators(
+    paths: tuple[Path, Path], browser: TestClient
+) -> None:
+    alpha = create_book(
+        browser,
+        title="Alpha",
+        authors=["Author One"],
+        isbn="978-0-306-40615-7",
+        readingStatus="unread",
+        tags=["fiction"],
+        shelves=["Shelf A"],
+    )
+    beta = create_book(
+        browser,
+        title="Beta",
+        authors=["Author Two"],
+        isbn=None,
+        readingStatus="reading",
+        tags=["science"],
+        shelves=["Shelf B"],
+    )
+    create_book(
+        browser,
+        title="Gamma",
+        authors=["Author One"],
+        isbn=None,
+        readingStatus="done",
+        tags=["fiction"],
+        shelves=["Shelf A"],
+    )
+
+    engine = create_sqlite_engine(paths[0])
+    try:
+        with Session(engine) as session, session.begin():
+            session.add(
+                BookCopy(
+                    id=str(uuid4()),
+                    book_id=alpha["id"],
+                    location_id=None,
+                    acquired_at=None,
+                    note=None,
+                )
+            )
+            root_id = str(uuid4())
+            object_id = str(uuid4())
+            session.add(
+                StorageRoot(
+                    id=root_id,
+                    name="Root",
+                    root_path="/tmp/acbooks-filter-test",
+                    mode="managed",
+                )
+            )
+            session.flush()
+            session.add(
+                StorageObject(
+                    id=object_id,
+                    root_id=root_id,
+                    relative_path="beta.epub",
+                    size_bytes=10,
+                    sha256=None,
+                    file_status="present",
+                    mtime_ms=0,
+                )
+            )
+            session.flush()
+            session.add(
+                BookFile(
+                    id=str(uuid4()),
+                    book_id=beta["id"],
+                    storage_object_id=object_id,
+                    format="epub",
+                )
+            )
+    finally:
+        engine.dispose()
+
+    def total(query: str, **params: object) -> int:
+        response = browser.get(
+            BOOKS, params={"filters": query, **params}
+        )
+        assert response.status_code == 200, response.text
+        return int(response.json()["total"])
+
+    assert total(
+        filter_query(
+            {"field": "tag", "operator": "equals", "value": "fiction"},
+            {"field": "readingStatus", "operator": "equals", "value": "unread"},
+        )
+    ) == 1
+    assert total(
+        filter_query(
+            {"field": "title", "operator": "contains", "value": "Alpha"},
+            {"field": "title", "operator": "contains", "value": "Gamma"},
+            combinator="ANY",
+        )
+    ) == 2
+    assert total(
+        filter_query(
+            {"field": "tag", "operator": "not_equals", "value": "fiction"}
+        )
+    ) == 1
+    assert total(
+        filter_query(
+            {"field": "format", "operator": "equals", "value": "EPUB"}
+        )
+    ) == 1
+    assert total(
+        filter_query(
+            {
+                "field": "copyCount",
+                "operator": "greater_or_equal",
+                "value": "1",
+            }
+        )
+    ) == 1
+    assert total(
+        filter_query(
+            {"field": "fileCount", "operator": "is_empty"}
+        )
+    ) == 2
+    created_date = datetime.fromtimestamp(
+        alpha["createdAt"] / 1000, tz=UTC
+    ).date().isoformat()
+    assert total(
+        filter_query(
+            {
+                "field": "createdAt",
+                "operator": "between",
+                "value": [created_date, created_date],
+            }
+        )
+    ) == 3
+    assert total(
+        filter_query(
+            {"field": "hasCover", "operator": "is_false"}
+        )
+    ) == 3
+    assert total(
+        filter_query(
+            {
+                "field": "isbn",
+                "operator": "equals",
+                "value": "978-0-306-40615-7",
+            }
+        )
+    ) == 1
+    assert total(
+        filter_query(
+            {
+                "field": "author",
+                "operator": "equals",
+                "value": "author one",
+            }
+        )
+    ) == 2
+    assert total(filter_query()) == 3
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "{not-json",
+        json.dumps(
+            {
+                "combinator": "ALL",
+                "conditions": [
+                    {"field": "unknown", "operator": "equals", "value": "x"}
+                ],
+            }
+        ),
+        json.dumps(
+            {
+                "combinator": "ALL",
+                "conditions": [
+                    {"field": "title", "operator": "between", "value": "x"}
+                ],
+            }
+        ),
+        json.dumps(
+            {
+                "combinator": "ALL",
+                "conditions": [
+                    {
+                        "field": "copyCount",
+                        "operator": "greater_than",
+                        "value": "not-a-number",
+                    }
+                ],
+            }
+        ),
+        json.dumps(
+            {
+                "combinator": "ALL",
+                "conditions": [
+                    {"field": "title", "operator": "is_empty", "value": None}
+                ]
+                * 31,
+            }
+        ),
+    ],
+)
+def test_smart_filters_reject_invalid_rules(
+    browser: TestClient, payload: str
+) -> None:
+    response = browser.get(BOOKS, params={"filters": payload})
+    assert_problem(response, 422, "INVALID_BOOK_FILTER")
+
+
+def test_filter_schema_and_options_use_real_library_data(
+    browser: TestClient,
+) -> None:
+    create_book(
+        browser,
+        title="Alpha",
+        authors=["Author One"],
+        readingStatus="unread",
+        tags=["fiction"],
+        shelves=["Shelf A"],
+    )
+    create_book(
+        browser,
+        title="Beta",
+        authors=["Author One"],
+        readingStatus="reading",
+        tags=["fiction", "science"],
+        shelves=["Shelf B"],
+    )
+    create_book(
+        browser,
+        title="Gamma",
+        authors=["Author Two"],
+        readingStatus="done",
+        tags=["science"],
+        shelves=["Shelf A"],
+    )
+
+    schema_response = browser.get(f"{BOOKS}/filter-schema")
+    assert schema_response.status_code == 200
+    assert schema_response.headers["cache-control"] == "no-store"
+    schema = schema_response.json()
+    assert schema["maxConditions"] == 30
+    fields = {field["key"]: field for field in schema["fields"]}
+    assert fields["title"]["type"] == "text"
+    assert fields["author"]["optionSource"] == "authors"
+    assert "contains" in fields["title"]["operators"]
+    assert fields["readingStatus"]["options"] == [
+        {"value": "unread", "label": "Unread", "count": None},
+        {"value": "reading", "label": "Reading", "count": None},
+        {"value": "done", "label": "Read", "count": None},
+    ]
+
+    tags = browser.get(
+        f"{BOOKS}/filter-options",
+        params={"source": "tags", "query": "fic"},
+    )
+    assert tags.status_code == 200
+    assert tags.headers["cache-control"] == "no-store"
+    assert tags.json()["options"] == [
+        {"value": "fiction", "label": "fiction", "count": 2}
+    ]
+    assert tags.json()["hasMore"] is False
+    assert tags.json()["indexReady"] is True
+
+    authors = browser.get(
+        f"{BOOKS}/filter-options", params={"source": "authors"}
+    ).json()
+    assert authors["options"][0] == {
+        "value": "Author One",
+        "label": "Author One",
+        "count": 2,
+    }
+    shelves = browser.get(
+        f"{BOOKS}/filter-options",
+        params={"source": "shelves", "query": "shelf"},
+    ).json()
+    assert {option["value"] for option in shelves["options"]} == {
+        "Shelf A",
+        "Shelf B",
+    }
+    limited = browser.get(
+        f"{BOOKS}/filter-options",
+        params={"source": "authors", "limit": 1},
+    ).json()
+    assert len(limited["options"]) == 1
+    assert limited["hasMore"] is True
+
+    assert_problem(
+        browser.get(
+            f"{BOOKS}/filter-options", params={"source": "unknown"}
+        ),
+        422,
+        "VALIDATION_ERROR",
+    )
+
+
 def test_patch_book_preserves_copies_files_and_reading_data(
     paths: tuple[Path, Path], browser: TestClient
 ) -> None:
@@ -541,6 +845,14 @@ def test_books_openapi_contract(browser: TestClient) -> None:
     assert item["get"]["operationId"] == "getBook"
     assert item["patch"]["operationId"] == "updateBook"
     assert "delete" not in item
+    assert (
+        paths[f"{BOOKS}/filter-schema"]["get"]["operationId"]
+        == "getBookFilterSchema"
+    )
+    assert (
+        paths[f"{BOOKS}/filter-options"]["get"]["operationId"]
+        == "getBookFilterOptions"
+    )
 
     security = {
         name
@@ -567,6 +879,7 @@ def test_books_openapi_contract(browser: TestClient) -> None:
         "shelfId",
         "mediaType",
         "format",
+        "filters",
         "sort",
         "order",
         "limit",
@@ -582,5 +895,7 @@ def test_books_openapi_contract(browser: TestClient) -> None:
     assert "BookUpdate" in schemas
     assert "BookDetail" in schemas
     assert "BookPage" in schemas
+    assert "BookFilterSchema" in schemas
+    assert "BookFilterOptionPage" in schemas
     assert "title" in schemas["BookCreate"]["required"]
     assert "readingStatus" in schemas["BookCreate"]["properties"]

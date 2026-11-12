@@ -141,6 +141,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/books/filter-schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Filter Schema */
+        get: operations["getBookFilterSchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/books/filter-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Filter Options */
+        get: operations["getBookFilterOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/books/{bookId}": {
         parameters: {
             query?: never;
@@ -267,6 +301,63 @@ export interface components {
             fileStatus: "present" | "missing";
             /** Sizebytes */
             sizeBytes: number;
+        };
+        /** BookFilterField */
+        BookFilterField: {
+            /** Key */
+            key: string;
+            /** Group */
+            group: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "text" | "select" | "number" | "date" | "boolean";
+            /** Operators */
+            operators: string[];
+            /** Optionsource */
+            optionSource?: ("authors" | "translators" | "tags" | "shelves" | "formats") | null;
+            /**
+             * Allowcustom
+             * @default false
+             */
+            allowCustom: boolean;
+            /** Unit */
+            unit?: string | null;
+            /** Options */
+            options?: components["schemas"]["BookFilterOption"][];
+        };
+        /** BookFilterOption */
+        BookFilterOption: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /** Count */
+            count?: number | null;
+        };
+        /** BookFilterOptionPage */
+        BookFilterOptionPage: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "authors" | "translators" | "tags" | "shelves" | "formats";
+            /** Query */
+            query: string;
+            /** Options */
+            options: components["schemas"]["BookFilterOption"][];
+            /** Hasmore */
+            hasMore: boolean;
+            /** Indexready */
+            indexReady: boolean;
+        };
+        /** BookFilterSchema */
+        BookFilterSchema: {
+            /** Fields */
+            fields: components["schemas"]["BookFilterField"][];
+            /** Maxconditions */
+            maxConditions: number;
         };
         /** BookIdentifier */
         BookIdentifier: {
@@ -1012,6 +1103,7 @@ export interface operations {
                 shelfId?: string | null;
                 mediaType?: ("physical" | "digital") | null;
                 format?: string | null;
+                filters?: string | null;
                 sort?: "title" | "author" | "createdAt" | "updatedAt";
                 order?: "asc" | "desc";
                 limit?: number;
@@ -1171,6 +1263,162 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    getBookFilterSchema: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookFilterSchema"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    getBookFilterOptions: {
+        parameters: {
+            query: {
+                source: "authors" | "translators" | "tags" | "shelves" | "formats";
+                query?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookFilterOptionPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

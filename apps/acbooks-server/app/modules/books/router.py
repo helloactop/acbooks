@@ -6,9 +6,12 @@ from fastapi import APIRouter, Depends, Path, Query, Response
 from app.api.errors import problem_openapi
 from app.modules.auth.dependencies import AuthDependencies
 from app.modules.auth.service import WebSession
+from app.modules.books.filtering import BookFilterOptionSource
 from app.modules.books.schemas import (
     BookCreate,
     BookDetail,
+    BookFilterOptionPage,
+    BookFilterSchema,
     BookOrder,
     BookPage,
     BookSort,
@@ -57,6 +60,7 @@ def books_router(
         media_format: Annotated[
             str | None, Query(alias="format", max_length=32)
         ] = None,
+        filters: Annotated[str | None, Query(max_length=20000)] = None,
         sort: Annotated[BookSort, Query()] = "createdAt",
         order: Annotated[BookOrder, Query()] = "desc",
         limit: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -72,6 +76,7 @@ def books_router(
             shelf_id=shelf_id,
             media_type=media_type,
             media_format=media_format,
+            filters=filters,
             sort=sort,
             order=order,
         )
@@ -98,6 +103,49 @@ def books_router(
         response.headers["Cache-Control"] = "no-store"
         response.headers["Location"] = f"/api/v1/books/{detail.id}"
         return detail
+
+    @router.get(
+        "/filter-schema",
+        operation_id="getBookFilterSchema",
+        response_model=BookFilterSchema,
+        responses={
+            200: {"headers": no_store},
+            **{
+                status: problem_openapi(status)
+                for status in (401, 500)
+            },
+        },
+    )
+    def get_filter_schema(
+        response: Response,
+        current: Annotated[WebSession, Depends(dependencies.require_session)],
+    ) -> BookFilterSchema:
+        response.headers["Cache-Control"] = "no-store"
+        return service.get_filter_schema()
+
+    @router.get(
+        "/filter-options",
+        operation_id="getBookFilterOptions",
+        response_model=BookFilterOptionPage,
+        responses={
+            200: {"headers": no_store},
+            **{
+                status: problem_openapi(status)
+                for status in (401, 422, 500)
+            },
+        },
+    )
+    def get_filter_options(
+        response: Response,
+        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        source: Annotated[BookFilterOptionSource, Query()],
+        query: Annotated[str, Query(max_length=100)] = "",
+        limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    ) -> BookFilterOptionPage:
+        response.headers["Cache-Control"] = "no-store"
+        return service.get_filter_options(
+            source=source, query=query, limit=limit
+        )
 
     @router.get(
         "/{bookId}",

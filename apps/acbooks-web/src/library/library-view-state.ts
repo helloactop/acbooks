@@ -1,16 +1,21 @@
+import {
+  EMPTY_FILTER_RULES,
+  filterRulesFromTagAndFormat,
+  parseSmartFilterRules,
+  type SmartFilterRules,
+} from "./filter-model";
+
 export type TypeFilter = "all" | "digital" | "physical";
 export type StatusFilter = "all" | "done" | "reading" | "unread";
 export type SortOrder = "author" | "recent" | "title";
 export type ViewMode = "grid" | "list";
 
 export interface LibraryViewState {
-  format: string;
+  filters: SmartFilterRules;
   offset: number;
-  query: string;
   searchTerm: string;
   sort: SortOrder;
   status: StatusFilter;
-  tag: string;
   type: TypeFilter;
   view: ViewMode;
 }
@@ -20,13 +25,11 @@ const SCROLL_KEY = "acbooks-library-scroll";
 const DESCRIPTION_PREFIX = "acbooks-description-expanded:";
 
 export const DEFAULT_LIBRARY_VIEW: LibraryViewState = {
-  format: "",
+  filters: EMPTY_FILTER_RULES,
   offset: 0,
-  query: "",
   searchTerm: "",
   sort: "recent",
   status: "all",
-  tag: "",
   type: "all",
   view: "grid",
 };
@@ -73,21 +76,28 @@ export function readLibraryView(): LibraryViewState | null {
     return null;
   }
   try {
-    const value = JSON.parse(raw) as Partial<LibraryViewState>;
+    const value = JSON.parse(raw) as Partial<LibraryViewState> & {
+      format?: unknown;
+      tag?: unknown;
+    };
     return {
-      format: typeof value.format === "string" ? value.format : "",
+      filters:
+        value.filters !== undefined
+          ? parseSmartFilterRules(value.filters)
+          : filterRulesFromTagAndFormat(
+              typeof value.tag === "string" ? value.tag : "",
+              typeof value.format === "string" ? value.format : "",
+            ),
       offset:
         typeof value.offset === "number" && Number.isInteger(value.offset)
           ? Math.max(0, value.offset)
           : DEFAULT_LIBRARY_VIEW.offset,
-      query: typeof value.query === "string" ? value.query : "",
       searchTerm:
         typeof value.searchTerm === "string" ? value.searchTerm : "",
       sort: isOneOf(SORTS, value.sort) ? value.sort : DEFAULT_LIBRARY_VIEW.sort,
       status: isOneOf(STATUSES, value.status)
         ? value.status
         : DEFAULT_LIBRARY_VIEW.status,
-      tag: typeof value.tag === "string" ? value.tag : "",
       type: isOneOf(TYPES, value.type)
         ? value.type
         : DEFAULT_LIBRARY_VIEW.type,
@@ -107,12 +117,14 @@ export function readInitialLibraryView(): LibraryViewState {
   const mediaType = params.get("mediaType");
   const urlTag = params.get("tag");
   const urlFormat = params.get("format");
+  const urlFilters = params.get("filters");
   const reset = params.get("reset") === "1";
   if (
     urlQuery === null &&
     mediaType === null &&
     urlTag === null &&
     urlFormat === null &&
+    urlFilters === null &&
     !reset
   ) {
     return saved;
@@ -120,11 +132,9 @@ export function readInitialLibraryView(): LibraryViewState {
 
   const view: LibraryViewState = { ...saved, offset: 0 };
   if (reset) {
-    view.format = "";
-    view.query = "";
+    view.filters = EMPTY_FILTER_RULES;
     view.searchTerm = "";
     view.status = "all";
-    view.tag = "";
     view.type = "all";
   }
   if (mediaType === "physical" || mediaType === "digital") {
@@ -132,18 +142,18 @@ export function readInitialLibraryView(): LibraryViewState {
   } else if (mediaType !== null) {
     view.type = "all";
   }
-  if (urlTag !== null) {
-    view.tag = urlTag.trim();
-  }
-  if (urlFormat !== null) {
-    view.format = urlFormat.trim().toLocaleLowerCase();
+  if (urlFilters !== null) {
+    view.filters = parseSmartFilterRules(urlFilters);
+  } else if (urlTag !== null || urlFormat !== null) {
+    view.filters = filterRulesFromTagAndFormat(
+      urlTag?.trim() ?? "",
+      urlFormat?.trim() ?? "",
+    );
   }
   if (urlQuery !== null) {
-    view.format = "";
-    view.query = urlQuery;
+    view.filters = EMPTY_FILTER_RULES;
     view.searchTerm = urlQuery.trim();
     view.status = "all";
-    view.tag = "";
     view.type = "all";
   }
   return view;

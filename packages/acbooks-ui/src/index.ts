@@ -5,6 +5,11 @@ export {
   type ButtonVariant,
 } from "./components/button";
 export {
+  Combobox,
+  type ComboboxOption,
+  type ComboboxProps,
+} from "./components/combobox";
+export {
   DropdownMenu,
   type DropdownMenuAction,
   type DropdownMenuProps,

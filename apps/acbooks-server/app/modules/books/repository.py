@@ -19,6 +19,12 @@ from app.db.models.books import (
 )
 from app.db.models.copies import BookCopy, Location
 from app.db.models.storage import BookFile, StorageObject
+from app.modules.books.filtering import (
+    BookFilterExpression,
+    BookFilterOption,
+    BookFilterOptionSource,
+    compile_filter_expression,
+)
 from app.modules.books.normalization import escape_like, normalize_isbn
 from app.modules.books.types import BookOrder, BookSort, MediaType
 
@@ -31,6 +37,7 @@ class BookListQuery:
     shelf_id: str | None
     media_type: MediaType | None
     media_format: str | None
+    filter_expression: BookFilterExpression | None
     sort: BookSort
     order: BookOrder
     limit: int
@@ -152,6 +159,10 @@ def _conditions(query: BookListQuery) -> list[ColumnElement[bool]]:
                 )
             )
         )
+    if query.filter_expression is not None:
+        smart_filter = compile_filter_expression(query.filter_expression)
+        if smart_filter is not None:
+            conditions.append(smart_filter)
 
     return conditions
 
@@ -180,6 +191,93 @@ def _order_by(query: BookListQuery) -> list[ColumnElement[Any]]:
 
     direction = primary.desc() if query.order == "desc" else primary.asc()
     return [direction, Book.id.asc()]
+
+
+def list_filter_options(
+    session: Session,
+    *,
+    source: BookFilterOptionSource,
+    query: str,
+    limit: int,
+) -> tuple[list[BookFilterOption], bool]:
+    pattern = f"%{escape_like(query)}%" if query else None
+
+    if source in {"authors", "translators"}:
+        role = "author" if source == "authors" else "translator"
+        count = func.count(func.distinct(BookContributor.book_id))
+        statement = (
+            select(Contributor.name, count)
+            .select_from(BookContributor)
+            .join(Contributor, Contributor.id == BookContributor.contributor_id)
+            .where(BookContributor.role == role)
+            .group_by(Contributor.name)
+            .order_by(
+                count.desc(),
+                func.acbooks_casefold(Contributor.name),
+            )
+        )
+        if pattern is not None:
+            statement = statement.where(
+                func.acbooks_casefold(Contributor.name).like(
+                    func.acbooks_casefold(pattern), escape="\\"
+                )
+            )
+    elif source == "tags":
+        count = func.count(func.distinct(BookTag.book_id))
+        statement = (
+            select(Tag.name, count)
+            .select_from(BookTag)
+            .join(Tag, Tag.id == BookTag.tag_id)
+            .group_by(Tag.name)
+            .order_by(count.desc(), func.acbooks_casefold(Tag.name))
+        )
+        if pattern is not None:
+            statement = statement.where(
+                func.acbooks_casefold(Tag.name).like(
+                    func.acbooks_casefold(pattern), escape="\\"
+                )
+            )
+    elif source == "shelves":
+        count = func.count(func.distinct(ShelfBook.book_id))
+        statement = (
+            select(Shelf.name, count)
+            .select_from(ShelfBook)
+            .join(Shelf, Shelf.id == ShelfBook.shelf_id)
+            .group_by(Shelf.name)
+            .order_by(count.desc(), func.acbooks_casefold(Shelf.name))
+        )
+        if pattern is not None:
+            statement = statement.where(
+                func.acbooks_casefold(Shelf.name).like(
+                    func.acbooks_casefold(pattern), escape="\\"
+                )
+            )
+    else:
+        normalized_format = func.acbooks_casefold(BookFile.format)
+        count = func.count(func.distinct(BookFile.book_id))
+        statement = (
+            select(normalized_format, count)
+            .group_by(normalized_format)
+            .order_by(count.desc(), normalized_format)
+        )
+        if pattern is not None:
+            statement = statement.where(
+                normalized_format.like(
+                    func.acbooks_casefold(pattern), escape="\\"
+                )
+            )
+
+    rows = session.execute(statement.limit(limit + 1)).all()
+    has_more = len(rows) > limit
+    options = [
+        BookFilterOption(
+            value=str(row[0]),
+            label=str(row[0]).upper() if source == "formats" else str(row[0]),
+            count=int(row[1]),
+        )
+        for row in rows[:limit]
+    ]
+    return options, has_more
 
 
 def get_book(session: Session, book_id: str) -> Book | None:

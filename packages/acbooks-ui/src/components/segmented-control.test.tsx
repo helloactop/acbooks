@@ -14,7 +14,7 @@ const OPTIONS: readonly SegmentedControlOption<"system" | "light" | "dark">[] = 
   { value: "dark", label: "深色" },
 ];
 
-function Harness() {
+function Harness({ variant }: { variant?: "boxed" | "pill" }) {
   const [value, setValue] = useState<"system" | "light" | "dark">("system");
   return (
     <SegmentedControl
@@ -22,6 +22,7 @@ function Harness() {
       onValueChange={setValue}
       options={OPTIONS}
       value={value}
+      variant={variant}
     />
   );
 }
@@ -47,6 +48,14 @@ describe("SegmentedControl", () => {
       "aria-checked",
       "true",
     );
+  });
+
+  it("renders the rectangular boxed variant with a soft selected state", () => {
+    render(<Harness variant="boxed" />);
+    const group = screen.getByRole("radiogroup", { name: "外观模式" });
+    const selected = screen.getByRole("radio", { name: "跟随系统" });
+    expect(group).toHaveClass("rounded-menu");
+    expect(selected).toHaveClass("rounded-lg", "bg-accent-soft");
   });
 
   it("supports roving focus and arrow-key selection", async () => {

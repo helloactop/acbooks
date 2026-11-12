@@ -52,6 +52,102 @@ const BOOK1 = summary({
   fileCount: 2,
   formats: ["epub", "pdf"],
 });
+const FILTER_SCHEMA = {
+  fields: [
+    {
+      key: "title",
+      group: "metadata",
+      type: "text",
+      operators: ["contains", "equals", "is_empty"],
+      allowCustom: false,
+      options: [],
+    },
+    {
+      key: "author",
+      group: "metadata",
+      type: "select",
+      operators: ["equals", "not_equals"],
+      optionSource: "authors",
+      allowCustom: true,
+      options: [],
+    },
+    {
+      key: "tag",
+      group: "metadata",
+      type: "select",
+      operators: ["equals", "not_equals"],
+      optionSource: "tags",
+      allowCustom: true,
+      options: [],
+    },
+    {
+      key: "format",
+      group: "files",
+      type: "select",
+      operators: ["equals", "not_equals"],
+      optionSource: "formats",
+      allowCustom: true,
+      options: [],
+    },
+    {
+      key: "readingStatus",
+      group: "reading",
+      type: "select",
+      operators: ["equals", "not_equals"],
+      allowCustom: false,
+      options: [
+        { value: "unread", label: "Unread", count: null },
+        { value: "reading", label: "Reading", count: null },
+        { value: "done", label: "Read", count: null },
+      ],
+    },
+    {
+      key: "copyCount",
+      group: "files",
+      type: "number",
+      operators: ["equals", "greater_than", "between"],
+      allowCustom: false,
+      options: [],
+    },
+    {
+      key: "createdAt",
+      group: "timeline",
+      type: "date",
+      operators: ["equals", "between"],
+      allowCustom: false,
+      options: [],
+    },
+    {
+      key: "hasCover",
+      group: "timeline",
+      type: "boolean",
+      operators: ["is_true", "is_false"],
+      allowCustom: false,
+      options: [],
+    },
+  ],
+  maxConditions: 30,
+};
+
+const FILTER_OPTIONS: Record<string, Array<{ value: string; label: string; count: number }>> = {
+  authors: [
+    { value: "鲁迅", label: "鲁迅", count: 2 },
+    { value: "沈从文", label: "沈从文", count: 1 },
+  ],
+  tags: [
+    { value: "文学", label: "文学", count: 2 },
+    { value: "历史", label: "历史", count: 1 },
+  ],
+  formats: [
+    { value: "epub", label: "EPUB", count: 2 },
+    { value: "pdf", label: "PDF", count: 1 },
+  ],
+  shelves: [
+    { value: "书房", label: "书房", count: 2 },
+  ],
+  translators: [],
+};
+
 const BOOK2 = summary({
   id: "22222222-2222-4222-8222-222222222222",
   title: "边城",
@@ -155,6 +251,31 @@ function baseHandler(handler: ApiHandler): ApiHandler {
     if (url.pathname === "/api/v1/auth/csrf" && method === "GET") {
       return jsonResponse({ csrfToken: "csrf-token" });
     }
+    if (
+      url.pathname === "/api/v1/books/filter-schema" &&
+      method === "GET"
+    ) {
+      return jsonResponse(FILTER_SCHEMA);
+    }
+    if (
+      url.pathname === "/api/v1/books/filter-options" &&
+      method === "GET"
+    ) {
+      const source = url.searchParams.get("source") ?? "";
+      const query = url.searchParams.get("query") ?? "";
+      const options = (FILTER_OPTIONS[source] ?? []).filter(
+        (option) =>
+          query.length === 0 ||
+          option.label.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+      );
+      return jsonResponse({
+        source,
+        query,
+        options,
+        hasMore: false,
+        indexReady: true,
+      });
+    }
     return handler(url, init);
   };
 }
@@ -171,6 +292,23 @@ function bookRequests(): URL[] {
 
 function latestBookRequest(): URL | undefined {
   return bookRequests().at(-1);
+}
+
+function latestFilters(): {
+  combinator: string;
+  conditions: Array<{ field: string; operator: string; value?: unknown }>;
+} | null {
+  const raw = latestBookRequest()?.searchParams.get("filters");
+  return raw === null || raw === undefined
+    ? null
+    : (JSON.parse(raw) as {
+        combinator: string;
+        conditions: Array<{
+          field: string;
+          operator: string;
+          value?: unknown;
+        }>;
+      });
 }
 
 function findCall(method: string, pathname: string) {
@@ -255,7 +393,7 @@ describe("LibraryPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("sends server-side search, filters, sorting and pagination", async () => {
+  it("sends search, smart filters, sorting and pagination to the server", async () => {
     installApi(
       baseHandler((url, init) => {
         if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
@@ -291,48 +429,60 @@ describe("LibraryPage", () => {
       ).toBe("done");
     });
 
+    const beforeDuplicate = bookRequests().length;
+    await user.click(screen.getByRole("radio", { name: "已读" }));
+    await user.click(screen.getByRole("radio", { name: "网格视图" }));
+    expect(bookRequests()).toHaveLength(beforeDuplicate);
+
     await user.click(screen.getByRole("button", { name: "更多筛选" }));
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "类型" }),
-      "physical",
+    await user.click(
+      await screen.findByRole("button", { name: /添加第一个筛选条件/ }),
     );
-    await waitFor(() => {
-      expect(latestBookRequest()?.searchParams.get("mediaType")).toBe(
-        "physical",
-      );
-    });
-    expect(
-      screen.getByRole("heading", { level: 1, name: "实体书" }),
-    ).toBeInTheDocument();
 
     await user.selectOptions(
-      screen.getByRole("combobox", { name: "格式" }),
+      screen.getByRole("combobox", { name: "第 1 条筛选字段" }),
+      "tag",
+    );
+    const tagValue = screen.getByRole("combobox", {
+      name: "标签筛选值",
+    });
+    await user.type(tagValue, "文学");
+    await waitFor(() => {
+      expect(latestFilters()).toEqual({
+        combinator: "ALL",
+        conditions: [
+          { field: "tag", operator: "equals", value: "文学" },
+        ],
+      });
+    });
+    expect(
+      screen.getByRole("button", { name: /更多筛选，已启用 1 个条件/ }),
+    ).toHaveTextContent("1");
+
+    await user.click(screen.getByRole("button", { name: "添加条件" }));
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "第 2 条筛选字段" }),
+      "format",
+    );
+    await user.type(
+      screen.getByRole("combobox", { name: "文件格式筛选值" }),
       "epub",
     );
     await waitFor(() => {
-      expect(latestBookRequest()?.searchParams.get("format")).toBe("epub");
-    });
-
-    await user.type(screen.getByRole("textbox", { name: "标签" }), "文学");
-    await waitFor(() => {
-      expect(latestBookRequest()?.searchParams.get("tag")).toBe("文学");
+      expect(latestFilters()?.conditions).toHaveLength(2);
+      expect(latestBookRequest()?.searchParams.get("offset")).toBe("0");
     });
     expect(
-      screen.getByRole("button", { name: /更多筛选，已启用 3 个条件/ }),
-    ).toHaveTextContent("3");
+      screen.getByRole("button", { name: /更多筛选，已启用 2 个条件/ }),
+    ).toHaveTextContent("2");
 
-    await user.click(
-      screen.getByRole("button", { name: /更多筛选，已启用 3 个条件/ }),
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "条件组合方式" }),
+      "ANY",
     );
-    expect(
-      screen.getByRole("button", { name: "移除筛选：类型：实体" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "移除筛选：格式：EPUB" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "移除筛选：标签：文学" }),
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(latestFilters()?.combinator).toBe("ANY");
+    });
 
     await user.selectOptions(
       screen.getByRole("combobox", { name: "排序" }),
@@ -342,6 +492,82 @@ describe("LibraryPage", () => {
       const request = latestBookRequest();
       expect(request?.searchParams.get("sort")).toBe("title");
       expect(request?.searchParams.get("order")).toBe("asc");
+      expect(latestFilters()?.conditions).toHaveLength(2);
+    });
+
+    await user.click(screen.getByRole("button", { name: "清空组合条件" }));
+    await waitFor(() => {
+      const request = latestBookRequest();
+      expect(request?.searchParams.get("filters")).toBeNull();
+      expect(request?.searchParams.get("sort")).toBe("title");
+      expect(request?.searchParams.get("offset")).toBe("0");
+    });
+  });
+
+  it("restores smart filters, sorting and pagination from the session", async () => {
+    window.sessionStorage.setItem(
+      "acbooks-library-view",
+      JSON.stringify({
+        filters: {
+          combinator: "ANY",
+          conditions: [
+            {
+              field: "tag",
+              id: "saved-tag",
+              operator: "equals",
+              value: "文学",
+            },
+          ],
+        },
+        offset: 12,
+        searchTerm: "",
+        sort: "title",
+        status: "all",
+        type: "all",
+        view: "list",
+      }),
+    );
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage(makeBooks(12), 30, 12));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+    await screen.findByRole("table", { name: "书籍列表" });
+
+    const request = latestBookRequest();
+    expect(request?.searchParams.get("offset")).toBe("12");
+    expect(request?.searchParams.get("sort")).toBe("title");
+    expect(request?.searchParams.get("order")).toBe("asc");
+    expect(latestFilters()).toEqual({
+      combinator: "ANY",
+      conditions: [{ field: "tag", operator: "equals", value: "文学" }],
+    });
+    expect(
+      screen.getByRole("button", { name: /更多筛选，已启用 1 个条件/ }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: /更多筛选，已启用 1 个条件/ }),
+    );
+    expect(
+      await screen.findByRole("combobox", { name: "标签筛选值" }),
+    ).toHaveValue("文学");
+    expect(
+      screen.getByRole("combobox", { name: "条件组合方式" }),
+    ).toHaveValue("ANY");
+
+    await user.click(screen.getByRole("button", { name: "清除筛选" }));
+    await waitFor(() => {
+      const cleared = latestBookRequest();
+      expect(cleared?.searchParams.get("filters")).toBeNull();
+      expect(cleared?.searchParams.get("offset")).toBe("0");
+      expect(cleared?.searchParams.get("sort")).toBe("title");
+      expect(cleared?.searchParams.get("order")).toBe("asc");
     });
   });
 

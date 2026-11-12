@@ -11,6 +11,10 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel
 
+from app.modules.books.filtering import (
+    BookFilterFieldType,
+    BookFilterOptionSource,
+)
 from app.modules.books.normalization import (
     clean_text,
     normalize_isbn,
@@ -23,6 +27,10 @@ __all__ = [
     "BookCreate",
     "BookDetail",
     "BookFile",
+    "BookFilterField",
+    "BookFilterOption",
+    "BookFilterOptionPage",
+    "BookFilterSchema",
     "BookIdentifier",
     "BookOrder",
     "BookPage",
@@ -196,3 +204,33 @@ class BookPage(ApiModel):
     total: int
     limit: int
     offset: int
+
+
+class BookFilterOption(ApiModel):
+    value: str
+    label: str
+    count: int | None = None
+
+
+class BookFilterField(ApiModel):
+    key: str
+    group: str
+    type: BookFilterFieldType
+    operators: list[str]
+    option_source: BookFilterOptionSource | None = None
+    allow_custom: bool = False
+    unit: str | None = None
+    options: list[BookFilterOption] = Field(default_factory=list)
+
+
+class BookFilterSchema(ApiModel):
+    fields: list[BookFilterField]
+    max_conditions: int
+
+
+class BookFilterOptionPage(ApiModel):
+    source: BookFilterOptionSource
+    query: str
+    options: list[BookFilterOption]
+    has_more: bool
+    index_ready: bool
