@@ -10,6 +10,7 @@ import { cn } from "../lib/utils";
 interface FieldControlProps {
   id?: string;
   "aria-describedby"?: string;
+  "aria-errormessage"?: string;
   "aria-invalid"?: boolean;
   "aria-required"?: boolean;
 }
@@ -38,11 +39,18 @@ export function Field({
   const descriptionId = description ? `${controlId}-description` : undefined;
   const errorId = error ? `${controlId}-error` : undefined;
   const describedBy =
-    [descriptionId, errorId].filter(Boolean).join(" ") || undefined;
+    [
+      children.props["aria-describedby"],
+      descriptionId,
+      errorId,
+    ]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
   const control = cloneElement(children, {
     id: controlId,
     "aria-describedby": describedBy,
+    "aria-errormessage": error ? errorId : undefined,
     "aria-invalid": error ? true : undefined,
     "aria-required": required || undefined,
   });

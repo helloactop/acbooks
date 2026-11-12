@@ -22,6 +22,10 @@ describe("form components", () => {
     const input = screen.getByLabelText("用户名");
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(input).toHaveAttribute("aria-required", "true");
+    expect(input).toHaveAttribute(
+      "aria-errormessage",
+      `${input.id}-error`,
+    );
     expect(input).toHaveAccessibleDescription("用于登录 acbooks 请输入用户名");
   });
 
@@ -37,5 +41,31 @@ describe("form components", () => {
 
     const hideButton = screen.getByRole("button", { name: "隐藏密码" });
     expect(hideButton).toHaveAttribute("aria-pressed", "true");
+    expect(hideButton).toHaveAttribute("aria-controls", input.id);
+  });
+
+  it("disables the visibility control together with the password input", () => {
+    render(<PasswordInput aria-label="密码" defaultValue="secret" disabled />);
+
+    expect(screen.getByLabelText("密码")).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "显示密码" }),
+    ).toBeDisabled();
+  });
+
+  it("preserves the auth control height in the disabled state", () => {
+    render(
+      <Input
+        aria-label="禁用输入"
+        controlSize="auth"
+        defaultValue="不可编辑"
+        disabled
+      />,
+    );
+
+    const input = screen.getByLabelText("禁用输入");
+    expect(input).toBeDisabled();
+    expect(input).toHaveClass("h-11");
+    expect(input).toHaveClass("disabled:bg-surface");
   });
 });

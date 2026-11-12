@@ -1,5 +1,5 @@
 import { Eye, EyeOff } from "lucide-react";
-import { forwardRef, useState } from "react";
+import { forwardRef, useId, useState } from "react";
 
 import { cn } from "../lib/utils";
 import { IconButton } from "./icon-button";
@@ -8,7 +8,9 @@ import { Input, type InputProps } from "./input";
 export type PasswordInputProps = Omit<InputProps, "type">;
 
 export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
-  function PasswordInput({ className, ...props }, ref) {
+  function PasswordInput({ className, id, ...props }, ref) {
+    const generatedId = useId();
+    const inputId = id ?? generatedId;
     const [visible, setVisible] = useState(false);
     const label = visible ? "隐藏密码" : "显示密码";
 
@@ -16,13 +18,16 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
       <div className="relative">
         <Input
           ref={ref}
+          id={inputId}
           type={visible ? "text" : "password"}
           className={cn("pr-11", className)}
           {...props}
         />
         <IconButton
+          aria-controls={inputId}
           aria-pressed={visible}
           className="absolute top-1/2 right-1 -translate-y-1/2"
+          disabled={props.disabled}
           label={label}
           onClick={() => {
             setVisible((current) => !current);
