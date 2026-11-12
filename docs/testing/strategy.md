@@ -2,7 +2,8 @@
 
 GitHub Actions 在分支推送、Pull Request 或手动触发时运行
 [CI 工作流](../../.github/workflows/ci.yml)。后端在 Ubuntu 和 Windows
-上以最低支持版本 Python 3.12 运行相同的检查。两个平台分别报告结果，
+上以最低支持版本 Python 3.12 运行相同的检查；Web 在两个平台使用 Node.js 24
+和仓库锁定的 pnpm 版本运行相同的检查。两个平台分别报告结果，
 某个平台失败时，另一个平台继续运行。
 
 ## 本地运行
@@ -16,6 +17,16 @@ python -m mypy app tests
 python -m pytest
 ```
 
+Web 与共享 UI 从仓库根目录执行：
+
+```sh
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
 ## 当前覆盖范围
 
 | 检查 | 覆盖范围 |
@@ -26,9 +37,14 @@ python -m pytest
 | pytest | SQLite 临时文件库上的 Alembic 升降级、模型一致性、异常回滚重试、连接参数、外键和唯一约束、任务和文件状态校验、并发写入及在线备份恢复 |
 | pytest | 首次管理员初始化的码文件生成与权限、来源和 CSRF 验证、密码校验与 Argon2id 存储、限速、双应用实例并发、事务失败重试及清理失败后的重启 |
 | pytest | Web 密码登录与限速、Cookie 属性、会话摘要与过期、重启持久化、会话轮换、CSRF 来源与绑定、单会话注销 |
+| ESLint | Web 与共享 UI 的 TypeScript/React 代码、Hooks 规则和导入问题 |
+| tsc | Web 与共享 UI 的 TypeScript strict 类型检查 |
+| Vitest | 共享 UI 的按钮变体与加载、表单标签/错误关联、密码可见切换、主题解析与本地保存、分段选择器选中状态 |
+| Vite | Web 生产构建、共享 UI 源码解析与 Tailwind 样式生成 |
 
 测试使用 pytest 的临时目录创建数据库，不需要真实书库、NAS 挂载或服务凭据。
-Web、Windows 客户端和 Android 工程初始化后，再接入各自的构建与检查。
+前端测试使用 jsdom，不连接真实 API。Windows 客户端和 Android 工程初始化后，
+再接入各自的构建与检查。
 
 ## 验收要求
 
