@@ -9,6 +9,7 @@ const fetchMock = vi.fn();
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.sessionStorage.clear();
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -82,5 +83,52 @@ describe("App routes", () => {
     expect(
       await screen.findByText("书库还没有书籍"),
     ).toBeInTheDocument();
+  });
+
+  it("renders a book detail at /library/books/:bookId", async () => {
+    const bookId = "11111111-1111-4111-8111-111111111111";
+    window.history.replaceState({}, "", `/library/books/${bookId}`);
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.endsWith("/api/v1/auth/me")
+        ? {
+            id: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
+            username: "admin",
+          }
+        : {
+            id: bookId,
+            title: "呐喊",
+            authors: ["鲁迅"],
+            translators: [],
+            isbn: null,
+            readingStatus: "unread",
+            tags: [],
+            shelves: [],
+            copyCount: 0,
+            fileCount: 0,
+            formats: [],
+            createdAt: 1_700_000_000_000,
+            updatedAt: 1_700_000_000_000,
+            description: null,
+            identifiers: [],
+            copies: [],
+            files: [],
+          };
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => body,
+      };
+    });
+
+    renderApp();
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "呐喊" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link", { name: "全部书籍" }).length,
+    ).toBeGreaterThan(0);
   });
 });

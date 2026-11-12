@@ -8,6 +8,7 @@ import {
   updateBook,
   type BookCreate,
   type BookDetail,
+  type BookUpdate,
   type ReadingStatus,
 } from "./books-api";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
@@ -35,6 +36,53 @@ function splitNames(value: string): string[] {
     .split(/[,，]/)
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
+}
+
+function sameNames(left: readonly string[], right: readonly string[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+interface BookFormValues {
+  authors: string[];
+  description: string | null;
+  isbn: string | null;
+  readingStatus: ReadingStatus;
+  shelves: string[];
+  tags: string[];
+  title: string;
+  translators: string[];
+}
+
+function buildUpdate(book: BookDetail, values: BookFormValues): BookUpdate {
+  const update: BookUpdate = {};
+  if (values.title !== book.title) {
+    update.title = values.title;
+  }
+  if ((values.description ?? "") !== (book.description ?? "")) {
+    update.description = values.description;
+  }
+  if (!sameNames(values.authors, book.authors)) {
+    update.authors = values.authors;
+  }
+  if (!sameNames(values.translators, book.translators)) {
+    update.translators = values.translators;
+  }
+  if ((values.isbn ?? "") !== (book.isbn ?? "")) {
+    update.isbn = values.isbn;
+  }
+  if (values.readingStatus !== book.readingStatus) {
+    update.readingStatus = values.readingStatus;
+  }
+  if (!sameNames(values.tags, book.tags)) {
+    update.tags = values.tags;
+  }
+  if (!sameNames(values.shelves, book.shelves)) {
+    update.shelves = values.shelves;
+  }
+  return update;
 }
 
 export function BookFormDialog({
@@ -76,7 +124,7 @@ export function BookFormDialog({
     setBusy(true);
     setError(null);
 
-    const body: BookCreate = {
+    const values: BookFormValues = {
       title: trimmedTitle,
       description:
         description.trim().length > 0 ? description.trim() : null,
@@ -89,10 +137,19 @@ export function BookFormDialog({
     };
 
     try {
-      const saved =
-        mode === "edit" && book !== undefined
-          ? await updateBook(book.id, body)
-          : await createBook(body);
+      let saved: BookDetail;
+      if (mode === "edit" && book !== undefined) {
+        const update = buildUpdate(book, values);
+        if (Object.keys(update).length === 0) {
+          setBusy(false);
+          onSaved(book, mode);
+          return;
+        }
+        saved = await updateBook(book.id, update);
+      } else {
+        const body: BookCreate = values;
+        saved = await createBook(body);
+      }
       setBusy(false);
       onSaved(saved, mode);
     } catch (cause) {
@@ -141,6 +198,7 @@ export function BookFormDialog({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
+                className="sm:col-span-2"
                 error={titleError}
                 htmlFor="book-title"
                 label={t("form.title")}

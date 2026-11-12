@@ -9,6 +9,7 @@ import {
   TagBadges,
 } from "./BookMeta";
 import type { BookSummary } from "./books-api";
+import { bookDetailHref } from "./navigation";
 import {
   COVER_FONT,
   ROW_GRID,
@@ -48,16 +49,16 @@ export function BookListItem({ book, onOpen }: BookListItemProps) {
       </div>
 
       <div className="min-w-0" role="cell">
-        <button
+        <a
           aria-label={t("detail.open", { title: book.title })}
           className="block max-w-full truncate text-left text-sm font-medium hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+          href={bookDetailHref(book.id)}
           onClick={() => {
             onOpen(book.id);
           }}
-          type="button"
         >
           {book.title}
-        </button>
+        </a>
         <span className="block truncate text-[13px] text-muted-foreground">
           {authors}
         </span>

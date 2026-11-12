@@ -11,6 +11,7 @@ export interface LibraryTopbarProps {
   onCompositionStart: () => void;
   onLogout: () => void;
   onSearchChange: (value: string) => void;
+  onSearchSubmit?: () => void;
   query: string;
 }
 
@@ -22,6 +23,7 @@ export function LibraryTopbar({
   onCompositionStart,
   onLogout,
   onSearchChange,
+  onSearchSubmit,
   query,
 }: LibraryTopbarProps) {
   const { t } = useTranslation("library");
@@ -68,7 +70,14 @@ export function LibraryTopbar({
         <Menu aria-hidden="true" />
       </IconButton>
 
-      <div className="relative min-w-0 max-w-[480px] flex-1">
+      <form
+        className="relative min-w-0 max-w-[480px] flex-1"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSearchSubmit?.();
+        }}
+        role="search"
+      >
         <Search
           aria-hidden="true"
           className="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-muted-foreground"
@@ -88,7 +97,7 @@ export function LibraryTopbar({
           type="search"
           value={query}
         />
-      </div>
+      </form>
 
       <div className="hidden flex-1 md:block" />
 

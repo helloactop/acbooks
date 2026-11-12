@@ -7,7 +7,6 @@ import {
 } from "@acbooks/ui";
 import {
   BookOpen,
-  CircleAlert,
   LayoutGrid,
   List,
   Plus,
@@ -18,15 +17,13 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { isAbortError, toApiError, type ApiError } from "../api/client";
-import { getCurrentAccount, logout, type Account } from "../auth/auth-api";
 import { AppShell } from "../layout/AppShell";
+import { AccountGuard } from "./account-guard";
 import { BookCard } from "./BookCard";
-import { BookDetailDialog } from "./BookDetailDialog";
-import { BookFormDialog, type BookFormMode } from "./BookFormDialog";
+import { BookFormDialog } from "./BookFormDialog";
 import { BookList } from "./BookList";
 import {
   getBooks,
-  type BookDetail,
   type BookListQuery,
   type BookSummary,
 } from "./books-api";
@@ -35,22 +32,23 @@ import { FilterSelect, type FilterOption } from "./FilterSelect";
 import { LibraryAlert } from "./LibraryAlert";
 import { LibrarySidebar } from "./LibrarySidebar";
 import { LibraryTopbar } from "./LibraryTopbar";
+import {
+  readInitialLibraryView,
+  saveLibraryScroll,
+  saveLibraryView,
+  takeLibraryScroll,
+  type SortOrder,
+  type StatusFilter,
+  type TypeFilter,
+  type ViewMode,
+} from "./library-view-state";
+import {
+  redirectHome,
+  redirectToExpiredLogin,
+  redirectToLogin,
+} from "./navigation";
 import { Pagination } from "./Pagination";
-
-type TypeFilter = "all" | "digital" | "physical";
-type StatusFilter = "all" | "done" | "reading" | "unread";
-type SortOrder = "author" | "recent" | "title";
-type ViewMode = "grid" | "list";
-
-type DialogState =
-  | { mode: "create" }
-  | { mode: "detail"; bookId: string }
-  | { mode: "edit"; book: BookDetail };
-
-type GuardState =
-  | { status: "error" }
-  | { status: "loading" }
-  | { account: Account; status: "ready" };
+import { useLibraryLogout } from "./use-library-logout";
 
 const PAGE_SIZE = 12;
 
@@ -58,18 +56,6 @@ export interface LibraryPageProps {
   onLoggedOut?: () => void;
   onSessionExpired?: () => void;
   onUnauthenticated?: () => void;
-}
-
-function redirectToLogin(): void {
-  window.location.replace("/");
-}
-
-function redirectToExpiredLogin(): void {
-  window.location.replace("/?expired=1");
-}
-
-function redirectHome(): void {
-  window.location.assign("/");
 }
 
 function option(value: string, label: string): FilterOption {
@@ -89,26 +75,29 @@ function LibraryContent({
 }: LibraryContentProps) {
   const { t } = useTranslation("library");
   const { resolvedLanguage } = useLanguage();
+  const [initialView] = useState(readInitialLibraryView);
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
-  const [query, setQuery] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [type, setType] = useState<TypeFilter>("all");
-  const [status, setStatus] = useState<StatusFilter>("all");
-  const [sort, setSort] = useState<SortOrder>("recent");
-  const [view, setView] = useState<ViewMode>("grid");
+  const [offset, setOffset] = useState(initialView.offset);
+  const [query, setQuery] = useState(initialView.query);
+  const [searchTerm, setSearchTerm] = useState(initialView.searchTerm);
+  const [type, setType] = useState<TypeFilter>(initialView.type);
+  const [status, setStatus] = useState<StatusFilter>(initialView.status);
+  const [sort, setSort] = useState<SortOrder>(initialView.sort);
+  const [view, setView] = useState<ViewMode>(initialView.view);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [dialog, setDialog] = useState<DialogState | null>(null);
-  const [loggingOut, setLoggingOut] = useState(false);
-  const [logoutError, setLogoutError] = useState<string | undefined>(
-    undefined,
-  );
+  const [createOpen, setCreateOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+  const scrollRestored = useRef(false);
+  const { handleLogout, loggingOut, logoutError } = useLibraryLogout({
+    onLoggedOut,
+    onSessionExpired,
+  });
   const searchTimer = useRef<number | undefined>(undefined);
   const composingRef = useRef(false);
-  const searchTermRef = useRef("");
+  const searchTermRef = useRef(initialView.searchTerm);
 
   useEffect(
     () => () => {
@@ -118,6 +107,57 @@ function LibraryContent({
     },
     [],
   );
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("q")) {
+      return;
+    }
+    params.delete("q");
+    const search = params.toString();
+    window.history.replaceState(
+      {},
+      "",
+      `${window.location.pathname}${search.length > 0 ? `?${search}` : ""}${
+        window.location.hash
+      }`,
+    );
+  }, []);
+
+  useEffect(() => {
+    saveLibraryView({ offset, query, searchTerm, sort, status, type, view });
+  }, [offset, query, searchTerm, sort, status, type, view]);
+
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setLoading(true);
+        setError(null);
+        setReloadKey((current) => current + 1);
+      }
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (loading || scrollRestored.current) {
+      return;
+    }
+    scrollRestored.current = true;
+    const scrollTop = takeLibraryScroll();
+    if (scrollTop <= 0) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      mainRef.current?.scrollTo({ top: scrollTop });
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [loading]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -238,27 +278,14 @@ function LibraryContent({
     setReloadKey((current) => current + 1);
   };
 
-  const handleSaved = (_book: BookDetail, mode: BookFormMode) => {
-    setDialog(null);
-    refreshLibrary(mode === "create");
+  const handleCreated = () => {
+    setCreateOpen(false);
+    refreshLibrary(true);
   };
 
-  const handleLogout = async () => {
-    setLoggingOut(true);
-    setLogoutError(undefined);
-    try {
-      await logout();
-      setLoggingOut(false);
-      onLoggedOut();
-    } catch (cause) {
-      const apiError = toApiError(cause);
-      setLoggingOut(false);
-      if (apiError.status === 401) {
-        onSessionExpired();
-        return;
-      }
-      setLogoutError(libraryErrorMessage(t, apiError));
-    }
+  const openBook = () => {
+    saveLibraryView({ offset, query, searchTerm, sort, status, type, view });
+    saveLibraryScroll(mainRef.current?.scrollTop ?? 0);
   };
 
   const typeOptions: readonly FilterOption[] = [
@@ -332,9 +359,13 @@ function LibraryContent({
           onSearchChange={(value) => {
             commitSearch(value);
           }}
+          onSearchSubmit={() => {
+            commitSearch(query, true);
+          }}
           query={query}
         />
       }
+      mainRef={mainRef}
       sidebar={<LibrarySidebar />}
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -351,7 +382,7 @@ function LibraryContent({
         </div>
         <Button
           onClick={() => {
-            setDialog({ mode: "create" });
+            setCreateOpen(true);
           }}
           variant="soft"
         >
@@ -457,7 +488,7 @@ function LibraryContent({
             <Button
               className="mt-2"
               onClick={() => {
-                setDialog({ mode: "create" });
+                setCreateOpen(true);
               }}
               variant="soft"
             >
@@ -472,18 +503,14 @@ function LibraryContent({
             <BookCard
               key={book.id}
               book={book}
-              onOpen={(bookId) => {
-                setDialog({ mode: "detail", bookId });
-              }}
+              onOpen={openBook}
             />
           ))}
         </div>
       ) : (
         <BookList
           books={books}
-          onOpen={(bookId) => {
-            setDialog({ mode: "detail", bookId });
-          }}
+          onOpen={openBook}
         />
       )}
 
@@ -498,40 +525,13 @@ function LibraryContent({
         total={total}
       />
 
-      {dialog?.mode === "create" ? (
+      {createOpen ? (
         <BookFormDialog
           mode="create"
           onClose={() => {
-            setDialog(null);
+            setCreateOpen(false);
           }}
-          onSaved={handleSaved}
-          onSessionExpired={onSessionExpired}
-        />
-      ) : null}
-
-      {dialog?.mode === "edit" ? (
-        <BookFormDialog
-          key={dialog.book.id}
-          book={dialog.book}
-          mode="edit"
-          onClose={() => {
-            setDialog(null);
-          }}
-          onSaved={handleSaved}
-          onSessionExpired={onSessionExpired}
-        />
-      ) : null}
-
-      {dialog?.mode === "detail" ? (
-        <BookDetailDialog
-          key={dialog.bookId}
-          bookId={dialog.bookId}
-          onClose={() => {
-            setDialog(null);
-          }}
-          onEdit={(book) => {
-            setDialog({ mode: "edit", book });
-          }}
+          onSaved={handleCreated}
           onSessionExpired={onSessionExpired}
         />
       ) : null}
@@ -544,85 +544,15 @@ export function LibraryPage({
   onSessionExpired = redirectToExpiredLogin,
   onUnauthenticated = redirectToLogin,
 }: LibraryPageProps) {
-  const { t } = useTranslation("library");
-  const [guard, setGuard] = useState<GuardState>({ status: "loading" });
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        const account = await getCurrentAccount();
-        if (cancelled) {
-          return;
-        }
-        if (account === null) {
-          onUnauthenticated();
-          return;
-        }
-        setGuard({ account, status: "ready" });
-      } catch {
-        if (!cancelled) {
-          setGuard({ status: "error" });
-        }
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [attempt, onUnauthenticated]);
-
-  if (guard.status === "loading") {
-    return (
-      <div className="flex h-dvh items-center justify-center bg-frame">
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <Spinner label={t("guard.loading")} />
-          <span>{t("guard.loading")}</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (guard.status === "error") {
-    return (
-      <div className="flex h-dvh items-center justify-center bg-frame p-4">
-        <div className="w-full max-w-[400px] rounded-panel border border-border bg-background p-6 text-center">
-          <CircleAlert
-            aria-hidden="true"
-            className="mx-auto size-8 text-destructive-text"
-            strokeWidth={2}
-          />
-          <h1 className="mt-3 text-xl font-semibold">
-            {t("guard.errorTitle")}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t("guard.errorDescription")}
-          </p>
-          <Button
-            className="mt-5 w-full"
-            onClick={() => {
-              setGuard({ status: "loading" });
-              setAttempt((current) => current + 1);
-            }}
-            size="lg"
-            variant="soft"
-          >
-            <RefreshCw aria-hidden="true" />
-            {t("guard.retry")}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <LibraryContent
-      accountName={guard.account.username}
-      onLoggedOut={onLoggedOut}
-      onSessionExpired={onSessionExpired}
-    />
+    <AccountGuard onUnauthenticated={onUnauthenticated}>
+      {(account) => (
+        <LibraryContent
+          accountName={account.username}
+          onLoggedOut={onLoggedOut}
+          onSessionExpired={onSessionExpired}
+        />
+      )}
+    </AccountGuard>
   );
 }

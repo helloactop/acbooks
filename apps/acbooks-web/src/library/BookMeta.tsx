@@ -10,6 +10,10 @@ const FORMAT_CLASS = cn(
   "border border-border bg-background text-foreground",
 );
 const PHYSICAL_CLASS = cn(CHIP, "bg-surface-active text-foreground");
+const SHELF_CLASS = cn(
+  CHIP,
+  "border border-border bg-background text-foreground",
+);
 
 const STATUS_CLASSES: Record<ReadingStatus, string> = {
   done: cn(CHIP, "bg-accent-soft text-accent-text"),
@@ -68,6 +72,22 @@ export function PhysicalCopiesBadge({ count }: { count: number }) {
     <span className={PHYSICAL_CLASS}>
       {t("labels.physicalCopies", { count })}
     </span>
+  );
+}
+
+export function ShelfBadges({ shelves }: { shelves: readonly string[] }) {
+  const labels = unique(shelves);
+  if (labels.length === 0) {
+    return null;
+  }
+  return (
+    <>
+      {labels.map((shelf) => (
+        <span key={shelf} className={SHELF_CLASS}>
+          {shelf}
+        </span>
+      ))}
+    </>
   );
 }
 

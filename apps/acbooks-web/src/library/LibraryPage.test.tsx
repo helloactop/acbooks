@@ -183,6 +183,7 @@ function findCall(method: string, pathname: string) {
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.sessionStorage.clear();
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
   vi.spyOn(window.navigator, "languages", "get").mockReturnValue(["zh-CN"]);
@@ -530,42 +531,11 @@ describe("LibraryPage", () => {
     });
   });
 
-  it("shows real details and edits a book", async () => {
-    let current = BOOK1;
+  it("links books to the detail route and keeps the library view", async () => {
     installApi(
       baseHandler((url, init) => {
-        const method = methodOf(init);
-        if (url.pathname === "/api/v1/books" && method === "GET") {
-          return jsonResponse(makePage([current], 1));
-        }
-        if (
-          url.pathname === `/api/v1/books/${current.id}` &&
-          method === "GET"
-        ) {
-          return jsonResponse(detailFor(current));
-        }
-        if (
-          url.pathname === `/api/v1/books/${current.id}` &&
-          method === "PATCH"
-        ) {
-          const body = JSON.parse(String(init.body)) as {
-            authors: string[];
-            readingStatus: BookSummary["readingStatus"];
-            shelves: string[];
-            tags: string[];
-            title: string;
-            translators: string[];
-          };
-          current = summary({
-            ...current,
-            title: body.title,
-            authors: body.authors,
-            translators: body.translators,
-            readingStatus: body.readingStatus,
-            tags: body.tags,
-            shelves: body.shelves,
-          });
-          return jsonResponse(detailFor(current));
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1], 1));
         }
         throw new Error(`Unexpected request ${url.pathname}`);
       }),
@@ -574,50 +544,19 @@ describe("LibraryPage", () => {
     renderLibrary();
     await screen.findByRole("article", { name: "呐喊" });
 
-    await user.click(
-      screen.getByRole("button", { name: "查看《呐喊》详情" }),
-    );
-    const detailDialog = await screen.findByRole("dialog", {
-      name: "书籍详情",
-    });
-    expect(within(detailDialog).getByText("实体副本")).toBeInTheDocument();
-    expect(within(detailDialog).getByText("电子文件")).toBeInTheDocument();
-    expect(within(detailDialog).getByText("译者甲")).toBeInTheDocument();
-    expect(within(detailDialog).getByText("9787020002207")).toBeInTheDocument();
-    expect(within(detailDialog).getAllByText("可用")).toHaveLength(2);
-    expect(within(detailDialog).getAllByText("2 KB")).toHaveLength(2);
     expect(
-      within(detailDialog).queryAllByRole("progressbar"),
-    ).toHaveLength(0);
+      screen.getByRole("link", { name: "查看《呐喊》详情" }),
+    ).toHaveAttribute("href", `/library/books/${BOOK1.id}`);
 
-    await user.click(within(detailDialog).getByRole("button", { name: "编辑" }));
-    const formDialog = await screen.findByRole("dialog", {
-      name: "编辑书籍",
-    });
-    const title = within(formDialog).getByLabelText("书名");
-    expect(title).toHaveValue("呐喊");
-    await user.clear(title);
-    await user.type(title, "呐喊（修订）");
-    await user.click(within(formDialog).getByRole("button", { name: "保存" }));
-
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "状态" }),
+      "reading",
+    );
     await waitFor(() => {
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    });
-    expect(
-      await screen.findByRole("article", { name: "呐喊（修订）" }),
-    ).toBeInTheDocument();
-
-    const patch = findCall(
-      "PATCH",
-      `/api/v1/books/${BOOK1.id}`,
-    );
-    expect(patch).toBeDefined();
-    const init = (patch?.[1] ?? {}) as RequestInit;
-    expect(
-      (init.headers as Record<string, string>)["X-CSRF-Token"],
-    ).toBe("csrf-token");
-    expect(JSON.parse(String(init.body))).toMatchObject({
-      title: "呐喊（修订）",
+      const saved = JSON.parse(
+        window.sessionStorage.getItem("acbooks-library-view") ?? "{}",
+      ) as { status?: string };
+      expect(saved.status).toBe("reading");
     });
   });
 
