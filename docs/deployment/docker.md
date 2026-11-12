@@ -12,7 +12,8 @@ curl -fsS http://127.0.0.1:8000/api/v1/health
 
 `migrate` 先执行 `alembic upgrade head`，并为尚未初始化的数据库准备一次性初始化码。
 它成功退出后，Compose 才会启动 API 和 Worker。预期状态为 `migrate` 退出码 0、
-`api` 健康、`worker` 运行。Worker 会检查任务表并在整个进程生命周期内持有排他锁。
+`api` 和 `worker` 健康。Worker 获取排他锁并检查任务表后才通过健康探针，
+`up --wait` 会等待该探针通过。
 当前 Worker 只提供进程生命周期，扫描、导入等任务处理器接入后才会消费队列。
 如果启动失败，运行 `docker compose -f deploy/compose.yaml logs migrate api worker` 查看原因。
 
