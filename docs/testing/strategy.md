@@ -43,8 +43,16 @@ Web、Windows 客户端和 Android 工程初始化后，再接入各自的构建
 
 ## Docker 部署验收
 
-使用独立的 Compose 项目和空数据卷，按 [Docker 部署说明](../deployment/docker.md)启动。
-检查迁移退出码、API 健康状态、Worker 启动日志、非 root 用户以及 SQLite WAL 模式。
-尝试在同一数据卷启动第二个 Worker，确认排他锁拒绝它，并验证第一个 Worker 能正常停止。
-在测试项目中让迁移因权限不足失败，确认 API 和 Worker 均未启动。恢复权限后重建容器，
-确认原有数据库记录仍在，已使用的初始化码没有重新生成。
+CI 在 Ubuntu AMD64 和 ARM64 上运行真实 Docker Compose 集成测试。测试使用独立的项目、
+临时端口和空数据卷，并在结束后清理容器与数据卷。可在 Docker Engine 运行时从仓库根目录复现。
+
+```sh
+python apps/acbooks-server/tests/compose/smoke.py
+```
+
+- 验证迁移权限错误阻止 API 和 Worker 启动，修复权限后检查 Alembic 版本、非 root 用户和 SQLite WAL。
+- 通过启用证书校验的 Caddy HTTPS 代理创建管理员，验证 Cookie、一次性初始化码和代理信任边界。
+- 用共享数据卷启动第二个 Worker，验证排他锁和正常关闭，并验证未就绪的 Worker 无法通过 `up --wait`。
+- 重建容器后验证管理员 ID 保留，已使用的初始化码没有重新生成。
+
+目标 NAS 的实际绑定目录、域名和代理配置仍需按 [Docker 部署说明](../deployment/docker.md)验收。
