@@ -12,7 +12,8 @@ python -m uvicorn app.main:create_app --factory --no-access-log
 
 环境变量 `ACBOOKS_ENABLE_DOCS` 默认为 `false`，设为 `true` 可开启
 `/docs`。OpenAPI 始终在 `/openapi.json` 提供。健康检查见
-[后端健康检查](../../docs/api/health.md)。
+[后端健康检查](../../docs/api/health.md)，Books Core V1 见
+[Books API](../../docs/api/books.md)。
 
 ## SQLite 与迁移
 

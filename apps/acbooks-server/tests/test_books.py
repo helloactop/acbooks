@@ -1,0 +1,550 @@
+from collections.abc import Iterator
+from pathlib import Path
+from time import sleep
+from typing import Any
+from uuid import UUID, uuid4
+
+import pytest
+from alembic import command
+from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+from test_database import migration_config
+from test_setup import (
+    ORIGIN,
+    SETUP,
+    assert_problem,
+    challenge,
+    make_client,
+    payload,
+)
+from test_web_auth import CREDENTIALS, LOGIN
+
+from app.db.models.books import (
+    Book,
+    BookContributor,
+    BookIdentifier,
+    Contributor,
+    Shelf,
+    Tag,
+)
+from app.db.models.copies import BookCopy
+from app.db.models.reading import ReadingSession
+from app.db.models.storage import BookFile, StorageObject, StorageRoot
+from app.db.session import create_sqlite_engine
+from app.modules.auth.provision import main as provision_installation
+
+BOOKS = "/api/v1/books"
+
+
+@pytest.fixture
+def paths(tmp_path: Path) -> tuple[Path, Path]:
+    paths = tmp_path / "acbooks.db", tmp_path / "secrets" / "setup-code"
+    command.upgrade(migration_config(paths[0]), "head")
+    provision_installation(*paths)
+    return paths
+
+
+@pytest.fixture
+def browser(paths: tuple[Path, Path]) -> Iterator[TestClient]:
+    with make_client(paths) as client:
+        setup = client.post(SETUP, json=payload(paths[1]), headers=challenge(client))
+        assert setup.status_code == 201
+        login = client.post(LOGIN, json=CREDENTIALS, headers=challenge(client))
+        assert login.status_code == 200
+        yield client
+
+
+def book_payload(**changes: object) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "title": "呐喊",
+        "description": "一部短篇小说集。",
+        "authors": ["鲁迅"],
+        "translators": [],
+        "isbn": "978-7-02-000220-7",
+        "readingStatus": "unread",
+        "tags": ["文学"],
+        "shelves": ["书房"],
+    }
+    body.update(changes)
+    return body
+
+
+def create_book(client: TestClient, **changes: object) -> dict[str, Any]:
+    response = client.post(
+        BOOKS, json=book_payload(**changes), headers=challenge(client)
+    )
+    assert response.status_code == 201, response.text
+    result: dict[str, Any] = response.json()
+    return result
+
+
+def test_create_book_persists_metadata_and_does_not_merge_isbn(
+    paths: tuple[Path, Path], browser: TestClient
+) -> None:
+    response = browser.post(BOOKS, json=book_payload(), headers=challenge(browser))
+    assert response.status_code == 201, response.text
+    book = response.json()
+    assert response.headers["location"] == f"/api/v1/books/{book['id']}"
+    UUID(book["id"])
+    assert book["title"] == "呐喊"
+    assert book["description"] == "一部短篇小说集。"
+    assert book["authors"] == ["鲁迅"]
+    assert book["translators"] == []
+    assert book["isbn"] == "9787020002207"
+    assert book["identifiers"] == [{"scheme": "isbn", "value": "9787020002207"}]
+    assert book["readingStatus"] == "unread"
+    assert book["tags"] == ["文学"]
+    assert book["shelves"] == ["书房"]
+    assert book["copyCount"] == 0
+    assert book["fileCount"] == 0
+    assert book["formats"] == []
+    assert book["copies"] == []
+    assert book["files"] == []
+    assert book["createdAt"] == book["updatedAt"] > 0
+
+    detail = browser.get(f"{BOOKS}/{book['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["description"] == "一部短篇小说集。"
+
+    second = create_book(browser, title="同名不同书")
+    assert second["id"] != book["id"]
+    listing = browser.get(BOOKS)
+    assert listing.status_code == 200
+    assert listing.json()["total"] == 2
+
+    engine = create_sqlite_engine(paths[0])
+    try:
+        with Session(engine) as session:
+            assert session.scalar(select(func.count()).select_from(Book)) == 2
+            assert session.scalar(select(func.count()).select_from(BookIdentifier)) == 2
+            assert session.scalar(select(func.count()).select_from(Contributor)) == 1
+            assert session.scalar(select(func.count()).select_from(Tag)) == 1
+            assert session.scalar(select(func.count()).select_from(Shelf)) == 1
+            roles = {
+                (name, role)
+                for name, role in session.execute(
+                    select(Contributor.name, BookContributor.role).join(
+                        BookContributor,
+                        BookContributor.contributor_id == Contributor.id,
+                    )
+                )
+            }
+            assert ("鲁迅", "author") in roles
+    finally:
+        engine.dispose()
+
+
+def test_create_book_defaults_to_unread(browser: TestClient) -> None:
+    body = book_payload()
+    body.pop("readingStatus")
+    response = browser.post(BOOKS, json=body, headers=challenge(browser))
+    assert response.status_code == 201, response.text
+    assert response.json()["readingStatus"] == "unread"
+
+
+def test_list_books_searches_filters_sorts_and_paginates(
+    paths: tuple[Path, Path], browser: TestClient
+) -> None:
+    alpha = create_book(
+        browser,
+        title="Alpha",
+        authors=["Author One"],
+        translators=["Translator One"],
+        isbn="978-0-306-40615-7",
+        readingStatus="unread",
+        tags=["fiction"],
+        shelves=["Shelf A"],
+    )
+    beta = create_book(
+        browser,
+        title="Beta",
+        authors=["Author Two"],
+        isbn="0306406152",
+        readingStatus="reading",
+        tags=["science"],
+        shelves=["Shelf B"],
+    )
+    create_book(
+        browser,
+        title="Gamma",
+        authors=["Author One"],
+        isbn=None,
+        readingStatus="done",
+        tags=["fiction"],
+        shelves=["Shelf A"],
+    )
+
+    engine = create_sqlite_engine(paths[0])
+    try:
+        with Session(engine) as session, session.begin():
+            session.add(
+                BookCopy(
+                    id=str(uuid4()),
+                    book_id=alpha["id"],
+                    location_id=None,
+                    acquired_at=None,
+                    note="副本",
+                )
+            )
+            root_id = str(uuid4())
+            object_id = str(uuid4())
+            session.add(
+                StorageRoot(
+                    id=root_id,
+                    name="Test root",
+                    root_path="/tmp/acbooks-books-test",
+                    mode="managed",
+                )
+            )
+            session.flush()
+            session.add(
+                StorageObject(
+                    id=object_id,
+                    root_id=root_id,
+                    relative_path="beta.epub",
+                    size_bytes=123,
+                    sha256=None,
+                    file_status="present",
+                    mtime_ms=0,
+                )
+            )
+            session.flush()
+            session.add(
+                BookFile(
+                    id=str(uuid4()),
+                    book_id=beta["id"],
+                    storage_object_id=object_id,
+                    format="epub",
+                )
+            )
+        with Session(engine) as session:
+            shelf_a = session.scalar(
+                select(Shelf.id).where(Shelf.name == "Shelf A")
+            )
+        assert shelf_a is not None
+    finally:
+        engine.dispose()
+
+    page = browser.get(BOOKS)
+    assert page.status_code == 200
+    assert page.json()["total"] == 3
+    assert page.json()["limit"] == 20
+    assert page.json()["offset"] == 0
+
+    assert [
+        item["title"] for item in browser.get(BOOKS, params={"q": "Alpha"}).json()["items"]
+    ] == ["Alpha"]
+    assert (
+        browser.get(BOOKS, params={"q": "Author One"}).json()["total"] == 2
+    )
+    assert (
+        browser.get(BOOKS, params={"q": "Translator One"}).json()["total"] == 1
+    )
+    assert (
+        browser.get(BOOKS, params={"q": "978-0-306-40615-7"}).json()["total"] == 1
+    )
+    assert (
+        browser.get(BOOKS, params={"readingStatus": "reading"}).json()["total"]
+        == 1
+    )
+    assert browser.get(BOOKS, params={"tag": "fiction"}).json()["total"] == 2
+    assert browser.get(BOOKS, params={"shelfId": shelf_a}).json()["total"] == 2
+    assert browser.get(BOOKS, params={"mediaType": "physical"}).json()["total"] == 1
+    assert browser.get(BOOKS, params={"mediaType": "digital"}).json()["total"] == 1
+    assert browser.get(BOOKS, params={"format": "epub"}).json()["total"] == 1
+
+    titles = [
+        item["title"]
+        for item in browser.get(
+            BOOKS, params={"sort": "title", "order": "asc"}
+        ).json()["items"]
+    ]
+    assert titles == ["Alpha", "Beta", "Gamma"]
+    authors = [
+        item["authors"][0]
+        for item in browser.get(
+            BOOKS, params={"sort": "author", "order": "asc"}
+        ).json()["items"]
+    ]
+    assert authors == ["Author One", "Author One", "Author Two"]
+
+    first_page = browser.get(BOOKS, params={"limit": 2, "offset": 0}).json()
+    assert len(first_page["items"]) == 2
+    assert first_page["total"] == 3
+    second_page = browser.get(BOOKS, params={"limit": 2, "offset": 2}).json()
+    assert len(second_page["items"]) == 1
+
+    items = {item["id"]: item for item in page.json()["items"]}
+    assert items[alpha["id"]]["copyCount"] == 1
+    assert items[alpha["id"]]["fileCount"] == 0
+    assert items[beta["id"]]["fileCount"] == 1
+    assert items[beta["id"]]["formats"] == ["epub"]
+
+    alpha_detail = browser.get(f"{BOOKS}/{alpha['id']}").json()
+    assert len(alpha_detail["copies"]) == 1
+    assert alpha_detail["copies"][0]["note"] == "副本"
+    assert alpha_detail["copies"][0]["locationName"] is None
+    beta_detail = browser.get(f"{BOOKS}/{beta['id']}").json()
+    assert beta_detail["files"] == [
+        {
+            "id": beta_detail["files"][0]["id"],
+            "format": "epub",
+            "fileStatus": "present",
+            "sizeBytes": 123,
+        }
+    ]
+
+
+def test_patch_book_preserves_copies_files_and_reading_data(
+    paths: tuple[Path, Path], browser: TestClient
+) -> None:
+    book = create_book(browser)
+    book_id = book["id"]
+    engine = create_sqlite_engine(paths[0])
+    try:
+        with Session(engine) as session, session.begin():
+            session.add(
+                BookCopy(
+                    id=str(uuid4()),
+                    book_id=book_id,
+                    location_id=None,
+                    acquired_at=None,
+                    note="保留副本",
+                )
+            )
+            session.add(
+                ReadingSession(
+                    id=str(uuid4()),
+                    book_id=book_id,
+                    book_file_id=None,
+                    device_id=None,
+                    started_at=1_000,
+                    ended_at=2_000,
+                    active_seconds=1_000,
+                    source="manual",
+                )
+            )
+    finally:
+        engine.dispose()
+
+    sleep(0.002)
+    response = browser.patch(
+        f"{BOOKS}/{book_id}",
+        json={
+            "title": "新标题",
+            "description": "新简介",
+            "authors": ["新作者"],
+            "translators": [],
+            "isbn": None,
+            "readingStatus": "done",
+            "tags": ["新标签"],
+            "shelves": ["新书架"],
+        },
+        headers=challenge(browser),
+    )
+    assert response.status_code == 200, response.text
+    updated = response.json()
+    assert updated["title"] == "新标题"
+    assert updated["description"] == "新简介"
+    assert updated["authors"] == ["新作者"]
+    assert updated["translators"] == []
+    assert updated["isbn"] is None
+    assert updated["identifiers"] == []
+    assert updated["readingStatus"] == "done"
+    assert updated["tags"] == ["新标签"]
+    assert updated["shelves"] == ["新书架"]
+    assert updated["copyCount"] == 1
+    assert updated["updatedAt"] >= updated["createdAt"]
+
+    partial = browser.patch(
+        f"{BOOKS}/{book_id}",
+        json={"readingStatus": "reading"},
+        headers=challenge(browser),
+    )
+    assert partial.status_code == 200
+    assert partial.json()["title"] == "新标题"
+    assert partial.json()["authors"] == ["新作者"]
+    assert partial.json()["tags"] == ["新标签"]
+    assert partial.json()["copyCount"] == 1
+
+    engine = create_sqlite_engine(paths[0])
+    try:
+        with Session(engine) as session:
+            assert session.scalar(select(func.count()).select_from(BookCopy)) == 1
+            assert (
+                session.scalar(select(func.count()).select_from(ReadingSession))
+                == 1
+            )
+            names = set(
+                session.execute(
+                    select(Contributor.name)
+                    .join(
+                        BookContributor,
+                        BookContributor.contributor_id == Contributor.id,
+                    )
+                    .where(
+                        BookContributor.book_id == book_id,
+                        BookContributor.role == "author",
+                    )
+                ).scalars()
+            )
+            assert names == {"新作者"}
+    finally:
+        engine.dispose()
+
+    assert_problem(
+        browser.patch(
+            f"{BOOKS}/{book_id}", json={}, headers=challenge(browser)
+        ),
+        422,
+        "VALIDATION_ERROR",
+    )
+    assert_problem(
+        browser.patch(
+            f"{BOOKS}/{book_id}",
+            json={"title": None},
+            headers=challenge(browser),
+        ),
+        422,
+        "VALIDATION_ERROR",
+    )
+    assert_problem(
+        browser.patch(
+            f"{BOOKS}/{book_id}",
+            json={"isbn": "not-an-isbn"},
+            headers=challenge(browser),
+        ),
+        422,
+        "VALIDATION_ERROR",
+    )
+    assert_problem(
+        browser.patch(
+            f"{BOOKS}/{uuid4()}",
+            json={"title": "Missing"},
+            headers=challenge(browser),
+        ),
+        404,
+        "BOOK_NOT_FOUND",
+    )
+
+
+def test_books_require_session_and_csrf(
+    paths: tuple[Path, Path], browser: TestClient
+) -> None:
+    with make_client(paths) as anonymous:
+        assert_problem(anonymous.get(BOOKS), 401, "UNAUTHORIZED")
+        assert_problem(
+            anonymous.post(BOOKS, json=book_payload()), 401, "UNAUTHORIZED"
+        )
+
+    assert browser.get(BOOKS).status_code == 200
+    assert_problem(
+        browser.post(BOOKS, json=book_payload()),
+        403,
+        "FORBIDDEN",
+    )
+
+    headers = challenge(browser)
+    headers["Origin"] = "https://evil.example"
+    assert_problem(
+        browser.post(BOOKS, json=book_payload(), headers=headers),
+        403,
+        "FORBIDDEN",
+    )
+    assert_problem(
+        browser.patch(
+            f"{BOOKS}/{uuid4()}", json={"title": "Blocked"}, headers={"Origin": ORIGIN}
+        ),
+        403,
+        "FORBIDDEN",
+    )
+    assert_problem(
+        browser.delete(f"{BOOKS}/{uuid4()}"), 405, "METHOD_NOT_ALLOWED"
+    )
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"title": ""},
+        {"title": "   "},
+        {"readingStatus": "finished"},
+        {"isbn": "not-an-isbn"},
+        {"authors": [""]},
+        {"unexpected": "value"},
+    ],
+)
+def test_create_book_validation(
+    browser: TestClient, changes: dict[str, object]
+) -> None:
+    response = browser.post(
+        BOOKS, json=book_payload(**changes), headers=challenge(browser)
+    )
+    assert_problem(response, 422, "VALIDATION_ERROR")
+
+
+def test_search_treats_like_wildcards_as_literals(browser: TestClient) -> None:
+    create_book(browser, title="100% Real", isbn=None)
+    create_book(browser, title="Plain", isbn=None)
+
+    response = browser.get(BOOKS, params={"q": "%"})
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+    assert response.json()["items"][0]["title"] == "100% Real"
+
+
+def test_books_openapi_contract(browser: TestClient) -> None:
+    schema = browser.get("/openapi.json").json()
+    paths = schema["paths"]
+    collection = paths[BOOKS]
+    item = paths[f"{BOOKS}/{{bookId}}"]
+
+    assert collection["get"]["operationId"] == "listBooks"
+    assert collection["post"]["operationId"] == "createBook"
+    assert item["get"]["operationId"] == "getBook"
+    assert item["patch"]["operationId"] == "updateBook"
+    assert "delete" not in item
+
+    security = {
+        name
+        for requirement in item["get"]["security"]
+        for name in requirement
+    }
+    assert "WebSession" in security
+
+    post_security = {
+        name
+        for requirement in collection["post"]["security"]
+        for name in requirement
+    }
+    assert "WebSession" in post_security
+    assert "Location" in collection["post"]["responses"]["201"]["headers"]
+
+    query_parameters = {
+        parameter["name"] for parameter in collection["get"]["parameters"]
+    }
+    assert {
+        "q",
+        "readingStatus",
+        "tag",
+        "shelfId",
+        "mediaType",
+        "format",
+        "sort",
+        "order",
+        "limit",
+        "offset",
+    } <= query_parameters
+    path_parameters = {
+        parameter["name"] for parameter in item["get"]["parameters"]
+    }
+    assert "bookId" in path_parameters
+
+    schemas = schema["components"]["schemas"]
+    assert "BookCreate" in schemas
+    assert "BookUpdate" in schemas
+    assert "BookDetail" in schemas
+    assert "BookPage" in schemas
+    assert "title" in schemas["BookCreate"]["required"]
+    assert "readingStatus" in schemas["BookCreate"]["properties"]

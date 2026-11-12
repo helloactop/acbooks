@@ -12,9 +12,13 @@ from app.api.errors import internal_error, register_exception_handlers
 from app.api.health import router as health_router
 from app.core.config import Settings
 from app.db.session import DATABASE_PATH, create_sqlite_engine
+from app.modules.auth.csrf import CsrfTokens
+from app.modules.auth.dependencies import AuthDependencies
 from app.modules.auth.router import auth_router
 from app.modules.auth.service import SetupService, WebAuthService
 from app.modules.auth.setup_code import SETUP_CODE_PATH
+from app.modules.books.router import books_router
+from app.modules.books.service import BooksService
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -42,13 +46,21 @@ def create_app(
         lifespan=lifespan,
     )
     register_exception_handlers(app)
+    auth = WebAuthService(engine, settings.web_session_ttl_seconds)
+    dependencies = AuthDependencies(
+        auth, settings.public_origin, CsrfTokens()
+    )
     app.include_router(health_router, prefix="/api/v1")
     app.include_router(
         auth_router(
             SetupService(engine, setup_code_path),
-            WebAuthService(engine, settings.web_session_ttl_seconds),
-            settings.public_origin,
+            auth,
+            dependencies,
         ),
+        prefix="/api/v1",
+    )
+    app.include_router(
+        books_router(BooksService(engine), dependencies),
         prefix="/api/v1",
     )
 

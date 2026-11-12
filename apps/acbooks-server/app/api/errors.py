@@ -2,7 +2,7 @@ import logging
 from collections.abc import Mapping
 from http import HTTPStatus
 from traceback import walk_tb
-from typing import cast
+from typing import Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -23,7 +23,19 @@ _BUSINESS_PROBLEMS = {
         "Setup has already been completed.",
     ),
     BusinessErrorCode.RATE_LIMITED: (HTTPStatus.TOO_MANY_REQUESTS, "Too many requests."),
+    BusinessErrorCode.BOOK_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Book not found."),
 }
+
+
+def problem_openapi(status: int) -> dict[str, Any]:
+    headers = {"Retry-After": {"schema": {"type": "integer"}}} if status == 429 else {}
+    return {
+        "description": HTTPStatus(status).phrase,
+        "headers": headers,
+        "content": {
+            "application/problem+json": {"schema": Problem.model_json_schema(mode="serialization")}
+        },
+    }
 
 
 class Problem(BaseModel):

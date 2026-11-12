@@ -38,6 +38,7 @@ pnpm build
 | pytest | SQLite 临时文件库上的 Alembic 升降级、模型一致性、异常回滚重试、连接参数、外键和唯一约束、任务和文件状态校验、并发写入及在线备份恢复 |
 | pytest | 首次管理员初始化的码文件生成与权限、来源和 CSRF 验证、密码校验与 Argon2id 存储、限速、双应用实例并发、事务失败重试及清理失败后的重启 |
 | pytest | Web 密码登录与限速、Cookie 属性、会话摘要与过期、重启持久化、会话轮换、CSRF 来源与绑定、单会话注销 |
+| pytest | Books Core V1：创建书目、重复 ISBN 不合并、作者/译者/ISBN/标签/书架关联、数据库级搜索筛选排序分页、部分更新保留副本与阅读数据、会话/CSRF、OpenAPI 契约 |
 | ESLint | Web 与共享 UI 的 TypeScript/React 代码、Hooks 规则和导入问题 |
 | tsc | Web 与共享 UI 的 TypeScript strict 类型检查 |
 | i18n:check | 共享与 Web 翻译资源的语言目录、命名空间、键集合和插值参数一致性 |

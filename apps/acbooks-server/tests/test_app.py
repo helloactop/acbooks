@@ -105,6 +105,7 @@ def test_business_error_contract(code: BusinessErrorCode) -> None:
         BusinessErrorCode.SETUP_CODE_INVALID: ("SETUP_CODE_INVALID", 403),
         BusinessErrorCode.SETUP_ALREADY_INITIALIZED: ("SETUP_ALREADY_INITIALIZED", 409),
         BusinessErrorCode.RATE_LIMITED: ("RATE_LIMITED", 429),
+        BusinessErrorCode.BOOK_NOT_FOUND: ("BOOK_NOT_FOUND", 404),
     }[code]
     app = create_app()
 
