@@ -21,6 +21,7 @@ export interface FieldProps {
   description?: ReactNode;
   error?: ReactNode;
   htmlFor?: string;
+  invalid?: boolean;
   label: ReactNode;
   required?: boolean;
 }
@@ -31,6 +32,7 @@ export function Field({
   description,
   error,
   htmlFor,
+  invalid = false,
   label,
   required = false,
 }: FieldProps) {
@@ -51,7 +53,7 @@ export function Field({
     id: controlId,
     "aria-describedby": describedBy,
     "aria-errormessage": error ? errorId : undefined,
-    "aria-invalid": error ? true : undefined,
+    "aria-invalid": error ? true : invalid || undefined,
     "aria-required": required || undefined,
   });
 

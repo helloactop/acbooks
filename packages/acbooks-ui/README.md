@@ -12,7 +12,8 @@ shadcn/ui 风格基础组件。业务页面不放在此包内。
   密码输入框隐藏浏览器自带 reveal 控件，只保留可访问的可见性切换按钮
 - `Button` / `IconButton`：`soft`、`default`、`outline`、`ghost`、`danger`、
   `danger-confirm` 变体及 loading 状态
-- `Input` / `PasswordInput` / `Field`：认证表单基础控件与标签、说明、错误关联
+- `Input` / `PasswordInput` / `Field`：认证表单基础控件与标签、说明、错误关联；
+  `Field` 可通过 `invalid` 标记表单级错误，而不额外显示行内错误文案
 - `SegmentedControl`：主题等互斥选项的中性胶囊选择器，使用 radiogroup
   语义并支持方向键、Home/End 和 roving focus
 - `Spinner`

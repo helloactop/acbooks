@@ -35,6 +35,9 @@ importers:
       '@acbooks/ui':
         specifier: workspace:*
         version: link:../../packages/acbooks-ui
+      i18next:
+        specifier: ^27.1.1
+        version: 27.1.1(typescript@5.9.3)
       lucide-react:
         specifier: ^1.72.0
         version: 1.72.0(@types/react@19.3.0)(react@19.3.1)

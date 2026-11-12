@@ -30,6 +30,20 @@ describe("form components", () => {
     expect(input).toHaveAccessibleDescription("用于登录 acbooks 请输入用户名");
   });
 
+  it("marks fields invalid without rendering an inline error", () => {
+    render(
+      <Field invalid label="用户名">
+        <Input />
+      </Field>,
+    );
+
+    expect(screen.getByLabelText("用户名")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("toggles password visibility without changing the input value", async () => {
     renderWithI18n(
       <PasswordInput aria-label="密码" defaultValue="secret-value" />,

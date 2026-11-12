@@ -3,7 +3,16 @@
 React + TypeScript + Vite Web 客户端。共享主题令牌与基础组件来自
 [`@acbooks/ui`](../../packages/acbooks-ui/README.md)。
 
-当前完成前端工程初始化与公共组件预览，尚未实现初始化、登录、书库等业务页面。
+当前完成前端工程初始化、初始化/登录页与公共组件预览；书库页面尚未实现。
+
+## 页面
+
+- `/`：实例尚未初始化时显示初始化表单，否则显示登录表单；已有有效会话时跳转 `/preview`。
+- `/preview`：公共组件预览，仅用于开发检查，不要求登录。
+
+初始化与登录使用同一 `AuthPanel`，通过 `GET /api/v1/setup/status` 判断入口。
+会话保存在 HttpOnly Cookie 中，写请求先获取 `GET /api/v1/auth/csrf` 的
+`csrfToken` 并放入 `X-CSRF-Token`，不把认证令牌写入 `localStorage`。
 
 ## 环境
 
@@ -29,13 +38,24 @@ pnpm i18n:check
 pnpm build
 ```
 
-开发服务器默认监听 `http://127.0.0.1:5173`，预览构建产物使用
-`pnpm preview:web`。
+开发服务器默认监听 `http://localhost:5173`，预览构建产物使用
+`pnpm preview:web`。开发服务器将 `/api` 代理到 `http://127.0.0.1:8000`。
+
+## 本地认证联调
+
+启动后端时把可信来源设为前端来源，使 Origin/CSRF 校验与浏览器一致：
+
+```sh
+ACBOOKS_PUBLIC_ORIGIN=http://localhost:5173 python -m uvicorn app.main:create_app --factory --no-access-log
+```
+
+数据库迁移和初始化码生成见
+[后端运行说明](../../apps/acbooks-server/README.md#首次管理员初始化)。
 
 ## 国际化
 
-界面文案位于 `src/i18n/locales/<language>/preview.json`；公共词条由
-`@acbooks/ui` 的 `common` 资源提供。`main.tsx` 在根节点包裹
+界面文案位于 `src/i18n/locales/<language>/auth.json` 与
+`preview.json`；公共词条由 `@acbooks/ui` 的 `common` 资源提供。`main.tsx` 在根节点包裹
 `I18nProvider` 并传入 `appResources`。支持跟随系统、简体中文和 English，
 偏好保存在 `localStorage` 的 `acbooks-language`，切换即时生效并同步
 `<html lang>`，不改变 API、路由或业务数据。
@@ -54,7 +74,7 @@ pnpm build
 - Radix Primitives（当前使用 Slot 支持 `asChild`）
 - Lucide React 图标
 - i18next + react-i18next（与 `@acbooks/ui` 共用语言机制）
-- Vitest + Testing Library（共享组件与预览页双语测试）
+- Vitest + Testing Library（共享组件、预览页与认证流程测试）
 
 所有颜色、圆角、尺寸和组件状态以
 [UI 设计规范](../../docs/development/ui.md)与
