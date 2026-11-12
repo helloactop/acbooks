@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { appResources } from "../i18n/resources";
+import { AuthenticatedLayout } from "../layout/AuthenticatedLayout";
 import type { BookDetail } from "./books-api";
 import { BookDetailPage } from "./BookDetailPage";
 
@@ -138,12 +139,14 @@ function renderDetail(
   const onUnauthenticated = vi.fn();
   render(
     <I18nProvider defaultLanguage={language} resources={appResources}>
-      <BookDetailPage
-        bookId={bookId}
+      <AuthenticatedLayout
+        currentPath={`/library/books/${bookId}`}
         onLoggedOut={onLoggedOut}
         onSessionExpired={onSessionExpired}
         onUnauthenticated={onUnauthenticated}
-      />
+      >
+        <BookDetailPage bookId={bookId} />
+      </AuthenticatedLayout>
     </I18nProvider>,
   );
   return { onLoggedOut, onSessionExpired, onUnauthenticated };
@@ -336,12 +339,9 @@ describe("BookDetailPage", () => {
     );
     const { unmount } = render(
       <I18nProvider defaultLanguage="zh-CN" resources={appResources}>
-        <BookDetailPage
-          bookId={BOOK_ID}
-          onLoggedOut={vi.fn()}
-          onSessionExpired={vi.fn()}
-          onUnauthenticated={vi.fn()}
-        />
+        <AuthenticatedLayout currentPath={`/library/books/${BOOK_ID}`}>
+          <BookDetailPage bookId={BOOK_ID} />
+        </AuthenticatedLayout>
       </I18nProvider>,
     );
     await screen.findByRole("heading", { level: 1, name: BOOK.title });

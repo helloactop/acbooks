@@ -106,6 +106,7 @@
     "loading": "正在载入书籍详情",
     "breadcrumb": "面包屑",
     "backToLibrary": "全部书籍",
+    "backHome": "返回首页",
     "open": "查看《{{title}}》详情",
     "edit": "编辑",
     "close": "关闭",

@@ -51,7 +51,15 @@ function writeSession(key: string, value: string): void {
   try {
     window.sessionStorage.setItem(key, value);
   } catch {
-    // Storage can be unavailable in private or restricted browsing modes.
+    return;
+  }
+}
+
+function removeSession(key: string): void {
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    return;
   }
 }
 
@@ -88,16 +96,32 @@ export function readLibraryView(): LibraryViewState | null {
 
 export function readInitialLibraryView(): LibraryViewState {
   const saved = readLibraryView() ?? DEFAULT_LIBRARY_VIEW;
-  const urlQuery = new URLSearchParams(window.location.search).get("q");
-  if (urlQuery === null) {
+  const params = new URLSearchParams(window.location.search);
+  const urlQuery = params.get("q");
+  const mediaType = params.get("mediaType");
+  const reset = params.get("reset") === "1";
+  if (urlQuery === null && mediaType === null && !reset) {
     return saved;
   }
-  return {
-    ...saved,
-    offset: 0,
-    query: urlQuery,
-    searchTerm: urlQuery.trim(),
-  };
+
+  const view: LibraryViewState = { ...saved, offset: 0 };
+  if (reset) {
+    view.query = "";
+    view.searchTerm = "";
+    view.status = "all";
+  }
+  if (mediaType === "physical" || mediaType === "digital") {
+    view.type = mediaType;
+  } else if (mediaType !== null) {
+    view.type = "all";
+  }
+  if (urlQuery !== null) {
+    view.query = urlQuery;
+    view.searchTerm = urlQuery.trim();
+    view.type = "all";
+    view.status = "all";
+  }
+  return view;
 }
 
 export function saveLibraryView(view: LibraryViewState): void {
@@ -113,11 +137,7 @@ export function takeLibraryScroll(): number {
   if (raw === null) {
     return 0;
   }
-  try {
-    window.sessionStorage.removeItem(SCROLL_KEY);
-  } catch {
-    // Ignore storage restrictions.
-  }
+  removeSession(SCROLL_KEY);
   const value = Number(raw);
   return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
@@ -134,20 +154,20 @@ export function saveDescriptionExpanded(
 }
 
 export function clearLibrarySessionState(): void {
+  removeSession(VIEW_KEY);
+  removeSession(SCROLL_KEY);
+  const keys: string[] = [];
   try {
-    window.sessionStorage.removeItem(VIEW_KEY);
-    window.sessionStorage.removeItem(SCROLL_KEY);
-    const keys: string[] = [];
     for (let index = 0; index < window.sessionStorage.length; index += 1) {
       const key = window.sessionStorage.key(index);
       if (key !== null && key.startsWith(DESCRIPTION_PREFIX)) {
         keys.push(key);
       }
     }
-    for (const key of keys) {
-      window.sessionStorage.removeItem(key);
-    }
   } catch {
-    // Ignore storage restrictions.
+    return;
+  }
+  for (const key of keys) {
+    removeSession(key);
   }
 }

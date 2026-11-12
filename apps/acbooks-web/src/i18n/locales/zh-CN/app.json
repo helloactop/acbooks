@@ -1,0 +1,85 @@
+{
+  "brand": "acbooks",
+  "nav": {
+    "main": "主导航",
+    "sidebar": "应用侧边栏",
+    "openMenu": "打开导航菜单",
+    "closeMenu": "关闭导航菜单",
+    "home": "首页",
+    "library": "书库",
+    "allBooks": "全部书籍",
+    "physical": "实体书",
+    "digital": "电子书",
+    "shelves": "我的书架",
+    "bookShelf": "书架",
+    "reading": "阅读",
+    "history": "阅读记录",
+    "statistics": "阅读统计",
+    "notAvailable": "暂未开放"
+  },
+  "search": {
+    "label": "全局搜索",
+    "placeholder": "搜索整个书库",
+    "shortcut": "Ctrl K",
+    "loading": "正在搜索",
+    "empty": "没有找到匹配的书籍",
+    "error": "搜索失败，请重试。",
+    "retry": "重试",
+    "viewAll": "查看全部 {{count}} 个结果",
+    "resultLabel": "搜索结果",
+    "unknownAuthor": "未知作者"
+  },
+  "account": {
+    "settings": "账户与设置",
+    "settingsFor": "账户与设置：{{username}}",
+    "logout": "退出登录",
+    "loggingOut": "正在退出…",
+    "logoutError": "退出失败，请重试。"
+  },
+  "guard": {
+    "loading": "正在载入 acbooks",
+    "errorTitle": "无法载入 acbooks",
+    "errorDescription": "请确认服务端已启动并稍后重试。",
+    "retry": "重试"
+  },
+  "errors": {
+    "network": "无法连接到服务器，请稍后重试。",
+    "forbidden": "请求未通过安全校验，请刷新页面后重试。",
+    "server": "服务器暂时无法完成请求，请稍后重试。",
+    "unknown": "操作未完成，请稍后重试。",
+    "requestId": "请求 ID：{{requestId}}"
+  },
+  "settings": {
+    "title": "设置",
+    "description": "管理账户、外观和语言。",
+    "back": "返回",
+    "backToLibrary": "返回书库",
+    "personal": "个人设置",
+    "account": "账户",
+    "appearance": "外观",
+    "language": "语言",
+    "accountDescription": "当前登录账号与退出操作。",
+    "appearanceDescription": "跟随系统，或固定浅色、深色外观。",
+    "languageDescription": "选择界面语言，切换后立即生效。",
+    "theme": "主题",
+    "themeDescription": "跟随系统时会随设备外观自动切换。",
+    "themeSystem": "跟随系统",
+    "themeLight": "浅色",
+    "themeDark": "深色",
+    "languageMode": "界面语言",
+    "languageDescriptionShort": "仅影响界面文字，不改变书籍数据。",
+    "languageSystem": "跟随系统",
+    "languageZh": "简体中文",
+    "languageEn": "English",
+    "accountName": "用户名",
+    "logout": "退出登录",
+    "loggingOut": "正在退出…",
+    "categoryHint": "选择要管理的设置分类。",
+    "openSection": "打开{{name}}设置"
+  },
+  "notFound": {
+    "title": "页面不存在",
+    "description": "链接可能已失效，或页面尚未开放。",
+    "back": "返回首页"
+  }
+}

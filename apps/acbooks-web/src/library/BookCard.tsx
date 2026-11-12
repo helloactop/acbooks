@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { BookCover } from "./BookCover";
 import { BookMeta } from "./BookMeta";
 import type { BookSummary } from "./books-api";
-import { bookDetailHref } from "./navigation";
+import { bookDetailHref } from "../layout/routes";
 import { joinNames } from "./presentation";
 
 export interface BookCardProps {

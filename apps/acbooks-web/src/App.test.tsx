@@ -1,5 +1,6 @@
 import { I18nProvider, ThemeProvider } from "@acbooks/ui";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
@@ -17,6 +18,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  document.documentElement.lang = "zh-CN";
+  delete document.documentElement.dataset.theme;
   window.history.replaceState({}, "", "/");
 });
 
@@ -82,6 +85,149 @@ describe("App routes", () => {
     ).toBeInTheDocument();
     expect(
       await screen.findByText("书库还没有书籍"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the dashboard at /home", async () => {
+    window.history.replaceState({}, "", "/home");
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.endsWith("/api/v1/auth/me")
+        ? {
+            id: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
+            username: "admin",
+          }
+        : { items: [], total: 0, limit: 12, offset: 0 };
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => body,
+      };
+    });
+
+    renderApp();
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "首页" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("书库还没有书籍"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows recently added books on the dashboard", async () => {
+    window.history.replaceState({}, "", "/home");
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.endsWith("/api/v1/auth/me")
+        ? {
+            id: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
+            username: "admin",
+          }
+        : {
+            items: [
+              {
+                id: "11111111-1111-4111-8111-111111111111",
+                title: "呐喊",
+                authors: ["鲁迅"],
+                translators: [],
+                isbn: null,
+                readingStatus: "unread",
+                tags: [],
+                shelves: [],
+                copyCount: 0,
+                fileCount: 0,
+                formats: [],
+                createdAt: 1_700_000_000_000,
+                updatedAt: 1_700_000_000_000,
+              },
+            ],
+            total: 1,
+            limit: 12,
+            offset: 0,
+          };
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => body,
+      };
+    });
+
+    renderApp();
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "首页" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("article", { name: "呐喊" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("最近加入")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "查看全部" })).toHaveAttribute(
+      "href",
+      "/library?mediaType=all&reset=1",
+    );
+  });
+
+  it("renders personal settings at /settings", async () => {
+    window.history.replaceState({}, "", "/settings");
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => ({
+        id: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
+        username: "admin",
+      }),
+    });
+
+    renderApp();
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "设置" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "账户" }),
+    ).toBeInTheDocument();
+  });
+
+  it("applies theme and language preferences from settings", async () => {
+    window.history.replaceState({}, "", "/settings");
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => ({
+        id: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
+        username: "admin",
+      }),
+    });
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { level: 1, name: "设置" });
+
+    await user.selectOptions(screen.getByLabelText("主题"), "dark");
+    await waitFor(() => {
+      expect(document.documentElement.dataset.theme).toBe("dark");
+    });
+
+    await user.selectOptions(screen.getByLabelText("界面语言"), "en");
+    await waitFor(() => {
+      expect(document.documentElement.lang).toBe("en");
+    });
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Settings" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a safe not-found page for unknown routes", () => {
+    window.history.replaceState({}, "", "/not-a-real-page");
+
+    renderApp();
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "页面不存在" }),
     ).toBeInTheDocument();
   });
 

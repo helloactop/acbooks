@@ -3,19 +3,19 @@ import { useTranslation } from "react-i18next";
 
 import { toApiError } from "../api/client";
 import { logout } from "../auth/auth-api";
-import { libraryErrorMessage } from "./errors";
-import { clearLibrarySessionState } from "./library-view-state";
+import { clearLibrarySessionState } from "../library/library-view-state";
+import { appErrorMessage } from "./errors";
 
-export interface UseLibraryLogoutOptions {
+export interface UseAppLogoutOptions {
   onLoggedOut: () => void;
   onSessionExpired: () => void;
 }
 
-export function useLibraryLogout({
+export function useAppLogout({
   onLoggedOut,
   onSessionExpired,
-}: UseLibraryLogoutOptions) {
-  const { t } = useTranslation("library");
+}: UseAppLogoutOptions) {
+  const { t } = useTranslation("app");
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | undefined>(
     undefined,
@@ -36,7 +36,7 @@ export function useLibraryLogout({
         onSessionExpired();
         return;
       }
-      setLogoutError(libraryErrorMessage(t, apiError));
+      setLogoutError(appErrorMessage(t, apiError));
     }
   };
 

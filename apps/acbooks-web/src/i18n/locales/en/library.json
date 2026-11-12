@@ -106,6 +106,7 @@
     "loading": "Loading book details",
     "breadcrumb": "Breadcrumb",
     "backToLibrary": "All books",
+    "backHome": "Back to home",
     "open": "View details for {{title}}",
     "edit": "Edit",
     "close": "Close",

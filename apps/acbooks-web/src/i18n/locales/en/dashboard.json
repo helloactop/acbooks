@@ -1,0 +1,13 @@
+{
+  "title": "Home",
+  "description_one": "{{count}} book in your library. Recent additions are shown below.",
+  "description_other": "{{count}} books in your library. Recent additions are shown below.",
+  "loading": "Loading recent books",
+  "recentTitle": "Recently added",
+  "viewAll": "View all",
+  "emptyTitle": "Your library is empty",
+  "emptyDescription": "Add your first book to start building your library.",
+  "addBook": "Add book",
+  "error": "Could not load recently added books.",
+  "retry": "Retry"
+}

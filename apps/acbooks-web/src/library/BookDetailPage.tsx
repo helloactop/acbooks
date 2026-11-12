@@ -1,12 +1,15 @@
 import { Button, Spinner, buttonVariants } from "@acbooks/ui";
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { isAbortError, toApiError, type ApiError } from "../api/client";
-import type { Account } from "../auth/auth-api";
-import { AppShell } from "../layout/AppShell";
-import { AccountGuard } from "./account-guard";
+import { useAppShell } from "../layout/app-shell-context";
+import { MobileNavigationTrigger } from "../layout/PageHeader";
+import {
+  detailReturnHref,
+  isDetailReturnFromHome,
+} from "../layout/routes";
 import { BookDetailHeader } from "./BookDetailHeader";
 import { BookDetailTabs } from "./BookDetailTabs";
 import { BookFormDialog } from "./BookFormDialog";
@@ -18,58 +21,14 @@ import {
 } from "./books-api";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
 import { LibraryAlert } from "./LibraryAlert";
-import { LibrarySidebar } from "./LibrarySidebar";
-import { LibraryTopbar } from "./LibraryTopbar";
-import {
-  libraryHref,
-  redirectHome,
-  redirectToExpiredLogin,
-  redirectToLogin,
-} from "./navigation";
-import { useLibraryLogout } from "./use-library-logout";
 
 export interface BookDetailPageProps {
   bookId: string;
-  onLoggedOut?: () => void;
-  onSessionExpired?: () => void;
-  onUnauthenticated?: () => void;
 }
 
-export function BookDetailPage({
-  bookId,
-  onLoggedOut = redirectHome,
-  onSessionExpired = redirectToExpiredLogin,
-  onUnauthenticated = redirectToLogin,
-}: BookDetailPageProps) {
-  return (
-    <AccountGuard onUnauthenticated={onUnauthenticated}>
-      {(account: Account) => (
-        <BookDetailContent
-          accountName={account.username}
-          bookId={bookId}
-          key={bookId}
-          onLoggedOut={onLoggedOut}
-          onSessionExpired={onSessionExpired}
-        />
-      )}
-    </AccountGuard>
-  );
-}
-
-interface BookDetailContentProps {
-  accountName: string;
-  bookId: string;
-  onLoggedOut: () => void;
-  onSessionExpired: () => void;
-}
-
-function BookDetailContent({
-  accountName,
-  bookId,
-  onLoggedOut,
-  onSessionExpired,
-}: BookDetailContentProps) {
+export function BookDetailPage({ bookId }: BookDetailPageProps) {
   const { t } = useTranslation("library");
+  const { expireSession } = useAppShell();
   const [detail, setDetail] = useState<BookDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
@@ -78,12 +37,10 @@ function BookDetailContent({
   const [statusDraft, setStatusDraft] = useState<ReadingStatus | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
   const [actionError, setActionError] = useState<ApiError | null>(null);
-  const [query, setQuery] = useState("");
-  const composingRef = useRef(false);
-  const { handleLogout, loggingOut, logoutError } = useLibraryLogout({
-    onLoggedOut,
-    onSessionExpired,
-  });
+  const backHref = detailReturnHref();
+  const backLabel = isDetailReturnFromHome()
+    ? t("detail.backHome")
+    : t("detail.backToLibrary");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -98,7 +55,7 @@ function BookDetailContent({
         }
         const apiError = toApiError(cause);
         if (apiError.status === 401) {
-          onSessionExpired();
+          expireSession();
           return;
         }
         setError(apiError);
@@ -109,7 +66,7 @@ function BookDetailContent({
         }
       });
     return () => controller.abort();
-  }, [attempt, bookId, onSessionExpired]);
+  }, [attempt, bookId, expireSession]);
 
   const retry = () => {
     setLoading(true);
@@ -119,11 +76,7 @@ function BookDetailContent({
   };
 
   const changeStatus = async (next: ReadingStatus) => {
-    if (
-      detail === null ||
-      detail.readingStatus === next ||
-      statusSaving
-    ) {
+    if (detail === null || detail.readingStatus === next || statusSaving) {
       return;
     }
     setStatusDraft(next);
@@ -137,7 +90,7 @@ function BookDetailContent({
       const apiError = toApiError(cause);
       setStatusDraft(null);
       if (apiError.status === 401) {
-        onSessionExpired();
+        expireSession();
         return;
       }
       setActionError(apiError);
@@ -163,104 +116,76 @@ function BookDetailContent({
     (error.code === "BOOK_NOT_FOUND" || error.status === 404);
 
   return (
-    <AppShell
-      header={
-        <LibraryTopbar
-          accountName={accountName}
-          loggingOut={loggingOut}
-          logoutError={logoutError}
-          onCompositionEnd={(value) => {
-            composingRef.current = false;
-            setQuery(value);
-          }}
-          onCompositionStart={() => {
-            composingRef.current = true;
-          }}
-          onLogout={() => {
-            void handleLogout();
-          }}
-          onSearchChange={setQuery}
-          onSearchSubmit={() => {
-            if (composingRef.current) {
-              return;
-            }
-            window.location.assign(
-              query.trim().length > 0 ? libraryHref(query) : "/library?q=",
-            );
-          }}
-          query={query}
-        />
-      }
-      sidebar={<LibrarySidebar />}
-    >
-      <div className="@container flex min-h-0 flex-col gap-6">
+    <div className="@container flex min-h-0 flex-col gap-6">
+      <div className="flex items-center gap-2">
+        <MobileNavigationTrigger className="-ml-1 lg:hidden" />
         <nav aria-label={t("detail.breadcrumb")}>
           <a
             className="inline-flex items-center gap-1.5 rounded-control text-[13px] font-medium text-muted-foreground transition-colors duration-150 ease-out hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
-            href={libraryHref()}
+            href={backHref}
           >
             <ArrowLeft aria-hidden="true" className="size-4" />
-            {t("detail.backToLibrary")}
+            {backLabel}
           </a>
         </nav>
-
-        {loading ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-sm text-muted-foreground">
-            <Spinner label={t("detail.loading")} />
-            <span>{t("detail.loading")}</span>
-            <h1 className="sr-only">{t("detail.title")}</h1>
-          </div>
-        ) : notFound ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 py-16 text-center">
-            <h1 className="text-2xl font-semibold">{t("detail.notFoundTitle")}</h1>
-            <p className="max-w-[42ch] text-sm text-muted-foreground">
-              {t("detail.notFoundDescription")}
-            </p>
-            <a
-              className={buttonVariants({
-                className: "mt-2",
-                size: "lg",
-                variant: "soft",
-              })}
-              href={libraryHref()}
-            >
-              {t("detail.backToLibrary")}
-            </a>
-          </div>
-        ) : errorMessage !== undefined ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16">
-            <h1 className="sr-only">{t("detail.title")}</h1>
-            <LibraryAlert requestId={errorRequestId}>
-              {errorMessage}
-            </LibraryAlert>
-            <Button onClick={retry} variant="soft">
-              <RefreshCw aria-hidden="true" />
-              {t("errors.retry")}
-            </Button>
-          </div>
-        ) : headerDetail !== null ? (
-          <>
-            <BookDetailHeader
-              detail={headerDetail}
-              onEdit={() => {
-                setEditing(true);
-              }}
-              onStatusChange={(next) => {
-                void changeStatus(next);
-              }}
-              statusSaving={statusSaving}
-            />
-
-            {actionErrorMessage !== undefined ? (
-              <LibraryAlert requestId={actionErrorRequestId}>
-                {actionErrorMessage}
-              </LibraryAlert>
-            ) : null}
-
-            <BookDetailTabs detail={detail ?? headerDetail} />
-          </>
-        ) : null}
       </div>
+
+      {loading ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-sm text-muted-foreground">
+          <Spinner label={t("detail.loading")} />
+          <span>{t("detail.loading")}</span>
+          <h1 className="sr-only">{t("detail.title")}</h1>
+        </div>
+      ) : notFound ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-16 text-center">
+          <h1 className="text-2xl font-semibold">{t("detail.notFoundTitle")}</h1>
+          <p className="max-w-[42ch] text-sm text-muted-foreground">
+            {t("detail.notFoundDescription")}
+          </p>
+          <a
+            className={buttonVariants({
+              className: "mt-2",
+              size: "lg",
+              variant: "soft",
+            })}
+            href={backHref}
+          >
+            {backLabel}
+          </a>
+        </div>
+      ) : errorMessage !== undefined ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16">
+          <h1 className="sr-only">{t("detail.title")}</h1>
+          <LibraryAlert requestId={errorRequestId}>
+            {errorMessage}
+          </LibraryAlert>
+          <Button onClick={retry} variant="soft">
+            <RefreshCw aria-hidden="true" />
+            {t("errors.retry")}
+          </Button>
+        </div>
+      ) : headerDetail !== null ? (
+        <>
+          <BookDetailHeader
+            detail={headerDetail}
+            onEdit={() => {
+              setEditing(true);
+            }}
+            onStatusChange={(next) => {
+              void changeStatus(next);
+            }}
+            statusSaving={statusSaving}
+          />
+
+          {actionErrorMessage !== undefined ? (
+            <LibraryAlert requestId={actionErrorRequestId}>
+              {actionErrorMessage}
+            </LibraryAlert>
+          ) : null}
+
+          <BookDetailTabs detail={detail ?? headerDetail} />
+        </>
+      ) : null}
 
       {editing && detail !== null ? (
         <BookFormDialog
@@ -274,9 +199,9 @@ function BookDetailContent({
             setEditing(false);
             setDetail(saved);
           }}
-          onSessionExpired={onSessionExpired}
+          onSessionExpired={expireSession}
         />
       ) : null}
-    </AppShell>
+    </div>
   );
 }

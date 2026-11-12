@@ -19,6 +19,7 @@ import { AuthAlert } from "./AuthAlert";
 import { AuthPanel } from "./AuthPanel";
 import { LoginForm } from "./LoginForm";
 import { SetupForm } from "./SetupForm";
+import { redirectToHome } from "../layout/routes";
 
 type Screen = "loading" | "login" | "setup" | "statusError";
 type Notice =
@@ -31,12 +32,8 @@ export interface AuthPageProps {
   onAuthenticated?: (account: Account) => void;
 }
 
-function redirectToLibrary(): void {
-  window.location.assign("/library");
-}
-
 export function AuthPage({
-  onAuthenticated = redirectToLibrary,
+  onAuthenticated = redirectToHome,
 }: AuthPageProps) {
   const { t } = useTranslation("auth");
   const [screen, setScreen] = useState<Screen>("loading");

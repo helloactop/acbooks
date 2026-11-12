@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { appResources } from "../i18n/resources";
+import { AuthenticatedLayout } from "../layout/AuthenticatedLayout";
 import type { BookDetail, BookPage, BookSummary } from "./books-api";
 import { LibraryPage } from "./LibraryPage";
 
@@ -201,11 +202,14 @@ function renderLibrary(language: "zh-CN" | "en" = "zh-CN") {
   const onUnauthenticated = vi.fn();
   render(
     <I18nProvider defaultLanguage={language} resources={appResources}>
-      <LibraryPage
+      <AuthenticatedLayout
+        currentPath="/library"
         onLoggedOut={onLoggedOut}
         onSessionExpired={onSessionExpired}
         onUnauthenticated={onUnauthenticated}
-      />
+      >
+        <LibraryPage />
+      </AuthenticatedLayout>
     </I18nProvider>,
   );
   return { onLoggedOut, onSessionExpired, onUnauthenticated };
@@ -241,13 +245,13 @@ describe("LibraryPage", () => {
     expect(screen.getAllByText("已读").length).toBeGreaterThan(0);
     expect(screen.queryAllByRole("progressbar")).toHaveLength(0);
     expect(
-      screen.getByRole("complementary", { name: "书库侧边栏" }),
+      screen.getByRole("complementary", { name: "应用侧边栏" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "添加书籍" }),
     ).toBeEnabled();
     expect(
-      screen.getByRole("button", { name: "账号菜单：admin" }),
+      screen.getByRole("link", { name: "账户与设置：admin" }),
     ).toBeInTheDocument();
   });
 
@@ -280,10 +284,7 @@ describe("LibraryPage", () => {
     });
     expect(latestBookRequest()?.searchParams.get("offset")).toBe("0");
 
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "状态" }),
-      "done",
-    );
+    await user.click(screen.getByRole("radio", { name: "已读" }));
     await waitFor(() => {
       expect(
         latestBookRequest()?.searchParams.get("readingStatus"),
@@ -309,6 +310,45 @@ describe("LibraryPage", () => {
       expect(request?.searchParams.get("sort")).toBe("title");
       expect(request?.searchParams.get("order")).toBe("asc");
     });
+  });
+
+  it("resets transient filters for sidebar media views", async () => {
+    window.sessionStorage.setItem(
+      "acbooks-library-view",
+      JSON.stringify({
+        offset: 0,
+        query: "旧查询",
+        searchTerm: "旧查询",
+        sort: "recent",
+        status: "done",
+        type: "digital",
+        view: "grid",
+      }),
+    );
+    window.history.replaceState(
+      {},
+      "",
+      "/library?mediaType=physical&reset=1",
+    );
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1], 1));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    renderLibrary();
+    await screen.findByRole("article", { name: "呐喊" });
+
+    const request = latestBookRequest();
+    expect(request?.searchParams.get("mediaType")).toBe("physical");
+    expect(request?.searchParams.get("readingStatus")).toBeNull();
+    expect(request?.searchParams.get("q")).toBeNull();
+    expect(
+      screen.getByRole("searchbox", { name: "搜索书库" }),
+    ).toHaveValue("");
+    expect(screen.getByRole("radio", { name: "全部" })).toBeChecked();
   });
 
   it("shows a loading state before the first page arrives", async () => {
@@ -384,7 +424,9 @@ describe("LibraryPage", () => {
       await screen.findByText("没有找到匹配的书籍"),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "清除筛选" }));
+    await user.click(
+      screen.getAllByRole("button", { name: "清除筛选" })[0]!,
+    );
     expect(
       await screen.findByRole("article", { name: "呐喊" }),
     ).toBeInTheDocument();
@@ -548,10 +590,7 @@ describe("LibraryPage", () => {
       screen.getByRole("link", { name: "查看《呐喊》详情" }),
     ).toHaveAttribute("href", `/library/books/${BOOK1.id}`);
 
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "状态" }),
-      "reading",
-    );
+    await user.click(screen.getByRole("radio", { name: "阅读中" }));
     await waitFor(() => {
       const saved = JSON.parse(
         window.sessionStorage.getItem("acbooks-library-view") ?? "{}",
@@ -560,7 +599,7 @@ describe("LibraryPage", () => {
     });
   });
 
-  it("logs out through the account menu with CSRF", async () => {
+  it("logs out with CSRF", async () => {
     installApi(
       baseHandler((url, init) => {
         const method = methodOf(init);
@@ -577,12 +616,7 @@ describe("LibraryPage", () => {
     const { onLoggedOut } = renderLibrary();
     await screen.findByRole("article", { name: "呐喊" });
 
-    await user.click(
-      screen.getByRole("button", { name: "账号菜单：admin" }),
-    );
-    await user.click(
-      screen.getByRole("menuitem", { name: "退出登录" }),
-    );
+    await user.click(screen.getByRole("button", { name: "退出登录" }));
 
     await waitFor(() => {
       expect(onLoggedOut).toHaveBeenCalledOnce();
@@ -646,10 +680,12 @@ describe("LibraryPage", () => {
     expect(screen.getByText("Physical ×2")).toBeInTheDocument();
     expect(screen.getAllByText("Reading").length).toBeGreaterThan(0);
     expect(
-      screen.getByRole("complementary", { name: "Library sidebar" }),
+      screen.getByRole("complementary", { name: "Application sidebar" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Account menu for admin" }),
+      screen.getByRole("link", {
+        name: "Account and settings for admin",
+      }),
     ).toBeInTheDocument();
   });
 });

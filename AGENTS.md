@@ -15,6 +15,7 @@
 | 公共 UI 组件的实现、修改与复用 | [UI 设计规范](docs/development/ui.md)、[UI 公共组件规范](docs/development/ui-components.md) |
 | 页面布局、组件组合与交互流程 | [UI 设计规范](docs/development/ui.md)、[UI 公共组件规范](docs/development/ui-components.md)、[UI 页面设计规范](docs/development/ui-pages.md) |
 | 图书详情页、简介折叠与编辑弹窗 | [图书详情页规范](docs/development/book-detail-spec.md) |
+| 管理面板 AppShell、导航、搜索与设置布局 | [管理面板布局规范](docs/development/management-layout-spec.md) |
 | 测试计划、报告 | `docs/testing/` 中适用文档（存在时） |
 | REST / OPDS / WebDAV | `docs/api/` 中适用文档（存在时） |
 | NAS、Docker、备份与部署 | `docs/deployment/` 中适用文档（存在时） |

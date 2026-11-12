@@ -1,0 +1,13 @@
+{
+  "title": "首页",
+  "description_one": "共 {{count}} 本书，以下展示最近加入。",
+  "description_other": "共 {{count}} 本书，以下展示最近加入。",
+  "loading": "正在载入最近书籍",
+  "recentTitle": "最近加入",
+  "viewAll": "查看全部",
+  "emptyTitle": "书库还没有书籍",
+  "emptyDescription": "添加第一本书，开始整理你的书库。",
+  "addBook": "添加书籍",
+  "error": "无法载入最近加入的书籍。",
+  "retry": "重试"
+}

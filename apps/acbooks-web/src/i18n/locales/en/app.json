@@ -1,0 +1,85 @@
+{
+  "brand": "acbooks",
+  "nav": {
+    "main": "Main navigation",
+    "sidebar": "Application sidebar",
+    "openMenu": "Open navigation menu",
+    "closeMenu": "Close navigation menu",
+    "home": "Home",
+    "library": "Library",
+    "allBooks": "All books",
+    "physical": "Physical books",
+    "digital": "Digital books",
+    "shelves": "My shelves",
+    "bookShelf": "Shelves",
+    "reading": "Reading",
+    "history": "Reading log",
+    "statistics": "Reading statistics",
+    "notAvailable": "Not available yet"
+  },
+  "search": {
+    "label": "Global search",
+    "placeholder": "Search library",
+    "shortcut": "Ctrl K",
+    "loading": "Searching",
+    "empty": "No matching books",
+    "error": "Search failed. Try again.",
+    "retry": "Retry",
+    "viewAll": "View all {{count}} results",
+    "resultLabel": "Search results",
+    "unknownAuthor": "Unknown author"
+  },
+  "account": {
+    "settings": "Settings",
+    "settingsFor": "Account and settings for {{username}}",
+    "logout": "Sign out",
+    "loggingOut": "Signing out…",
+    "logoutError": "Could not sign out. Try again."
+  },
+  "guard": {
+    "loading": "Loading acbooks",
+    "errorTitle": "Cannot load acbooks",
+    "errorDescription": "Make sure the server is running and try again.",
+    "retry": "Retry"
+  },
+  "errors": {
+    "network": "Cannot reach the server. Try again later.",
+    "forbidden": "This request did not pass the security check. Refresh the page and try again.",
+    "server": "The server could not complete the request. Try again later.",
+    "unknown": "The request did not complete. Try again later.",
+    "requestId": "Request ID: {{requestId}}"
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Manage your account, appearance and language.",
+    "back": "Back",
+    "backToLibrary": "Back to library",
+    "personal": "Personal settings",
+    "account": "Account",
+    "appearance": "Appearance",
+    "language": "Language",
+    "accountDescription": "Current account and sign-out action.",
+    "appearanceDescription": "Follow the system or fix a light or dark appearance.",
+    "languageDescription": "Choose the interface language. Changes apply immediately.",
+    "theme": "Theme",
+    "themeDescription": "Follow the system appearance or choose a fixed theme.",
+    "themeSystem": "Follow system",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "languageMode": "Interface language",
+    "languageDescriptionShort": "Only changes interface text, not book data.",
+    "languageSystem": "Follow system",
+    "languageZh": "简体中文",
+    "languageEn": "English",
+    "accountName": "Username",
+    "logout": "Sign out",
+    "loggingOut": "Signing out…",
+    "categoryHint": "Choose a settings category to manage.",
+    "openSection": "Open {{name}} settings"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "The link may be invalid or the page is not available yet.",
+    "back": "Back to home"
+  }
+}

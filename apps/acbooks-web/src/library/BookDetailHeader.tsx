@@ -7,7 +7,7 @@ import { BookDescription } from "./BookDescription";
 import { BookDetailActions } from "./BookDetailActions";
 import { ShelfBadges, TagBadges } from "./BookMeta";
 import type { BookDetail, ReadingStatus } from "./books-api";
-import { libraryHref } from "./navigation";
+import { libraryHref } from "../layout/routes";
 import { joinNames } from "./presentation";
 
 export interface BookDetailHeaderProps {

@@ -3,25 +3,40 @@ import { CircleAlert, RefreshCw } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { toApiError, type ApiError } from "../api/client";
 import { getCurrentAccount, type Account } from "../auth/auth-api";
+import { AppShell } from "./AppShell";
+import { appErrorMessage } from "./errors";
+import { redirectToExpiredLogin, redirectToLogin } from "./routes";
+import { useAppLogout } from "./use-app-logout";
 
 type GuardState =
-  | { status: "error" }
+  | { status: "error"; error: ApiError }
   | { status: "loading" }
   | { account: Account; status: "ready" };
 
-export interface AccountGuardProps {
-  children: (account: Account) => ReactNode;
-  onUnauthenticated: () => void;
+export interface AuthenticatedLayoutProps {
+  children: ReactNode;
+  currentPath: string;
+  onLoggedOut?: () => void;
+  onSessionExpired?: () => void;
+  onUnauthenticated?: () => void;
 }
 
-export function AccountGuard({
+export function AuthenticatedLayout({
   children,
-  onUnauthenticated,
-}: AccountGuardProps) {
-  const { t } = useTranslation("library");
+  currentPath,
+  onLoggedOut = redirectToLogin,
+  onSessionExpired = redirectToExpiredLogin,
+  onUnauthenticated = redirectToLogin,
+}: AuthenticatedLayoutProps) {
+  const { t } = useTranslation("app");
   const [guard, setGuard] = useState<GuardState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
+  const { handleLogout, loggingOut, logoutError } = useAppLogout({
+    onLoggedOut,
+    onSessionExpired,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -37,9 +52,9 @@ export function AccountGuard({
           return;
         }
         setGuard({ account, status: "ready" });
-      } catch {
+      } catch (cause) {
         if (!cancelled) {
-          setGuard({ status: "error" });
+          setGuard({ error: toApiError(cause), status: "error" });
         }
       }
     };
@@ -74,7 +89,7 @@ export function AccountGuard({
             {t("guard.errorTitle")}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {t("guard.errorDescription")}
+            {appErrorMessage(t, guard.error)}
           </p>
           <Button
             className="mt-5 w-full"
@@ -93,5 +108,18 @@ export function AccountGuard({
     );
   }
 
-  return <>{children(guard.account)}</>;
+  return (
+    <AppShell
+      accountName={guard.account.username}
+      currentPath={currentPath}
+      expireSession={onSessionExpired}
+      loggingOut={loggingOut}
+      logoutError={logoutError}
+      onLogout={() => {
+        void handleLogout();
+      }}
+    >
+      {children}
+    </AppShell>
+  );
 }
