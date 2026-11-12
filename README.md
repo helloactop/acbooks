@@ -26,7 +26,7 @@ acbooks 是一款面向个人的自托管图书馆应用，优先面向 NAS 部�
 
 ## 前端开发
 
-需要 Node.js >= 22.12 与 pnpm 10。在仓库根目录执行：
+需要 Node.js 22.13 或 24（LTS）与 pnpm 10。在仓库根目录执行：
 
 ```sh
 pnpm install

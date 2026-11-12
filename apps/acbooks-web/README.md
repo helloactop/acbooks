@@ -7,7 +7,7 @@ React + TypeScript + Vite Web 客户端。共享主题令牌与基础组件来�
 
 ## 环境
 
-- Node.js >= 22.12
+- Node.js 22.13 或 24（LTS）
 - pnpm 10（仓库根目录 `corepack enable` 后使用）
 
 ## 命令

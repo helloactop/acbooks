@@ -8,7 +8,7 @@ The project is in early development. Planned features include library management
 
 ## Frontend development
 
-The Web client requires Node.js >= 22.12 and pnpm 10. From the repository root:
+The Web client requires Node.js 22.13 or 24 (LTS) and pnpm 10. From the repository root:
 
 ```sh
 pnpm install

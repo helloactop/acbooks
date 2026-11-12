@@ -7,12 +7,14 @@ shadcn/ui 风格基础组件。业务页面不放在此包内。
 
 - `src/styles/theme.css`：淡蓝浅色/深色语义令牌、Tailwind 主题映射、
   shadcn/ui 变量映射与基础样式
-- `ThemeProvider` / `useTheme`：跟随系统、浅色、深色三种模式，偏好保存在本地；
+- `ThemeProvider` / `useTheme`：跟随系统、浅色、深色三种模式，偏好保存在本地，
+  同步 `data-theme`、`color-scheme` 与浏览器 `theme-color`；
   密码输入框隐藏浏览器自带 reveal 控件，只保留可访问的可见性切换按钮
 - `Button` / `IconButton`：`soft`、`default`、`outline`、`ghost`、`danger`、
   `danger-confirm` 变体及 loading 状态
 - `Input` / `PasswordInput` / `Field`：认证表单基础控件与标签、说明、错误关联
-- `SegmentedControl`：主题等互斥选项的中性胶囊选择器
+- `SegmentedControl`：主题等互斥选项的中性胶囊选择器，使用 radiogroup
+  语义并支持方向键、Home/End 和 roving focus
 - `Spinner`
 
 组件只消费 `ui.md` 的语义令牌，不请求业务 API。当前使用
@@ -41,3 +43,6 @@ Web 应用在入口 CSS 中导入主题：
 pnpm --filter @acbooks/ui typecheck
 pnpm --filter @acbooks/ui test
 ```
+
+测试包含浅色/深色语义令牌的正文 4.5:1 与控件边界/焦点 3:1 对比度检查，
+以及主题、键盘、禁用状态回归。
