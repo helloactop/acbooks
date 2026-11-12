@@ -8,11 +8,19 @@ import {
 
 export interface ModalProps {
   children: ReactNode;
+  describedBy?: string;
   labelledBy: string;
   onClose: () => void;
+  size?: "confirm" | "form";
 }
 
-export function Modal({ children, labelledBy, onClose }: ModalProps) {
+export function Modal({
+  children,
+  describedBy,
+  labelledBy,
+  onClose,
+  size = "form",
+}: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -35,8 +43,13 @@ export function Modal({ children, labelledBy, onClose }: ModalProps) {
 
   return (
     <dialog
+      aria-describedby={describedBy}
       aria-labelledby={labelledBy}
-      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(640px,calc(100vw-2rem))] rounded-dialog border border-border bg-background p-0 text-foreground shadow-overlay backdrop:bg-black/40"
+      className={
+        size === "confirm"
+          ? "m-auto max-h-[calc(100dvh-2rem)] w-[min(420px,calc(100vw-2rem))] rounded-dialog border border-border bg-background p-0 text-foreground shadow-overlay backdrop:bg-black/40"
+          : "m-auto max-h-[calc(100dvh-2rem)] w-[min(640px,calc(100vw-2rem))] rounded-dialog border border-border bg-background p-0 text-foreground shadow-overlay backdrop:bg-black/40"
+      }
       onCancel={handleCancel}
       onClick={handleClick}
       ref={dialogRef}

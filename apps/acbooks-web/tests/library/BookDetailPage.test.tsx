@@ -238,6 +238,9 @@ describe("BookDetailPage", () => {
     ).toHaveAttribute("href", `/library?q=${encodeURIComponent("作者甲")}`);
     expect(screen.getByText("9787020002207")).toBeInTheDocument();
     expect(screen.getAllByText("文学").length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("link", { name: "文学" }),
+    ).toHaveAttribute("href", `/library?tag=${encodeURIComponent("文学")}`);
     expect(screen.getByText("经典")).toBeInTheDocument();
     expect(screen.getByText("书房")).toBeInTheDocument();
     expect(
@@ -455,6 +458,55 @@ describe("BookDetailPage", () => {
       await screen.findByText("服务器暂时无法完成请求，请稍后重试。"),
     ).toBeInTheDocument();
     expect(select).toHaveValue("reading");
+  });
+
+  it("edits authors through token chips instead of comma text", async () => {
+    installApi(
+      baseHandler((url, init) => {
+        const method = methodOf(init);
+        if (
+          url.pathname === `/api/v1/books/${BOOK_ID}` &&
+          method === "GET"
+        ) {
+          return jsonResponse(BOOK);
+        }
+        if (
+          url.pathname === `/api/v1/books/${BOOK_ID}` &&
+          method === "PATCH"
+        ) {
+          return jsonResponse(BOOK);
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetail();
+    await screen.findByRole("heading", { level: 1, name: BOOK.title });
+
+    await user.click(screen.getByRole("button", { name: "编辑" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "编辑书籍",
+    });
+    expect(within(dialog).getByText("作者甲")).toBeInTheDocument();
+    expect(within(dialog).getByText("作者乙")).toBeInTheDocument();
+
+    await user.click(
+      within(dialog).getByRole("button", { name: "移除 作者乙" }),
+    );
+    await user.type(
+      within(dialog).getByLabelText("作者"),
+      "作者丙{Enter}",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    const patch = findCall("PATCH", `/api/v1/books/${BOOK_ID}`);
+    const init = (patch?.[1] ?? {}) as RequestInit;
+    expect(JSON.parse(String(init.body))).toEqual({
+      authors: ["作者甲", "作者丙"],
+    });
   });
 
   it("edits the book with a partial patch and refreshes the detail", async () => {

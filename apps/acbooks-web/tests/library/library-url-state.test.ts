@@ -30,7 +30,7 @@ describe("library URL state", () => {
     expect(state.status).toBe("done");
     expect(state.sort).toBe("title");
     expect(state.view).toBe("list");
-    expect(state.offset).toBe(0);
+    expect(state.offset).toBe(12);
     expect(state.filters).toEqual({
       combinator: "ANY",
       conditions: [
@@ -73,6 +73,16 @@ describe("library URL state", () => {
         value: "epub",
       }),
     ]);
+  });
+
+  it("keeps the offset when serializing a search result page", () => {
+    const state = readLibraryUrlState(
+      "?q=%E4%B8%89%E4%BD%93&offset=24",
+    );
+
+    const search = new URLSearchParams(libraryUrlSearch(state));
+    expect(search.get("q")).toBe("三体");
+    expect(search.get("offset")).toBe("24");
   });
 
   it("serializes back to a canonical URL", () => {

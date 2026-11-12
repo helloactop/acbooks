@@ -17,5 +17,8 @@
   "password": {
     "show": "Show password",
     "hide": "Hide password"
+  },
+  "multiValue": {
+    "remove": "Remove {{value}}"
   }
 }

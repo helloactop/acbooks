@@ -76,7 +76,6 @@ function applyNonListParams(
   if (query !== null) {
     next = {
       ...next,
-      offset: 0,
       searchTerm: query.trim(),
     };
   }

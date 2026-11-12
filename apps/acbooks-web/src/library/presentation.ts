@@ -4,7 +4,7 @@ export const COVER_FONT =
   "'Songti SC', 'Noto Serif SC', 'Source Han Serif SC', serif";
 
 export const ROW_GRID =
-  "grid grid-cols-[48px_minmax(0,2fr)_minmax(0,1fr)_180px_36px] items-center gap-4 max-md:grid-cols-[48px_minmax(0,1fr)_36px]";
+  "grid grid-cols-[48px_minmax(0,2fr)_minmax(0,1fr)_180px] items-center gap-4 max-md:grid-cols-[48px_minmax(0,1fr)]";
 
 interface CoverStyle {
   background: string;

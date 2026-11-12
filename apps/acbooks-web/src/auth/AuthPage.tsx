@@ -1,5 +1,4 @@
 import { Button, Spinner } from "@acbooks/ui";
-import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -18,6 +17,7 @@ import {
 import { authErrorMessage, showRequestId } from "./auth-messages";
 import { AuthAlert } from "./AuthAlert";
 import { AuthPanel } from "./AuthPanel";
+import { useDocumentTitle } from "../layout/use-document-title";
 import { LoginForm } from "./LoginForm";
 import { SetupForm } from "./SetupForm";
 
@@ -56,6 +56,16 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   );
   const [loginUsername, setLoginUsername] = useState("");
   const [busy, setBusy] = useState(false);
+  useDocumentTitle(
+    screen === "setup"
+      ? t("setup.title")
+      : screen === "login"
+        ? t("login.title")
+        : screen === "statusError"
+          ? t("statusError.title")
+          : t("loading.title"),
+    { brand: false },
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -184,7 +194,6 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
             size="lg"
             variant="soft"
           >
-            <RefreshCw aria-hidden="true" />
             {t("statusError.retry")}
           </Button>
         </div>

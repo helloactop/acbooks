@@ -28,6 +28,7 @@ export interface SidebarContentProps {
   onLogout: () => void;
   onNavigate?: () => void;
   pathname: string;
+  replaceNavigation?: boolean;
   search: string;
   searchInputRef?: RefObject<HTMLInputElement | null>;
   variant: "desktop" | "mobile";
@@ -43,6 +44,7 @@ export function SidebarContent({
   onLogout,
   onNavigate,
   pathname,
+  replaceNavigation = false,
   search,
   searchInputRef,
   variant,
@@ -57,8 +59,9 @@ export function SidebarContent({
       <div className="flex h-14 shrink-0 items-center gap-2.5">
         <Link
           aria-label="acbooks"
-          className="flex min-w-0 items-center gap-2.5 rounded-control focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-frame focus-visible:outline-none"
+          className="flex min-w-0 items-center gap-2.5 rounded-control focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-frame focus-visible:outline-none max-lg:min-h-11"
           onClick={onNavigate}
+          replace={replaceNavigation}
           to={homeHref()}
         >
           <img
@@ -72,7 +75,7 @@ export function SidebarContent({
         </Link>
         {variant === "mobile" && onCloseNavigation !== undefined ? (
           <IconButton
-            className="ml-auto"
+            className="ml-auto size-11"
             label={t("nav.closeMenu")}
             onClick={onCloseNavigation}
           >
@@ -84,8 +87,9 @@ export function SidebarContent({
       {settingsMode ? (
         <>
           <Link
-            className="flex h-10 shrink-0 items-center gap-2 rounded-control px-3 text-sm text-muted-foreground transition-colors duration-150 ease-out hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="flex h-10 shrink-0 items-center gap-2 rounded-control px-3 text-sm text-muted-foreground transition-colors duration-150 ease-out hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-lg:min-h-11"
             onClick={onNavigate}
+            replace={replaceNavigation}
             to={settingsReturnHref()}
           >
             <ArrowLeft aria-hidden="true" className="size-[18px]" />
@@ -112,13 +116,14 @@ export function SidebarContent({
                   return (
                     <Link
                       aria-current={active ? "page" : undefined}
-                      className={`${itemClass} h-10 ${
+                      className={`${itemClass} h-10 max-lg:min-h-11 ${
                         active
                           ? "bg-accent-soft font-medium text-accent-text"
                           : "text-foreground hover:bg-surface-hover"
                       }`}
                       key={item.section}
                       onClick={onNavigate}
+                      replace={replaceNavigation}
                       to={settingsHref(item.section)}
                     >
                       <Icon
@@ -141,6 +146,7 @@ export function SidebarContent({
               focusOnMount={focusSearchOnOpen}
               inputRef={searchInputRef}
               onFocusHandled={onFocusSearchHandled}
+              replaceNavigation={replaceNavigation}
             />
           </div>
 
@@ -168,7 +174,7 @@ export function SidebarContent({
                   if (item.disabled === true || item.href === undefined) {
                     return (
                       <button
-                        className={`${itemClass} h-10 cursor-not-allowed text-disabled-foreground max-md:min-h-11`}
+                        className={`${itemClass} h-10 cursor-not-allowed text-disabled-foreground max-lg:min-h-11`}
                         disabled
                         key={item.labelKey}
                         title={t("nav.notAvailable")}
@@ -187,13 +193,14 @@ export function SidebarContent({
                   return (
                     <Link
                       aria-current={active ? "page" : undefined}
-                      className={`${itemClass} h-10 max-md:min-h-11 ${
+                      className={`${itemClass} h-10 max-lg:min-h-11 ${
                         active
                           ? "bg-accent-soft font-medium text-accent-text"
                           : "text-foreground hover:bg-surface-hover"
                       }`}
                       key={item.labelKey}
                       onClick={onNavigate}
+                      replace={replaceNavigation}
                       to={item.href}
                     >
                       <Icon
@@ -222,6 +229,7 @@ export function SidebarContent({
               }
               onNavigate?.();
             }}
+            replace={replaceNavigation}
             to={settingsMode ? settingsHref("account") : settingsHref()}
           >
             <span
@@ -244,6 +252,7 @@ export function SidebarContent({
             />
           </Link>
           <IconButton
+            className="max-lg:size-11"
             label={loggingOut ? t("account.loggingOut") : t("account.logout")}
             loading={loggingOut}
             onClick={onLogout}

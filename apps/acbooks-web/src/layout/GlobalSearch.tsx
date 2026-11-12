@@ -22,12 +22,14 @@ export interface GlobalSearchProps {
   focusOnMount?: boolean;
   inputRef?: RefObject<HTMLInputElement | null>;
   onFocusHandled?: () => void;
+  replaceNavigation?: boolean;
 }
 
 export function GlobalSearch({
   focusOnMount = false,
   inputRef,
   onFocusHandled,
+  replaceNavigation = false,
 }: GlobalSearchProps) {
   const { t } = useTranslation("app");
   const { resolvedLanguage } = useLanguage();
@@ -47,6 +49,7 @@ export function GlobalSearch({
   const localInputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<number | undefined>(undefined);
   const controllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
   const composingRef = useRef(false);
   const listId = useId();
   const input = inputRef ?? localInputRef;
@@ -81,15 +84,20 @@ export function GlobalSearch({
     const controller = new AbortController();
     controllerRef.current?.abort();
     controllerRef.current = controller;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     getBooks({ q: term, limit: 5, offset: 0 }, controller.signal)
       .then((page) => {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
         setResults(page.items);
         setTotal(page.total);
         setError(null);
         setActiveIndex(-1);
       })
       .catch((cause) => {
-        if (isAbortError(cause)) {
+        if (isAbortError(cause) || requestId !== requestIdRef.current) {
           return;
         }
         const apiError = toApiError(cause);
@@ -102,7 +110,7 @@ export function GlobalSearch({
         setError(apiError);
       })
       .finally(() => {
-        if (!controller.signal.aborted) {
+        if (requestId === requestIdRef.current) {
           setLoading(false);
         }
       });
@@ -133,6 +141,7 @@ export function GlobalSearch({
       }
       controllerRef.current?.abort();
       controllerRef.current = null;
+      requestIdRef.current += 1;
       setTerm("");
       setResults([]);
       setTotal(0);
@@ -147,9 +156,6 @@ export function GlobalSearch({
         window.clearTimeout(timerRef.current);
         timerRef.current = undefined;
       }
-      controllerRef.current?.abort();
-      controllerRef.current = null;
-      setLoading(false);
       setOpen(true);
       return;
     }
@@ -160,14 +166,15 @@ export function GlobalSearch({
     }
     controllerRef.current?.abort();
     controllerRef.current = null;
+    requestIdRef.current += 1;
+    setResults([]);
+    setTotal(0);
     setError(null);
     setActiveIndex(-1);
     setOpen(true);
     setLoading(true);
     const run = () => {
       timerRef.current = undefined;
-      setResults([]);
-      setTotal(0);
       setTerm(trimmed);
     };
     if (immediate) {
@@ -190,7 +197,7 @@ export function GlobalSearch({
     }
     setOpen(false);
     setActiveIndex(-1);
-    routerNavigate(href);
+    routerNavigate(href, replaceNavigation ? { replace: true } : undefined);
   };
 
   const currentResult = results[activeIndex];
@@ -256,7 +263,7 @@ export function GlobalSearch({
           aria-expanded={open}
           aria-haspopup="listbox"
           aria-label={t("search.label")}
-          className="pr-16 pl-9 [&::-webkit-search-cancel-button]:appearance-none"
+          className="pr-16 pl-9 max-lg:h-11 [&::-webkit-search-cancel-button]:appearance-none"
           onChange={(event) => {
             handleChange(event.target.value);
           }}
@@ -373,6 +380,7 @@ export function GlobalSearch({
                 setOpen(false);
                 setActiveIndex(-1);
               }}
+              replace={replaceNavigation}
               to={libraryHref(term)}
             >
               <span>{t("search.viewAll", { count: total })}</span>

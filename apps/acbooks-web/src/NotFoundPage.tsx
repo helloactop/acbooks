@@ -3,8 +3,11 @@ import { CircleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { useDocumentTitle } from "./layout/use-document-title";
+
 export function NotFoundPage() {
   const { t } = useTranslation("app");
+  useDocumentTitle(t("notFound.title"));
 
   return (
     <div className="flex h-dvh items-center justify-center bg-frame p-4">

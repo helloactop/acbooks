@@ -1,5 +1,5 @@
 import { Button, Spinner } from "@acbooks/ui";
-import { CircleAlert, RefreshCw } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet } from "react-router-dom";
@@ -97,7 +97,6 @@ export function AuthenticatedLayout({
             size="lg"
             variant="soft"
           >
-            <RefreshCw aria-hidden="true" />
             {t("guard.retry")}
           </Button>
         </div>

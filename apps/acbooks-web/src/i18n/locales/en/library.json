@@ -166,7 +166,8 @@
   "labels": {
     "physicalCopies": "Physical ×{{count}}",
     "unknownAuthor": "Unknown author",
-    "none": "—"
+    "none": "—",
+    "moreTags": "{{count}} more tags"
   },
   "list": {
     "tableLabel": "Book list",
@@ -267,17 +268,23 @@
     "description": "Description",
     "descriptionPlaceholder": "Optional",
     "authors": "Authors",
-    "authorsHint": "Separate multiple names with commas",
+    "authorsHint": "Add multiple values, pressing Enter to confirm",
     "translators": "Translators",
-    "translatorsHint": "Separate multiple names with commas",
+    "translatorsHint": "Add multiple values, pressing Enter to confirm",
     "isbn": "ISBN",
     "isbnPlaceholder": "ISBN-10 or ISBN-13",
     "readingStatus": "Reading status",
     "tags": "Tags",
-    "tagsHint": "Separate multiple tags with commas",
+    "tagsHint": "Add multiple values, pressing Enter to confirm",
     "shelves": "Shelves",
-    "shelvesHint": "Separate multiple shelves with commas",
+    "shelvesHint": "Add multiple values, pressing Enter to confirm",
+    "multiValuePlaceholder": "Type and press Enter to add",
     "cancel": "Cancel",
+    "close": "Close",
+    "discard": "Discard changes",
+    "discardDescription": "Your edits will be lost when you close this form.",
+    "discardTitle": "Discard unsaved changes?",
+    "keepEditing": "Keep editing",
     "save": "Save"
   },
   "guard": {

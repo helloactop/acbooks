@@ -1,6 +1,8 @@
 import { cn } from "@acbooks/ui";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
+import { libraryTagHref } from "../layout/routes";
 import type { BookSummary, ReadingStatus } from "./books-api";
 
 const CHIP = "rounded px-1.5 py-0.5 text-xs leading-4";
@@ -31,7 +33,40 @@ function unique(values: readonly string[]): string[] {
   return Array.from(new Set(values));
 }
 
-export function TagBadges({ tags }: { tags: readonly string[] }) {
+export function TagBadges({
+  limit,
+  tags,
+}: {
+  limit?: number;
+  tags: readonly string[];
+}) {
+  const { t } = useTranslation("library");
+  const labels = unique(tags);
+  const visible = limit === undefined ? labels : labels.slice(0, limit);
+  const hiddenCount = labels.length - visible.length;
+  if (labels.length === 0) {
+    return null;
+  }
+  return (
+    <>
+      {visible.map((tag) => (
+        <span key={tag} className={TAG_CLASS}>
+          {tag}
+        </span>
+      ))}
+      {hiddenCount > 0 ? (
+        <span
+          aria-label={t("labels.moreTags", { count: hiddenCount })}
+          className={TAG_CLASS}
+        >
+          +{hiddenCount}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+export function TagLinks({ tags }: { tags: readonly string[] }) {
   const labels = unique(tags);
   if (labels.length === 0) {
     return null;
@@ -39,9 +74,16 @@ export function TagBadges({ tags }: { tags: readonly string[] }) {
   return (
     <>
       {labels.map((tag) => (
-        <span key={tag} className={TAG_CLASS}>
+        <Link
+          className={cn(
+            TAG_CLASS,
+            "transition-colors duration-150 ease-out hover:bg-surface-hover hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
+          )}
+          key={tag}
+          to={libraryTagHref(tag)}
+        >
           {tag}
-        </span>
+        </Link>
       ))}
     </>
   );

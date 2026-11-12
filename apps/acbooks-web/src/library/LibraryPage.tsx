@@ -1,13 +1,23 @@
 import { Button, Spinner, useLanguage } from "@acbooks/ui";
-import { BookOpen, Plus, RefreshCw, Search } from "lucide-react";
+import { BookOpen, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation, useNavigate } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  useNavigationType,
+} from "react-router-dom";
 
 import { isAbortError, toApiError, type ApiError } from "../api/client";
 import { useAppShell } from "../layout/app-shell-context";
 import { PageHeader } from "../layout/PageHeader";
 import { rememberDetailReturn } from "../layout/routes";
+import {
+  readScrollPosition,
+  rememberReturnScroll,
+  takeReturnScroll,
+} from "../layout/scroll-restoration";
+import { useDocumentTitle } from "../layout/use-document-title";
 import { BookCard } from "./BookCard";
 import { BookFormDialog } from "./BookFormDialog";
 import { BookList } from "./BookList";
@@ -30,8 +40,6 @@ import {
   readLibraryUrlState,
 } from "./library-url-state";
 import {
-  saveLibraryScroll,
-  takeLibraryScroll,
   type SortOrder,
   type StatusFilter,
   type ViewMode,
@@ -48,9 +56,11 @@ export function LibraryPage() {
   const { expireSession, mainRef } = useAppShell();
   const location = useLocation();
   const navigate = useNavigate();
+  const navigationType = useNavigationType();
   const [initialView] = useState(() =>
     readLibraryUrlState(location.search),
   );
+  const [syncedSearch, setSyncedSearch] = useState(location.search);
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(initialView.offset);
@@ -69,8 +79,8 @@ export function LibraryPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const scrollRestored = useRef(false);
-  const skipUrlSync = useRef(false);
   const filterTimer = useRef<number | undefined>(undefined);
+  const pendingWrites = useRef<string[]>([]);
   const filterSchema = useBookFilterSchema(true, expireSession);
   const fields = filterSchema.schema?.fields ?? [];
   const summary = summarizeSmartFilterRules(rules, fields);
@@ -95,10 +105,24 @@ export function LibraryPage() {
   );
 
   useEffect(() => {
-    skipUrlSync.current = true;
+    if (location.search === syncedSearch) {
+      return;
+    }
+    // Router transitions commit after local state, so a URL this page just wrote
+    // must not be treated as external navigation.
+    const pendingIndex = pendingWrites.current.indexOf(location.search);
+    if (pendingIndex >= 0) {
+      pendingWrites.current.splice(pendingIndex, 1);
+      setSyncedSearch(location.search);
+      return;
+    }
+    pendingWrites.current = [];
+    if (filterTimer.current !== undefined) {
+      window.clearTimeout(filterTimer.current);
+      filterTimer.current = undefined;
+    }
     const parsed = readLibraryUrlState(location.search);
-    // Router history is an external store; mirror it into the page's editable state.
-    /* eslint-disable react-hooks/set-state-in-effect */
+    // Router history is an external store; adopt only URLs this page did not write.
     setSearchTerm(parsed.searchTerm);
     setType(parsed.type);
     setStatus(parsed.status);
@@ -107,12 +131,11 @@ export function LibraryPage() {
     setSort(parsed.sort);
     setView(parsed.view);
     setOffset(parsed.offset);
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [location.search]);
+    setSyncedSearch(location.search);
+  }, [location.search, syncedSearch]);
 
   useEffect(() => {
-    if (skipUrlSync.current) {
-      skipUrlSync.current = false;
+    if (location.search !== syncedSearch) {
       return;
     }
     const next = libraryUrlSearch({
@@ -130,10 +153,15 @@ export function LibraryPage() {
     if (next === current) {
       return;
     }
+    const search = next.length > 0 ? `?${next}` : "";
+    pendingWrites.current.push(search);
+    if (pendingWrites.current.length > 8) {
+      pendingWrites.current.shift();
+    }
     navigate(
       {
         pathname: "/library",
-        search: next.length > 0 ? `?${next}` : "",
+        search,
       },
       { replace: true },
     );
@@ -145,6 +173,7 @@ export function LibraryPage() {
     searchTerm,
     sort,
     status,
+    syncedSearch,
     type,
     view,
   ]);
@@ -168,7 +197,12 @@ export function LibraryPage() {
       return;
     }
     scrollRestored.current = true;
-    const scrollTop = takeLibraryScroll();
+    const returnScroll = takeReturnScroll();
+    // Browser back/forward restores the entry's own position; waiting for the loaded
+    // list avoids clamping it against the loading placeholder.
+    const entryScroll =
+      navigationType === "POP" ? readScrollPosition(location) : 0;
+    const scrollTop = Math.max(returnScroll, entryScroll);
     if (scrollTop <= 0) {
       return;
     }
@@ -178,7 +212,7 @@ export function LibraryPage() {
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [loading, mainRef]);
+  }, [loading, location, mainRef, navigationType]);
 
   useEffect(() => {
     if (waitingForSchema) {
@@ -346,7 +380,7 @@ export function LibraryPage() {
   };
 
   const openBook = () => {
-    saveLibraryScroll(mainRef.current?.scrollTop ?? 0);
+    rememberReturnScroll(mainRef.current?.scrollTop ?? 0);
     rememberDetailReturn();
   };
 
@@ -372,6 +406,7 @@ export function LibraryPage() {
       : type === "digital"
         ? t("page.digitalTitle")
         : t("page.title");
+  useDocumentTitle(pageTitle);
   const formattedTotal = new Intl.NumberFormat(resolvedLanguage).format(total);
   const countMessage =
     loading && books.length === 0
@@ -399,7 +434,6 @@ export function LibraryPage() {
             }}
             variant="soft"
           >
-            <Plus aria-hidden="true" />
             {t("actions.addBook")}
           </Button>
         }
@@ -465,7 +499,6 @@ export function LibraryPage() {
           </LibraryAlert>
           <div>
             <Button onClick={retry} size="sm" variant="outline">
-              <RefreshCw aria-hidden="true" />
               {t("errors.retry")}
             </Button>
           </div>
@@ -483,7 +516,6 @@ export function LibraryPage() {
             {errorMessage}
           </LibraryAlert>
           <Button onClick={retry} variant="soft">
-            <RefreshCw aria-hidden="true" />
             {t("errors.retry")}
           </Button>
         </div>
@@ -526,7 +558,6 @@ export function LibraryPage() {
               }}
               variant="soft"
             >
-              <Plus aria-hidden="true" />
               {t("empty.addBook")}
             </Button>
           )}

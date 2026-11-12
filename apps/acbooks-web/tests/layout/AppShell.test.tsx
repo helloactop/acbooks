@@ -1,5 +1,6 @@
 import { I18nProvider } from "@acbooks/ui";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -8,7 +9,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { appResources } from "../../src/i18n/resources";
@@ -26,6 +27,20 @@ function LocationProbe() {
   return null;
 }
 
+function HistoryControls() {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => {
+        navigate(-1);
+      }}
+      type="button"
+    >
+      history-back
+    </button>
+  );
+}
+
 function jsonResponse(body: unknown, status = 200): Response {
   return {
     ok: status >= 200 && status < 300,
@@ -41,6 +56,55 @@ function bookSearchCalls(): number {
   ).length;
 }
 
+interface DeferredSearch {
+  q: string;
+  signal: AbortSignal | null;
+  resolve: (body: unknown) => void;
+}
+
+function installDeferredSearch(): DeferredSearch[] {
+  const pending: DeferredSearch[] = [];
+  fetchMock.mockImplementation(
+    (input: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((resolve) => {
+        const url = new URL(String(input), "http://localhost");
+        pending.push({
+          q: url.searchParams.get("q") ?? "",
+          signal: init?.signal ?? null,
+          resolve: (body) => {
+            resolve(jsonResponse(body));
+          },
+        });
+      }),
+  );
+  return pending;
+}
+
+function searchPage(title: string, total = 1) {
+  return {
+    items: [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        title,
+        authors: ["作者"],
+        translators: [],
+        isbn: null,
+        readingStatus: "unread",
+        tags: [],
+        shelves: [],
+        copyCount: 0,
+        fileCount: 0,
+        formats: [],
+        createdAt: 1_700_000_000_000,
+        updatedAt: 1_700_000_000_000,
+      },
+    ],
+    total,
+    limit: 5,
+    offset: 0,
+  };
+}
+
 function renderShell(currentPath: string, title = "全部书籍") {
   const onLogout = vi.fn();
   const expireSession = vi.fn();
@@ -48,6 +112,7 @@ function renderShell(currentPath: string, title = "全部书籍") {
     <I18nProvider defaultLanguage="zh-CN" resources={appResources}>
       <MemoryRouter initialEntries={[currentPath]}>
         <LocationProbe />
+        <HistoryControls />
         <AppShell
           accountName="admin"
           expireSession={expireSession}
@@ -152,6 +217,99 @@ describe("AppShell", () => {
     await waitFor(() => {
       expect(trigger).toHaveAttribute("aria-expanded", "false");
     });
+  });
+
+  it("closes the drawer after navigating and keeps it closed on back", async () => {
+    const user = userEvent.setup();
+    renderShell("/library");
+    const trigger = screen.getByRole("button", { name: "打开导航菜单" });
+    await user.click(trigger);
+    const dialog = document.getElementById(
+      "app-navigation-drawer",
+    ) as HTMLDialogElement;
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(within(dialog).getByRole("link", { name: "首页" }));
+    await waitFor(() => {
+      expect(currentLocation).toBe("/home");
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+    });
+    expect(dialog.open).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: "history-back" }));
+    await waitFor(() => {
+      expect(currentLocation).toBe("/library");
+    });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(dialog.open).toBe(false);
+  });
+
+  it("keeps an in-flight search when the same keyword is confirmed", async () => {
+    const pending = installDeferredSearch();
+    const user = userEvent.setup();
+    renderShell("/library");
+    const sidebar = screen.getByRole("complementary", {
+      name: "应用侧边栏",
+    });
+    const search = within(sidebar).getByRole("combobox", {
+      name: "全局搜索",
+    });
+
+    await user.type(search, "三体");
+    await waitFor(() => {
+      expect(pending).toHaveLength(1);
+    });
+    expect(pending[0]?.q).toBe("三体");
+
+    fireEvent.compositionEnd(search, { target: { value: "三体" } });
+    expect(pending[0]?.signal?.aborted).toBe(false);
+
+    await act(async () => {
+      pending[0]?.resolve(searchPage("三体"));
+    });
+    expect(
+      await within(sidebar).findByRole("option", { name: /三体/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides stale results and discards late responses for old keywords", async () => {
+    const pending = installDeferredSearch();
+    const user = userEvent.setup();
+    renderShell("/library");
+    const sidebar = screen.getByRole("complementary", {
+      name: "应用侧边栏",
+    });
+    const search = within(sidebar).getByRole("combobox", {
+      name: "全局搜索",
+    });
+
+    await user.type(search, "三体");
+    await waitFor(() => {
+      expect(pending).toHaveLength(1);
+    });
+
+    fireEvent.change(search, { target: { value: "边城" } });
+    expect(within(sidebar).queryByRole("option")).not.toBeInTheDocument();
+    expect(pending[0]?.signal?.aborted).toBe(true);
+
+    await waitFor(() => {
+      expect(pending).toHaveLength(2);
+    });
+    expect(pending[1]?.q).toBe("边城");
+
+    await act(async () => {
+      pending[0]?.resolve(searchPage("三体"));
+    });
+    expect(
+      within(sidebar).queryByRole("option", { name: /三体/ }),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      pending[1]?.resolve(searchPage("边城"));
+    });
+    expect(
+      await within(sidebar).findByRole("option", { name: /边城/ }),
+    ).toBeInTheDocument();
   });
 
   it("searches the whole library and offers the full result list", async () => {

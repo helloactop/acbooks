@@ -1,6 +1,6 @@
-import { Button, IconButton, Spinner } from "@acbooks/ui";
-import { Copy, Ellipsis, Pencil } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { Button, DropdownMenu, Select, Spinner } from "@acbooks/ui";
+import { Ellipsis } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { BookDetail, ReadingStatus } from "./books-api";
@@ -44,52 +44,19 @@ export function BookDetailActions({
   statusSaving,
 }: BookDetailActionsProps) {
   const { t } = useTranslation("library");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>("idle");
-  const containerRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuId = useId();
+  const copyTimer = useRef<number | undefined>(undefined);
 
-  useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-    const handlePointerDown = (event: PointerEvent) => {
-      if (
-        containerRef.current !== null &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setMenuOpen(false);
+  useEffect(
+    () => () => {
+      if (copyTimer.current !== undefined) {
+        window.clearTimeout(copyTimer.current);
       }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-        triggerRef.current?.focus();
-      }
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [menuOpen]);
-
-  useEffect(() => {
-    if (copyState === "idle") {
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      setCopyState("idle");
-    }, 2500);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [copyState]);
+    },
+    [],
+  );
 
   const copyIsbn = async () => {
-    setMenuOpen(false);
     const isbn = detail.isbn;
     if (isbn === null) {
       setCopyState("error");
@@ -101,7 +68,13 @@ export function BookDetailActions({
     } catch {
       setCopyState("error");
     } finally {
-      triggerRef.current?.focus();
+      if (copyTimer.current !== undefined) {
+        window.clearTimeout(copyTimer.current);
+      }
+      copyTimer.current = window.setTimeout(() => {
+        copyTimer.current = undefined;
+        setCopyState("idle");
+      }, 2500);
     }
   };
 
@@ -113,7 +86,6 @@ export function BookDetailActions({
         size="lg"
         variant="soft"
       >
-        <Pencil aria-hidden="true" />
         {t("detail.edit")}
       </Button>
 
@@ -121,9 +93,10 @@ export function BookDetailActions({
         <label className="sr-only" htmlFor="book-reading-status">
           {t("detail.readingStatus")}
         </label>
-        <select
+        <Select
           aria-busy={statusSaving || undefined}
-          className="h-11 min-w-0 flex-1 rounded-control border border-control-border bg-background px-3 text-sm text-foreground transition-colors duration-150 ease-out focus-visible:border-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled-surface disabled:text-disabled-foreground @min-[640px]:h-10"
+          className="h-11 @min-[640px]:h-10"
+          containerClassName="min-w-0 flex-1"
           disabled={statusSaving}
           id="book-reading-status"
           onChange={(event) => {
@@ -136,47 +109,28 @@ export function BookDetailActions({
               {t(`status.${status}`)}
             </option>
           ))}
-        </select>
+        </Select>
 
         {statusSaving ? <Spinner label={t("detail.savingStatus")} /> : null}
 
         {detail.isbn !== null ? (
-          <div className="relative shrink-0" ref={containerRef}>
-            <IconButton
-              aria-controls={menuOpen ? menuId : undefined}
-              aria-expanded={menuOpen}
-              aria-haspopup="menu"
-              className="@max-[639px]:size-11"
-              label={t("actions.more")}
-              onClick={() => {
-                setMenuOpen((current) => !current);
-              }}
-              ref={triggerRef}
-              variant="outline"
-            >
-              <Ellipsis aria-hidden="true" />
-            </IconButton>
-
-            {menuOpen ? (
-              <div
-                className="absolute right-0 bottom-full z-20 mb-2 min-w-44 rounded-menu border border-border bg-background p-1 shadow-overlay"
-                id={menuId}
-                role="menu"
-              >
-                <button
-                  className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-md:min-h-11"
-                  onClick={() => {
-                    void copyIsbn();
-                  }}
-                  role="menuitem"
-                  type="button"
-                >
-                  <Copy aria-hidden="true" className="size-[18px]" />
-                  {t("detail.copyIsbn")}
-                </button>
-              </div>
-            ) : null}
-          </div>
+          <DropdownMenu
+            actions={[
+              {
+                label: t("detail.copyIsbn"),
+                onSelect: () => {
+                  void copyIsbn();
+                },
+              },
+            ]}
+            className="shrink-0"
+            label={t("actions.more")}
+            side="top"
+            triggerClassName="@max-[639px]:size-11"
+            triggerVariant="outline"
+          >
+            <Ellipsis aria-hidden="true" />
+          </DropdownMenu>
         ) : null}
       </div>
 

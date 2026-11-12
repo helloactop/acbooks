@@ -1,5 +1,5 @@
 import { Button, Spinner } from "@acbooks/ui";
-import { BookOpen, Plus, RefreshCw } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -16,12 +16,14 @@ import {
 import { useAppShell } from "../layout/app-shell-context";
 import { PageHeader } from "../layout/PageHeader";
 import { libraryMediaHref, rememberDetailReturn } from "../layout/routes";
+import { useDocumentTitle } from "../layout/use-document-title";
 
 const RECENT_LIMIT = 12;
 
 export function DashboardPage() {
   const { t } = useTranslation("dashboard");
   const { t: tLibrary } = useTranslation("library");
+  useDocumentTitle(t("title"));
   const { expireSession } = useAppShell();
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [total, setTotal] = useState<number | null>(null);
@@ -85,7 +87,6 @@ export function DashboardPage() {
             }}
             variant="soft"
           >
-            <Plus aria-hidden="true" />
             {t("addBook")}
           </Button>
         }
@@ -104,7 +105,6 @@ export function DashboardPage() {
           <LibraryAlert requestId={requestId}>{errorMessage}</LibraryAlert>
           <div>
             <Button onClick={reload} size="sm" variant="outline">
-              <RefreshCw aria-hidden="true" />
               {t("retry")}
             </Button>
           </div>
@@ -120,7 +120,6 @@ export function DashboardPage() {
         <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16">
           <LibraryAlert requestId={requestId}>{errorMessage}</LibraryAlert>
           <Button onClick={reload} variant="soft">
-            <RefreshCw aria-hidden="true" />
             {t("retry")}
           </Button>
         </div>
@@ -142,7 +141,6 @@ export function DashboardPage() {
             }}
             variant="soft"
           >
-            <Plus aria-hidden="true" />
             {t("addBook")}
           </Button>
         </div>

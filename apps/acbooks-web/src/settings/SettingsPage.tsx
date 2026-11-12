@@ -1,4 +1,4 @@
-import { Button, useLanguage, useTheme } from "@acbooks/ui";
+import { Button, Select, useLanguage, useTheme } from "@acbooks/ui";
 import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -11,10 +11,8 @@ import {
 } from "../layout/navigation";
 import { PageHeader } from "../layout/PageHeader";
 import { settingsHref } from "../layout/routes";
+import { useDocumentTitle } from "../layout/use-document-title";
 import { SettingsGroup, SettingsRow } from "./SettingsGroup";
-
-const SELECT_CLASS =
-  "h-10 w-full min-w-44 rounded-control border border-control-border bg-background px-3 text-sm text-foreground transition-colors duration-150 ease-out focus-visible:border-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none";
 
 export function SettingsPage() {
   const { t } = useTranslation("app");
@@ -30,6 +28,11 @@ export function SettingsPage() {
   const section = settingsSectionFromSearch(search);
   const items = SETTINGS_NAV_GROUPS.flatMap((group) => group.items);
   const currentItem = items.find((item) => item.section === section);
+  useDocumentTitle(
+    currentItem === undefined
+      ? t("settings.title")
+      : `${t(currentItem.labelKey)} · ${t("settings.title")}`,
+  );
 
   const renderSection = (item: SettingsNavItem) => {
     if (item.section === "account") {
@@ -77,8 +80,8 @@ export function SettingsPage() {
             htmlFor="settings-theme"
             label={t("settings.theme")}
           >
-            <select
-              className={SELECT_CLASS}
+            <Select
+              className="min-w-44"
               id="settings-theme"
               onChange={(event) => {
                 setTheme(event.target.value as "system" | "light" | "dark");
@@ -88,7 +91,7 @@ export function SettingsPage() {
               <option value="system">{t("settings.themeSystem")}</option>
               <option value="light">{t("settings.themeLight")}</option>
               <option value="dark">{t("settings.themeDark")}</option>
-            </select>
+            </Select>
           </SettingsRow>
         </SettingsGroup>
       );
@@ -105,8 +108,8 @@ export function SettingsPage() {
           htmlFor="settings-language"
           label={t("settings.languageMode")}
         >
-          <select
-            className={SELECT_CLASS}
+          <Select
+            className="min-w-44"
             id="settings-language"
             onChange={(event) => {
               setLanguage(
@@ -118,7 +121,7 @@ export function SettingsPage() {
             <option value="system">{t("settings.languageSystem")}</option>
             <option value="zh-CN">{t("settings.languageZh")}</option>
             <option value="en">{t("settings.languageEn")}</option>
-          </select>
+          </Select>
         </SettingsRow>
       </SettingsGroup>
     );

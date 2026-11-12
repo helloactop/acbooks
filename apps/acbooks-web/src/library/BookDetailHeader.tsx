@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { BookCover } from "./BookCover";
 import { BookDescription } from "./BookDescription";
 import { BookDetailActions } from "./BookDetailActions";
-import { ShelfBadges, TagBadges } from "./BookMeta";
+import { ShelfBadges, TagLinks } from "./BookMeta";
 import type { BookDetail, ReadingStatus } from "./books-api";
 import { libraryHref } from "../layout/routes";
 import { joinNames } from "./presentation";
@@ -90,14 +90,14 @@ export function BookDetailHeader({
         {detail.tags.length > 0 || detail.shelves.length > 0 ? (
           <div className="mt-3 flex flex-wrap justify-center gap-1 @min-[640px]:justify-start">
             <span className="sr-only">{t("detail.tags")}</span>
-            <TagBadges tags={detail.tags} />
+            <TagLinks tags={detail.tags} />
             <span className="sr-only">{t("detail.shelves")}</span>
             <ShelfBadges shelves={detail.shelves} />
           </div>
         ) : null}
       </div>
 
-      <div className="w-full @min-[640px]:col-start-2 @min-[640px]:row-start-2 @min-[1000px]:col-start-3 @min-[1000px]:row-span-2 @min-[1000px]:row-start-1 @min-[1000px]:flex @min-[1000px]:flex-col @min-[1000px]:justify-end @min-[1000px]:self-stretch">
+      <div className="w-full @min-[640px]:col-start-2 @min-[640px]:row-start-2 @min-[1000px]:col-start-3 @min-[1000px]:row-span-2 @min-[1000px]:row-start-1 @min-[1000px]:flex @min-[1000px]:flex-col @min-[1000px]:justify-start @min-[1000px]:self-stretch">
         <BookDetailActions
           detail={detail}
           onEdit={onEdit}

@@ -17,5 +17,8 @@
   "password": {
     "show": "显示密码",
     "hide": "隐藏密码"
+  },
+  "multiValue": {
+    "remove": "移除 {{value}}"
   }
 }

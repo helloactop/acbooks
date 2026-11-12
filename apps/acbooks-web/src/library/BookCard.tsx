@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { BookCover } from "./BookCover";
-import { BookMeta } from "./BookMeta";
+import { TagBadges } from "./BookMeta";
 import type { BookSummary } from "./books-api";
 import { bookDetailHref } from "../layout/routes";
 import { joinNames } from "./presentation";
@@ -38,7 +38,7 @@ export function BookCard({ book, onOpen }: BookCardProps) {
         />
 
         <h3
-          className="mt-2 line-clamp-2 text-sm leading-[1.4] font-medium group-hover:text-accent-text"
+          className="mt-2 line-clamp-2 min-h-[2.8em] text-sm leading-[1.4] font-medium group-hover:text-accent-text"
           id={titleId}
         >
           {book.title}
@@ -46,8 +46,8 @@ export function BookCard({ book, onOpen }: BookCardProps) {
         <p className="truncate text-[13px] text-muted-foreground">{authors}</p>
       </Link>
 
-      <div className="mt-1.5">
-        <BookMeta book={book} />
+      <div className="mt-1.5 flex h-5 flex-nowrap items-center gap-1 overflow-hidden">
+        <TagBadges limit={2} tags={book.tags} />
       </div>
     </article>
   );

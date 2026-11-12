@@ -45,7 +45,7 @@ export function MobileNavigation({
       }}
       ref={dialogRef}
     >
-      <div className="h-full">
+      <div className="h-full [padding-bottom:env(safe-area-inset-bottom)] [padding-left:env(safe-area-inset-left)] [padding-top:env(safe-area-inset-top)]">
         <SidebarContent
           {...contentProps}
           onCloseNavigation={onClose}

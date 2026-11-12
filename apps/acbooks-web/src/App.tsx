@@ -14,7 +14,7 @@ function BookDetailRoute() {
   return bookId === undefined ? (
     <NotFoundPage />
   ) : (
-    <BookDetailPage bookId={bookId} />
+    <BookDetailPage bookId={bookId} key={bookId} />
   );
 }
 

@@ -163,7 +163,7 @@ export function LibraryFilterToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="relative min-w-[160px] flex-1 basis-[190px]">
+      <div className="relative min-w-[160px] flex-1 basis-[190px] max-sm:basis-full">
         <Search
           aria-hidden="true"
           className="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-muted-foreground"
@@ -211,98 +211,100 @@ export function LibraryFilterToolbar({
         ) : null}
       </div>
 
-      {compact ? (
-        <Select
-          aria-label={t("filters.status")}
-          className="w-[104px] max-lg:h-11"
-          containerClassName="shrink-0"
-          onChange={(event) => {
-            onStatusChange(event.target.value as StatusFilter);
-          }}
-          value={status}
-        >
-          <option value="all">{t("filters.all")}</option>
-          <option value="unread">{t("filters.unread")}</option>
-          <option value="reading">{t("filters.reading")}</option>
-          <option value="done">{t("filters.done")}</option>
-        </Select>
-      ) : (
-        <SegmentedControl
-          ariaLabel={t("filters.status")}
-          className="shrink-0 whitespace-nowrap"
-          onValueChange={onStatusChange}
-          options={statusOptions}
-          value={status}
-          variant="boxed"
-        />
-      )}
-
-      <Button
-        aria-controls="library-smart-filter-panel"
-        aria-expanded={filtersOpen}
-        aria-label={moreLabel}
-        aria-pressed={filtersOpen || activeCount > 0}
-        className={cn(FILTER_CONTROL, "shrink-0 px-3")}
-        onClick={onToggleFilters}
-        variant="outline"
-      >
-        <SlidersHorizontal aria-hidden="true" />
-        <span className="max-lg:sr-only">{t("filters.more")}</span>
-        {activeCount > 0 ? (
-          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-text px-1 text-[11px] font-semibold text-background tabular-nums">
-            {activeCount}
-          </span>
-        ) : null}
-      </Button>
-
-      {compact ? (
-        <DropdownMenu
-          actions={sortOptions.map((option) => ({
-            icon: sort === option.value ? Check : undefined,
-            label: option.label,
-            onSelect: () => {
-              onSortChange(option.value);
-            },
-          }))}
-          className="shrink-0"
-          label={t("filters.sortCurrent", { value: sortLabel })}
-          side="bottom"
-          triggerClassName="size-10 max-lg:size-11"
-          triggerVariant="outline"
-        >
-          <ArrowUpDown aria-hidden="true" />
-        </DropdownMenu>
-      ) : (
-        <label className="inline-flex shrink-0 items-center gap-1.5">
-          <ArrowUpDown
-            aria-hidden="true"
-            className="size-4 shrink-0 text-muted-foreground"
-            strokeWidth={2}
-          />
+      <div className="flex w-full flex-wrap items-center gap-2 sm:contents">
+        {compact ? (
           <Select
-            aria-label={t("filters.sort")}
-            className="h-10 w-[168px]"
+            aria-label={t("filters.status")}
+            className="w-[104px] max-lg:h-11"
+            containerClassName="shrink-0"
             onChange={(event) => {
-              onSortChange(event.target.value as SortOrder);
+              onStatusChange(event.target.value as StatusFilter);
             }}
-            value={sort}
+            value={status}
           >
-            {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+            <option value="all">{t("filters.all")}</option>
+            <option value="unread">{t("filters.unread")}</option>
+            <option value="reading">{t("filters.reading")}</option>
+            <option value="done">{t("filters.done")}</option>
           </Select>
-        </label>
-      )}
+        ) : (
+          <SegmentedControl
+            ariaLabel={t("filters.status")}
+            className="shrink-0 whitespace-nowrap"
+            onValueChange={onStatusChange}
+            options={statusOptions}
+            value={status}
+            variant="boxed"
+          />
+        )}
 
-      <SegmentedControl
-        ariaLabel={t("view.label")}
-        className={VIEW_SEGMENTED}
-        onValueChange={onViewChange}
-        options={viewOptions}
-        value={view}
-      />
+        <Button
+          aria-controls="library-smart-filter-panel"
+          aria-expanded={filtersOpen}
+          aria-label={moreLabel}
+          aria-pressed={filtersOpen || activeCount > 0}
+          className={cn(FILTER_CONTROL, "shrink-0 px-3")}
+          onClick={onToggleFilters}
+          variant="outline"
+        >
+          <SlidersHorizontal aria-hidden="true" className="lg:hidden" />
+          <span className="max-lg:sr-only">{t("filters.more")}</span>
+          {activeCount > 0 ? (
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-text px-1 text-[11px] font-semibold text-background tabular-nums">
+              {activeCount}
+            </span>
+          ) : null}
+        </Button>
+
+        {compact ? (
+          <DropdownMenu
+            actions={sortOptions.map((option) => ({
+              icon: sort === option.value ? Check : undefined,
+              label: option.label,
+              onSelect: () => {
+                onSortChange(option.value);
+              },
+            }))}
+            className="shrink-0"
+            label={t("filters.sortCurrent", { value: sortLabel })}
+            side="bottom"
+            triggerClassName="size-10 max-lg:size-11"
+            triggerVariant="outline"
+          >
+            <ArrowUpDown aria-hidden="true" />
+          </DropdownMenu>
+        ) : (
+          <label className="inline-flex shrink-0 items-center gap-1.5">
+            <ArrowUpDown
+              aria-hidden="true"
+              className="size-4 shrink-0 text-muted-foreground"
+              strokeWidth={2}
+            />
+            <Select
+              aria-label={t("filters.sort")}
+              className="h-10 w-[168px]"
+              onChange={(event) => {
+                onSortChange(event.target.value as SortOrder);
+              }}
+              value={sort}
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </label>
+        )}
+
+        <SegmentedControl
+          ariaLabel={t("view.label")}
+          className={cn(VIEW_SEGMENTED, "shrink-0 max-sm:ml-auto")}
+          onValueChange={onViewChange}
+          options={viewOptions}
+          value={view}
+        />
+      </div>
     </div>
   );
 }

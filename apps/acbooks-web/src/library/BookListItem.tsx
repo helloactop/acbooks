@@ -1,5 +1,4 @@
-import { IconButton, useLanguage } from "@acbooks/ui";
-import { Ellipsis } from "lucide-react";
+import { useLanguage } from "@acbooks/ui";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -9,15 +8,10 @@ import {
   ReadingStatusBadge,
   TagBadges,
 } from "./BookMeta";
+import { BookCover } from "./BookCover";
 import type { BookSummary } from "./books-api";
 import { bookDetailHref } from "../layout/routes";
-import {
-  COVER_FONT,
-  ROW_GRID,
-  coverFor,
-  initialOf,
-  joinNames,
-} from "./presentation";
+import { ROW_GRID, joinNames } from "./presentation";
 
 export interface BookListItemProps {
   book: BookSummary;
@@ -27,32 +21,26 @@ export interface BookListItemProps {
 export function BookListItem({ book, onOpen }: BookListItemProps) {
   const { t } = useTranslation("library");
   const { resolvedLanguage } = useLanguage();
-  const cover = coverFor(book);
   const authors =
     joinNames(book.authors, resolvedLanguage) || t("labels.unknownAuthor");
 
   return (
     <div
-      className={`${ROW_GRID} min-h-[72px] border-b border-border px-3 py-1.5`}
+      className={`${ROW_GRID} relative min-h-[72px] border-b border-border px-3 py-1.5 transition-colors duration-150 ease-out hover:bg-surface-hover focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background`}
       role="row"
     >
-      <div aria-hidden="true" role="cell">
-        <div
-          className="flex h-[60px] w-10 items-center justify-center overflow-hidden rounded text-xs font-bold shadow-cover"
-          style={{
-            backgroundColor: cover.background,
-            color: cover.foreground,
-            fontFamily: COVER_FONT,
-          }}
-        >
-          {initialOf(book.title)}
-        </div>
+      <div aria-hidden="true" className="flex justify-center" role="cell">
+        <BookCover
+          book={book}
+          className="w-10"
+          titleClassName="text-[8px] leading-tight"
+        />
       </div>
 
       <div className="min-w-0" role="cell">
         <Link
           aria-label={t("detail.open", { title: book.title })}
-          className="block max-w-full truncate text-left text-sm font-medium hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+          className="block max-w-full truncate text-left text-sm font-medium after:absolute after:inset-0 after:content-[''] hover:text-accent-text focus-visible:outline-none"
           onClick={() => {
             onOpen(book.id);
           }}
@@ -85,16 +73,6 @@ export function BookListItem({ book, onOpen }: BookListItemProps) {
 
       <div className="flex items-center gap-2 max-md:hidden" role="cell">
         <ReadingStatusBadge status={book.readingStatus} />
-      </div>
-
-      <div role="cell">
-        <IconButton
-          disabled
-          label={t("actions.more")}
-          title={t("nav.notAvailable")}
-        >
-          <Ellipsis aria-hidden="true" />
-        </IconButton>
       </div>
     </div>
   );

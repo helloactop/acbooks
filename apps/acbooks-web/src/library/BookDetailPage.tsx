@@ -1,5 +1,5 @@
 import { Button, Spinner, buttonVariants } from "@acbooks/ui";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -11,6 +11,8 @@ import {
   detailReturnHref,
   isDetailReturnFromHome,
 } from "../layout/routes";
+import { takeReturnScroll } from "../layout/scroll-restoration";
+import { useDocumentTitle } from "../layout/use-document-title";
 import { BookDetailHeader } from "./BookDetailHeader";
 import { BookDetailTabs } from "./BookDetailTabs";
 import { BookFormDialog } from "./BookFormDialog";
@@ -38,6 +40,7 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
   const [statusDraft, setStatusDraft] = useState<ReadingStatus | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
   const [actionError, setActionError] = useState<ApiError | null>(null);
+  useDocumentTitle(detail?.title ?? t("detail.title"));
   const backHref = detailReturnHref();
   const backLabel = isDetailReturnFromHome()
     ? t("detail.backHome")
@@ -68,6 +71,23 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
       });
     return () => controller.abort();
   }, [attempt, bookId, expireSession]);
+
+  useEffect(
+    () => () => {
+      // Keep the library scroll only when leaving through its return link; StrictMode
+      // remounts while still on the detail path and must not consume it.
+      const stillOnDetail = window.location.pathname.startsWith(
+        "/library/books/",
+      );
+      const leavingToReturn =
+        `${window.location.pathname}${window.location.search}` ===
+        detailReturnHref();
+      if (!stillOnDetail && !leavingToReturn) {
+        takeReturnScroll();
+      }
+    },
+    [],
+  );
 
   const retry = () => {
     setLoading(true);
@@ -161,7 +181,6 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
             {errorMessage}
           </LibraryAlert>
           <Button onClick={retry} variant="soft">
-            <RefreshCw aria-hidden="true" />
             {t("errors.retry")}
           </Button>
         </div>

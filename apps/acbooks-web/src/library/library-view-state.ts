@@ -4,6 +4,7 @@ import {
   parseSmartFilterRules,
   type SmartFilterRules,
 } from "./filter-model";
+import { clearScrollRestoration } from "../layout/scroll-restoration";
 
 export type TypeFilter = "all" | "digital" | "physical";
 export type StatusFilter = "all" | "done" | "reading" | "unread";
@@ -21,7 +22,6 @@ export interface LibraryViewState {
 }
 
 const VIEW_KEY = "acbooks-library-view";
-const SCROLL_KEY = "acbooks-library-scroll";
 const DESCRIPTION_PREFIX = "acbooks-description-expanded:";
 
 export const DEFAULT_LIBRARY_VIEW: LibraryViewState = {
@@ -163,20 +163,6 @@ export function saveLibraryView(view: LibraryViewState): void {
   writeSession(VIEW_KEY, JSON.stringify(view));
 }
 
-export function saveLibraryScroll(scrollTop: number): void {
-  writeSession(SCROLL_KEY, String(Math.max(0, scrollTop)));
-}
-
-export function takeLibraryScroll(): number {
-  const raw = readSession(SCROLL_KEY);
-  if (raw === null) {
-    return 0;
-  }
-  removeSession(SCROLL_KEY);
-  const value = Number(raw);
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
-}
-
 export function readDescriptionExpanded(bookId: string): boolean {
   return readSession(`${DESCRIPTION_PREFIX}${bookId}`) === "true";
 }
@@ -190,7 +176,7 @@ export function saveDescriptionExpanded(
 
 export function clearLibrarySessionState(): void {
   removeSession(VIEW_KEY);
-  removeSession(SCROLL_KEY);
+  clearScrollRestoration();
   const keys: string[] = [];
   try {
     for (let index = 0; index < window.sessionStorage.length; index += 1) {

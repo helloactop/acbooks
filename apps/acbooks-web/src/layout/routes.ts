@@ -32,6 +32,10 @@ export function libraryMediaHref(mediaType: "all" | "physical" | "digital"): str
   return `/library?mediaType=${mediaType}&reset=1`;
 }
 
+export function libraryTagHref(tag: string): string {
+  return `/library?tag=${encodeURIComponent(tag)}`;
+}
+
 export function bookDetailHref(bookId: string): string {
   return `/library/books/${encodeURIComponent(bookId)}`;
 }

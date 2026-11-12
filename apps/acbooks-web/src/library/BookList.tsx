@@ -30,7 +30,6 @@ export function BookList({ books, onOpen }: BookListProps) {
         <span className="max-md:hidden" role="columnheader">
           {t("list.status")}
         </span>
-        <span role="columnheader" />
       </div>
 
       {books.map((book) => (

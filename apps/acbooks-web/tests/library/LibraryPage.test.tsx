@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { appResources } from "../../src/i18n/resources";
 import { AuthenticatedLayout } from "../../src/layout/AuthenticatedLayout";
+import { rememberReturnScroll } from "../../src/layout/scroll-restoration";
 import type { BookDetail, BookPage, BookSummary } from "../../src/library/books-api";
 import { LibraryPage } from "../../src/library/LibraryPage";
 
@@ -53,7 +54,7 @@ const BOOK1 = summary({
   translators: ["译者甲"],
   isbn: "9787020002207",
   readingStatus: "reading",
-  tags: ["文学"],
+  tags: ["文学", "经典", "长篇"],
   shelves: ["书房"],
   copyCount: 2,
   fileCount: 2,
@@ -382,7 +383,7 @@ function renderLibrary(language: "zh-CN" | "en" = "zh-CN") {
 }
 
 describe("LibraryPage", () => {
-  it("renders API books and keeps tags, formats and copies distinct", async () => {
+  it("renders API books as cards and keeps list metadata distinct", async () => {
     installApi(
       baseHandler((url, init) => {
         if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
@@ -391,6 +392,7 @@ describe("LibraryPage", () => {
         throw new Error(`Unexpected request ${url.pathname}`);
       }),
     );
+    const user = userEvent.setup();
     renderLibrary();
 
     expect(
@@ -403,12 +405,17 @@ describe("LibraryPage", () => {
     expect(
       screen.getByText("共 2 本，实体书与电子书统一管理"),
     ).toBeInTheDocument();
-    expect(screen.getAllByText("文学").length).toBeGreaterThan(0);
-    expect(screen.getByText("PDF")).toBeInTheDocument();
-    expect(screen.getAllByText("EPUB")).toHaveLength(2);
-    expect(screen.getByText("实体 ×2")).toBeInTheDocument();
-    expect(screen.getAllByText("阅读中").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("已读").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("文学")).toHaveLength(2);
+    expect(screen.getByText("经典")).toBeInTheDocument();
+    expect(screen.getByText("+1")).toBeInTheDocument();
+    expect(screen.queryByText("长篇")).not.toBeInTheDocument();
+    expect(screen.queryByText("PDF")).not.toBeInTheDocument();
+    expect(screen.queryByText("实体 ×2")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("article", { name: "呐喊" })).queryByText(
+        "阅读中",
+      ),
+    ).not.toBeInTheDocument();
     expect(screen.queryAllByRole("progressbar")).toHaveLength(0);
     expect(
       screen.getByRole("complementary", { name: "应用侧边栏" }),
@@ -419,6 +426,15 @@ describe("LibraryPage", () => {
     expect(
       screen.getByRole("link", { name: "账户与设置：admin" }),
     ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "列表视图" }));
+    await screen.findByRole("table", { name: "书籍列表" });
+    expect(screen.getAllByText("长篇").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("PDF").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("EPUB").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("实体 ×2").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("阅读中").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("已读").length).toBeGreaterThan(0);
   });
 
   it("sends search, smart filters, sorting and pagination to the server", async () => {
@@ -609,6 +625,51 @@ describe("LibraryPage", () => {
       expect(cleared?.searchParams.get("offset")).toBe("0");
       expect(cleared?.searchParams.get("sort")).toBe("title");
       expect(cleared?.searchParams.get("order")).toBe("asc");
+    });
+  });
+
+  it("labels an ANY summary when the combinator is OR", async () => {
+    const params = new URLSearchParams({
+      filters: JSON.stringify({
+        combinator: "ANY",
+        conditions: [
+          { field: "tag", operator: "equals", value: "文学" },
+        ],
+      }),
+    });
+    window.history.replaceState({}, "", `/library?${params.toString()}`);
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1]));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    renderLibrary();
+    await screen.findByRole("article", { name: "呐喊" });
+
+    expect(
+      await screen.findByText("OR · 满足任意一条即可"),
+    ).toBeInTheDocument();
+  });
+
+  it("restores the saved return scroll after the first page loads", async () => {
+    rememberReturnScroll(240);
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1], 1));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const scrollTo = vi.spyOn(HTMLElement.prototype, "scrollTo");
+    renderLibrary();
+    await screen.findByRole("article", { name: "呐喊" });
+
+    await waitFor(() => {
+      expect(scrollTo).toHaveBeenCalledWith({ top: 240 });
     });
   });
 
@@ -943,6 +1004,49 @@ describe("LibraryPage", () => {
     });
   });
 
+  it("confirms before discarding unsaved book edits", async () => {
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([]));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+    await screen.findByText("书库还没有书籍");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "添加书籍" })[0]!,
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "添加书籍",
+    });
+    await user.type(within(dialog).getByLabelText("书名"), "未保存的书");
+
+    await user.click(within(dialog).getByRole("button", { name: "取消" }));
+    const confirm = await screen.findByRole("dialog", {
+      name: "放弃未保存的修改？",
+    });
+    expect(confirm).toHaveTextContent("关闭后将丢失本次修改。");
+    await user.click(
+      within(confirm).getByRole("button", { name: "继续编辑" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "添加书籍" }),
+    ).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "关闭" }));
+    await user.click(
+      await screen.findByRole("button", { name: "放弃修改" }),
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(findCall("POST", "/api/v1/books")).toBeUndefined();
+  });
+
   it("adds a book and refreshes the library", async () => {
     let created: BookSummary | null = null;
     installApi(
@@ -1141,7 +1245,10 @@ describe("LibraryPage", () => {
         /physical and digital editions managed together/,
       ),
     ).toHaveTextContent("1 book ·");
-    expect(screen.getByText("Physical ×2")).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("radio", { name: "List view" }));
+    await screen.findByRole("table", { name: "Book list" });
+    expect(screen.getAllByText("Physical ×2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Reading").length).toBeGreaterThan(0);
     expect(
       screen.getByRole("complementary", { name: "Application sidebar" }),
