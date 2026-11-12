@@ -79,5 +79,6 @@ export function formatDateTime(timestamp: number, locale: string): string {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "UTC",
   }).format(new Date(timestamp));
 }

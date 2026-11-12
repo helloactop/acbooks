@@ -15,10 +15,11 @@ import {
   type BookListQuery,
   type BookSummary,
 } from "./books-api";
+import { ActiveFilterSummary } from "./ActiveFilterSummary";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
 import {
-  applicableSmartFilterRules,
   serializeSmartFilterRules,
+  summarizeSmartFilterRules,
   type SmartFilterRules,
 } from "./filter-model";
 import { LibraryAlert } from "./LibraryAlert";
@@ -50,8 +51,8 @@ export function LibraryPage() {
   const [type] = useState(initialView.type);
   const [status, setStatus] = useState<StatusFilter>(initialView.status);
   const [rules, setRules] = useState<SmartFilterRules>(initialView.filters);
-  const [appliedFilters, setAppliedFilters] = useState(() =>
-    serializeSmartFilterRules(initialView.filters),
+  const [appliedRules, setAppliedRules] = useState<SmartFilterRules>(
+    initialView.filters,
   );
   const [sort, setSort] = useState<SortOrder>(initialView.sort);
   const [view, setView] = useState<ViewMode>(initialView.view);
@@ -61,9 +62,15 @@ export function LibraryPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const scrollRestored = useRef(false);
-  const appliedFiltersRef = useRef(appliedFilters);
   const filterTimer = useRef<number | undefined>(undefined);
-  const filterSchema = useBookFilterSchema(filtersOpen, expireSession);
+  const filterSchema = useBookFilterSchema(true, expireSession);
+  const fields = filterSchema.schema?.fields ?? [];
+  const summary = summarizeSmartFilterRules(rules, fields);
+  const appliedFilters = serializeSmartFilterRules(appliedRules, fields);
+  const waitingForSchema =
+    appliedRules.conditions.length > 0 &&
+    fields.length === 0 &&
+    filterSchema.error === null;
 
   const beginRequest = () => {
     setLoading(true);
@@ -145,6 +152,9 @@ export function LibraryPage() {
   }, [loading, mainRef]);
 
   useEffect(() => {
+    if (waitingForSchema) {
+      return;
+    }
     const controller = new AbortController();
     const query: BookListQuery = {
       q: searchTerm.length > 0 ? searchTerm : undefined,
@@ -190,35 +200,35 @@ export function LibraryPage() {
     sort,
     status,
     type,
+    waitingForSchema,
   ]);
 
-  const commitAppliedFilters = (next: string) => {
-    if (next === appliedFiltersRef.current) {
-      return;
-    }
-    appliedFiltersRef.current = next;
-    setAppliedFilters(next);
+  const commitAppliedRules = (next: SmartFilterRules) => {
+    setAppliedRules(next);
     setOffset(0);
     beginRequest();
   };
 
-  const changeRules = (next: SmartFilterRules) => {
+  const changeRules = (
+    next: SmartFilterRules,
+    immediate = false,
+  ) => {
     setRules(next);
-    const serialized = serializeSmartFilterRules(next);
-    if (serialized === appliedFiltersRef.current) {
-      return;
-    }
     if (filterTimer.current !== undefined) {
       window.clearTimeout(filterTimer.current);
       filterTimer.current = undefined;
     }
-    if (serialized.length === 0) {
-      commitAppliedFilters(serialized);
+    const serialized = serializeSmartFilterRules(next, fields);
+    if (serialized === appliedFilters) {
+      return;
+    }
+    if (immediate || serialized.length === 0) {
+      commitAppliedRules(next);
       return;
     }
     filterTimer.current = window.setTimeout(() => {
       filterTimer.current = undefined;
-      commitAppliedFilters(serialized);
+      commitAppliedRules(next);
     }, 300);
   };
 
@@ -256,18 +266,38 @@ export function LibraryPage() {
     setView(value);
   };
 
-  const clearFilters = () => {
+  const clearSearch = () => {
+    if (searchTerm.length === 0) {
+      return;
+    }
+    beginRequest();
+    setSearchTerm("");
+    setOffset(0);
+  };
+
+  const clearAllFilters = () => {
     if (filterTimer.current !== undefined) {
       window.clearTimeout(filterTimer.current);
       filterTimer.current = undefined;
     }
-    appliedFiltersRef.current = "";
     setRules({ combinator: "ALL", conditions: [] });
-    setAppliedFilters("");
+    setAppliedRules({ combinator: "ALL", conditions: [] });
     setSearchTerm("");
     setStatus("all");
     setOffset(0);
     beginRequest();
+  };
+
+  const removeCondition = (id: string) => {
+    changeRules(
+      {
+        ...rules,
+        conditions: rules.conditions.filter(
+          (condition) => condition.id !== id,
+        ),
+      },
+      true,
+    );
   };
 
   const retry = () => {
@@ -300,9 +330,10 @@ export function LibraryPage() {
     rememberDetailReturn();
   };
 
-  const activeCount = applicableSmartFilterRules(rules).conditions.length;
-  const hasFilters =
-    searchTerm.length > 0 || status !== "all" || activeCount > 0;
+  const activeCount = summary.validCount;
+  const hasExternalFilters =
+    searchTerm.length > 0 || status !== "all";
+  const hasFilters = hasExternalFilters || activeCount > 0;
   const pageTitle =
     type === "physical"
       ? t("page.physicalTitle")
@@ -321,10 +352,9 @@ export function LibraryPage() {
     error === null ? undefined : libraryErrorMessage(t, error);
   const errorRequestId = error === null ? undefined : libraryRequestId(error);
   const schemaLoading =
-    filtersOpen && filterSchema.schema === null && filterSchema.error === null;
+    filterSchema.schema === null && filterSchema.error === null;
   const schemaError =
     filterSchema.error === null ? undefined : t("filters.schemaError");
-  const fields = filterSchema.schema?.fields ?? [];
   const maxConditions = filterSchema.schema?.maxConditions ?? 30;
 
   return (
@@ -356,8 +386,8 @@ export function LibraryPage() {
         <LibraryFilterToolbar
           activeCount={activeCount}
           filtersOpen={filtersOpen}
-          hasFilters={hasFilters}
-          onClearFilters={clearFilters}
+          hasSearch={searchTerm.length > 0}
+          onClearSearch={clearSearch}
           onSearchChange={changeSearch}
           onSortChange={changeSort}
           onStatusChange={changeStatus}
@@ -375,11 +405,22 @@ export function LibraryPage() {
           <SmartFilterBuilder
             error={schemaError}
             fields={fields}
+            hasExternalFilters={hasExternalFilters}
             loading={schemaLoading}
             maxConditions={maxConditions}
             onChange={changeRules}
+            onClearAll={clearAllFilters}
             onRetry={filterSchema.retry}
             rules={rules}
+          />
+        ) : summary.total > 0 ? (
+          <ActiveFilterSummary
+            fields={fields}
+            onOpenFilters={() => {
+              setFiltersOpen(true);
+            }}
+            onRemove={removeCondition}
+            summary={summary}
           />
         ) : null}
       </div>
@@ -439,7 +480,7 @@ export function LibraryPage() {
           {hasFilters ? (
             <Button
               className="mt-2"
-              onClick={clearFilters}
+              onClick={clearAllFilters}
               variant="outline"
             >
               {t("empty.clear")}

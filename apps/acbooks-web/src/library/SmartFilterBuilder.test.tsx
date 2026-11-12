@@ -50,15 +50,21 @@ const INITIAL_RULES: SmartFilterRules = {
   ],
 };
 
-function Harness() {
-  const [rules, setRules] = useState<SmartFilterRules>(INITIAL_RULES);
+function Harness({
+  initial = INITIAL_RULES,
+}: {
+  initial?: SmartFilterRules;
+}) {
+  const [rules, setRules] = useState<SmartFilterRules>(initial);
   return (
     <I18nProvider defaultLanguage="zh-CN" resources={appResources}>
       <SmartFilterBuilder
         fields={FIELDS}
+        hasExternalFilters={false}
         loading={false}
         maxConditions={30}
         onChange={setRules}
+        onClearAll={() => undefined}
         onRetry={() => undefined}
         rules={rules}
       />
@@ -104,5 +110,39 @@ describe("SmartFilterBuilder", () => {
       "type",
       "date",
     );
+  });
+
+  it("uses container layout and flags invalid ranges", () => {
+    render(
+      <Harness
+        initial={{
+          combinator: "ALL",
+          conditions: [
+            {
+              field: "copyCount",
+              id: "invalid-range",
+              operator: "between",
+              value: ["5", "1"],
+            },
+          ],
+        }}
+      />,
+    );
+
+    const panel = screen.getByRole("region", { name: "智能组合筛选" });
+    expect(panel).toHaveClass("@container");
+    expect(panel).not.toHaveClass("overflow-hidden");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "起始值不能大于结束值",
+    );
+    expect(
+      screen.getByRole("spinbutton", { name: "实体副本数起始值" }),
+    ).toHaveAttribute("aria-invalid", "true");
+    expect(
+      screen.getByRole("spinbutton", { name: "实体副本数结束值" }),
+    ).toHaveAttribute("aria-invalid", "true");
+    expect(
+      screen.getByText(/没有有效的组合条件/),
+    ).toBeInTheDocument();
   });
 });

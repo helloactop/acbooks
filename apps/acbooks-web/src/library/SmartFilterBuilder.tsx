@@ -6,7 +6,7 @@ import {
   Spinner,
   cn,
 } from "@acbooks/ui";
-import { Database, Plus, RotateCcw, Trash2, WandSparkles } from "lucide-react";
+import { Trash2, WandSparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -14,8 +14,11 @@ import { AsyncFilterValueEditor } from "./AsyncFilterValueEditor";
 import {
   createSmartFilterCondition,
   needsConditionValue,
+  summarizeSmartFilterRules,
+  validateSmartFilterCondition,
   type BookFilterField,
   type BookFilterOption,
+  type FilterConditionValidation,
   type SmartFilterCondition,
   type SmartFilterRules,
 } from "./filter-model";
@@ -23,15 +26,17 @@ import {
 export interface SmartFilterBuilderProps {
   error?: ReactNode;
   fields: readonly BookFilterField[];
+  hasExternalFilters: boolean;
   loading: boolean;
   maxConditions: number;
   onChange: (rules: SmartFilterRules) => void;
+  onClearAll: () => void;
   onRetry: () => void;
   rules: SmartFilterRules;
 }
 
 const ROW_GRID =
-  "grid gap-2 rounded-card border border-border bg-background p-3 md:grid-cols-[34px_minmax(170px,0.85fr)_minmax(132px,0.62fr)_minmax(190px,1.35fr)_42px] md:items-center";
+  "grid gap-2 rounded-card border border-border bg-background p-3 @min-[680px]:grid-cols-[34px_minmax(150px,0.85fr)_minmax(120px,0.62fr)_minmax(170px,1.35fr)_42px] @min-[680px]:items-center";
 
 function initialValue(operator: string): string | string[] | undefined {
   if (operator === "between") {
@@ -43,9 +48,11 @@ function initialValue(operator: string): string | string[] | undefined {
 export function SmartFilterBuilder({
   error,
   fields,
+  hasExternalFilters,
   loading,
   maxConditions,
   onChange,
+  onClearAll,
   onRetry,
   rules,
 }: SmartFilterBuilderProps) {
@@ -59,6 +66,7 @@ export function SmartFilterBuilder({
       return result;
     }, new Map<string, BookFilterField[]>()),
   );
+  const summary = summarizeSmartFilterRules(rules, fields);
 
   const fieldLabel = (field: BookFilterField) =>
     t(`filters.fields.${field.key}`, { defaultValue: field.key });
@@ -70,6 +78,28 @@ export function SmartFilterBuilder({
     field.key === "readingStatus"
       ? t(`status.${option.value}`, { defaultValue: option.label })
       : option.label;
+
+  const validationMessage = (validation: FilterConditionValidation) => {
+    if (validation.status === "incomplete") {
+      return t("filters.ruleIncomplete");
+    }
+    switch (validation.reason) {
+      case "date":
+        return t("filters.ruleInvalidDate");
+      case "field":
+        return t("filters.ruleInvalidField");
+      case "number":
+        return t("filters.ruleInvalidNumber");
+      case "operator":
+        return t("filters.ruleInvalidOperator");
+      case "range":
+        return t("filters.ruleInvalidRange");
+      case "value":
+        return t("filters.ruleInvalidValue");
+      default:
+        return t("filters.ruleInvalidValue");
+    }
+  };
 
   const addCondition = () => {
     onChange({
@@ -126,7 +156,9 @@ export function SmartFilterBuilder({
   const valueEditor = (
     condition: SmartFilterCondition,
     field: BookFilterField,
+    validation: FilterConditionValidation,
   ) => {
+    const invalid = validation.status === "invalid";
     if (!needsConditionValue(condition.operator)) {
       return (
         <div className="flex h-10 items-center rounded-control bg-surface px-3 text-sm text-muted-foreground max-lg:h-11">
@@ -143,6 +175,7 @@ export function SmartFilterBuilder({
       return (
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
           <Input
+            aria-invalid={invalid || undefined}
             aria-label={t("filters.rangeStart", {
               field: fieldLabel(field),
             })}
@@ -160,6 +193,7 @@ export function SmartFilterBuilder({
             {t("filters.rangeTo")}
           </span>
           <Input
+            aria-invalid={invalid || undefined}
             aria-label={t("filters.rangeEnd", {
               field: fieldLabel(field),
             })}
@@ -189,6 +223,7 @@ export function SmartFilterBuilder({
       return (
         <AsyncFilterValueEditor
           fieldLabel={fieldLabel(field)}
+          invalid={invalid}
           key={`${condition.id}:${field.key}`}
           onChange={(nextValue) => {
             updateCondition(condition.id, { value: nextValue });
@@ -202,6 +237,7 @@ export function SmartFilterBuilder({
     if (field.type === "select") {
       return (
         <Select
+          aria-invalid={invalid || undefined}
           aria-label={t("filters.valueLabel", {
             field: fieldLabel(field),
           })}
@@ -224,6 +260,7 @@ export function SmartFilterBuilder({
     return (
       <div className="relative min-w-0">
         <Input
+          aria-invalid={invalid || undefined}
           aria-label={t("filters.valueLabel", { field: fieldLabel(field) })}
           className={cn("max-lg:h-11", field.unit ? "pr-12" : undefined)}
           onChange={(event) => {
@@ -257,7 +294,7 @@ export function SmartFilterBuilder({
   return (
     <section
       aria-label={t("filters.smartTitle")}
-      className="overflow-hidden rounded-card border border-border bg-surface"
+      className="@container rounded-card border border-border bg-surface"
       id="library-smart-filter-panel"
     >
       <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -296,7 +333,6 @@ export function SmartFilterBuilder({
             onClick={addCondition}
             variant="soft"
           >
-            <Plus aria-hidden="true" />
             {t("filters.addCondition")}
           </Button>
         </div>
@@ -326,11 +362,7 @@ export function SmartFilterBuilder({
             onClick={addCondition}
             type="button"
           >
-            <Database
-              aria-hidden="true"
-              className="size-5 text-muted-foreground"
-            />
-            <span className="mt-2 text-sm font-medium">
+            <span className="text-sm font-medium">
               {t("filters.addFirst")}
             </span>
             <span className="mt-1 text-xs text-muted-foreground">
@@ -367,9 +399,13 @@ export function SmartFilterBuilder({
                 );
               }
 
+              const validation = validateSmartFilterCondition(
+                condition,
+                fields,
+              );
               return (
                 <div className={ROW_GRID} key={condition.id}>
-                  <span className="hidden h-7 w-7 items-center justify-center rounded-control bg-surface text-xs font-semibold text-muted-foreground md:flex">
+                  <span className="hidden h-7 w-7 items-center justify-center rounded-control bg-surface text-xs font-semibold text-muted-foreground @min-[680px]:flex">
                     {index + 1}
                   </span>
                   <Select
@@ -412,10 +448,10 @@ export function SmartFilterBuilder({
                     ))}
                   </Select>
                   <div className="min-w-0">
-                    {valueEditor(condition, field)}
+                    {valueEditor(condition, field, validation)}
                   </div>
                   <IconButton
-                    className="justify-self-end max-lg:size-11 md:justify-self-auto"
+                    className="justify-self-end max-lg:size-11 @min-[680px]:justify-self-auto"
                     label={t("filters.removeCondition", {
                       index: index + 1,
                     })}
@@ -425,37 +461,81 @@ export function SmartFilterBuilder({
                   >
                     <Trash2 aria-hidden="true" />
                   </IconButton>
+                  {validation.status !== "valid" ? (
+                    <p
+                      className={cn(
+                        "@min-[680px]:col-span-4 @min-[680px]:col-start-2",
+                        validation.status === "invalid"
+                          ? "text-destructive-text"
+                          : "text-warning",
+                      )}
+                      role={
+                        validation.status === "invalid"
+                          ? "alert"
+                          : undefined
+                      }
+                    >
+                      {validationMessage(validation)}
+                    </p>
+                  ) : null}
                 </div>
               );
             })
           : null}
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-border bg-background px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 rounded-b-card border-t border-border bg-background px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>
-          {rules.conditions.length > 0
-            ? t("filters.rulesActive", {
-                total: rules.conditions.length,
-                mode: t(
-                  rules.combinator === "ALL"
-                    ? "filters.allHint"
-                    : "filters.anyHint",
-                ),
-              })
-            : t("filters.noRules")}
+          {summary.total === 0
+            ? t("filters.noRules")
+            : [
+                summary.validCount > 0
+                  ? t("filters.rulesActive", {
+                      total: summary.validCount,
+                      mode: t(
+                        rules.combinator === "ALL"
+                          ? "filters.allHint"
+                          : "filters.anyHint",
+                      ),
+                    })
+                  : t("filters.noValidRules"),
+                summary.incompleteCount > 0
+                  ? t("filters.summaryIncomplete", {
+                      total: summary.incompleteCount,
+                    })
+                  : null,
+                summary.invalidCount > 0
+                  ? t("filters.summaryInvalid", {
+                      total: summary.invalidCount,
+                    })
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
         </span>
-        <Button
-          className="self-start max-lg:min-h-11 sm:self-auto"
-          disabled={rules.conditions.length === 0}
-          onClick={() => {
-            onChange({ combinator: "ALL", conditions: [] });
-          }}
-          size="sm"
-          variant="ghost"
-        >
-          <RotateCcw aria-hidden="true" />
-          {t("filters.clearConditions")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-1">
+          {hasExternalFilters ? (
+            <Button
+              className="self-start max-lg:min-h-11 sm:self-auto"
+              onClick={onClearAll}
+              size="sm"
+              variant="ghost"
+            >
+              {t("filters.clearAll")}
+            </Button>
+          ) : null}
+          <Button
+            className="self-start max-lg:min-h-11 sm:self-auto"
+            disabled={summary.total === 0}
+            onClick={() => {
+              onChange({ combinator: "ALL", conditions: [] });
+            }}
+            size="sm"
+            variant="ghost"
+          >
+            {t("filters.clearConditions")}
+          </Button>
+        </div>
       </div>
     </section>
   );

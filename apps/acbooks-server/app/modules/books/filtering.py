@@ -191,6 +191,16 @@ def _required_value(
         start, end = str(raw_value[0]).strip(), str(raw_value[1]).strip()
         _validate_scalar(field, start)
         _validate_scalar(field, end)
+        if field.field_type == "number":
+            if float(start) > float(end):
+                raise InvalidBookFilter(
+                    f"{field.key} range start must not exceed end."
+                )
+        elif field.field_type == "date":
+            if date.fromisoformat(start) > date.fromisoformat(end):
+                raise InvalidBookFilter(
+                    f"{field.key} range start must not exceed end."
+                )
         return (start, end)
 
     value = str(raw_value if raw_value is not None else "").strip()
@@ -296,15 +306,16 @@ def _text(
     if condition.operator == "is_not_empty":
         return not_(empty_predicate)
 
-    value = _literal_pattern(str(condition.value or ""))
+    literal = str(condition.value or "").casefold()
+    pattern = escape_like(literal)
     if condition.operator in {"contains", "not_contains"}:
-        predicate = normalized.like(f"%{value}%", escape="\\")
+        predicate = normalized.like(f"%{pattern}%", escape="\\")
         return not_(predicate) if condition.operator == "not_contains" else predicate
     if condition.operator == "starts_with":
-        return normalized.like(f"{value}%", escape="\\")
+        return normalized.like(f"{pattern}%", escape="\\")
     if condition.operator == "ends_with":
-        return normalized.like(f"%{value}", escape="\\")
-    equals_predicate = normalized == value
+        return normalized.like(f"%{pattern}", escape="\\")
+    equals_predicate = normalized == literal
     return (
         not_(equals_predicate)
         if condition.operator == "not_equals"

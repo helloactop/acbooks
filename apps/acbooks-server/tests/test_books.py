@@ -499,6 +499,30 @@ def test_smart_filters_compile_all_any_and_typed_operators(
             {
                 "combinator": "ALL",
                 "conditions": [
+                    {
+                        "field": "copyCount",
+                        "operator": "between",
+                        "value": ["5", "1"],
+                    }
+                ],
+            }
+        ),
+        json.dumps(
+            {
+                "combinator": "ALL",
+                "conditions": [
+                    {
+                        "field": "createdAt",
+                        "operator": "between",
+                        "value": ["2026-12-31", "2026-01-01"],
+                    }
+                ],
+            }
+        ),
+        json.dumps(
+            {
+                "combinator": "ALL",
+                "conditions": [
                     {"field": "title", "operator": "is_empty", "value": None}
                 ]
                 * 31,
@@ -511,6 +535,93 @@ def test_smart_filters_reject_invalid_rules(
 ) -> None:
     response = browser.get(BOOKS, params={"filters": payload})
     assert_problem(response, 422, "INVALID_BOOK_FILTER")
+
+
+def test_smart_filter_equals_and_patterns_treat_values_literally(
+    browser: TestClient,
+) -> None:
+    literal = create_book(browser, title="100%_match", isbn=None)
+    create_book(browser, title="100Xmatch", isbn=None)
+
+    def titles(filters: str) -> list[str]:
+        response = browser.get(BOOKS, params={"filters": filters})
+        assert response.status_code == 200, response.text
+        return [item["title"] for item in response.json()["items"]]
+
+    assert titles(
+        filter_query(
+            {"field": "title", "operator": "equals", "value": "100%_match"}
+        )
+    ) == [literal["title"]]
+    assert titles(
+        filter_query(
+            {
+                "field": "title",
+                "operator": "not_equals",
+                "value": "100%_match",
+            }
+        )
+    ) == ["100Xmatch"]
+    assert titles(
+        filter_query(
+            {"field": "title", "operator": "contains", "value": "%_"}
+        )
+    ) == [literal["title"]]
+    assert titles(
+        filter_query(
+            {
+                "field": "title",
+                "operator": "starts_with",
+                "value": "100%",
+            }
+        )
+    ) == [literal["title"]]
+    assert titles(
+        filter_query(
+            {
+                "field": "title",
+                "operator": "ends_with",
+                "value": "_match",
+            }
+        )
+    ) == [literal["title"]]
+
+
+def test_smart_filter_dates_use_utc_day_boundaries(
+    paths: tuple[Path, Path], browser: TestClient
+) -> None:
+    book = create_book(browser, title="UTC boundary", isbn=None)
+    timestamp = int(
+        datetime(2025, 1, 1, 23, 30, tzinfo=UTC).timestamp() * 1000
+    )
+    engine = create_sqlite_engine(paths[0])
+    try:
+        with Session(engine) as session, session.begin():
+            stored = session.get(Book, book["id"])
+            assert stored is not None
+            stored.created_at = timestamp
+            stored.updated_at = timestamp
+    finally:
+        engine.dispose()
+
+    def total(day: str) -> int:
+        response = browser.get(
+            BOOKS,
+            params={
+                "filters": filter_query(
+                    {
+                        "field": "createdAt",
+                        "operator": "equals",
+                        "value": day,
+                    }
+                )
+            },
+        )
+        assert response.status_code == 200, response.text
+        return int(response.json()["total"])
+
+    assert total("2025-01-01") == 1
+    assert total("2025-01-02") == 0
 
 
 def test_filter_schema_and_options_use_real_library_data(

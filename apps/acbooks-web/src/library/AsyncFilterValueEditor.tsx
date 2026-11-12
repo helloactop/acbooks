@@ -8,6 +8,7 @@ import type { BookFilterOptionSource } from "./filter-model";
 
 export interface AsyncFilterValueEditorProps {
   fieldLabel: string;
+  invalid?: boolean;
   onChange: (value: string) => void;
   source: BookFilterOptionSource;
   value: string;
@@ -29,6 +30,7 @@ const INITIAL_STATE: OptionState = {
 
 export function AsyncFilterValueEditor({
   fieldLabel,
+  invalid = false,
   onChange,
   source,
   value,
@@ -91,6 +93,7 @@ export function AsyncFilterValueEditor({
     <Combobox
       ariaLabel={t("filters.valueLabel", { field: fieldLabel })}
       emptyLabel={t("filters.valueNoMatches")}
+      invalid={invalid}
       loading={state.loading}
       onChange={onChange}
       options={state.options}

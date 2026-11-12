@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Combobox, type ComboboxOption } from "./combobox";
 
@@ -64,5 +64,35 @@ describe("Combobox", () => {
 
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("portals the menu outside clipping ancestors and flips near the viewport edge", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <div style={{ height: 40, overflow: "hidden" }}>
+        <Harness />
+      </div>,
+    );
+    const input = screen.getByRole("combobox", { name: "Author" });
+    vi.spyOn(input, "getBoundingClientRect").mockReturnValue({
+      bottom: 380,
+      height: 40,
+      left: 20,
+      right: 220,
+      top: 340,
+      width: 200,
+      x: 20,
+      y: 340,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(400);
+
+    await user.click(input);
+    const menu = screen.getByRole("listbox");
+    expect(container.contains(menu)).toBe(false);
+    expect(menu).toHaveClass("fixed");
+    expect(menu.style.bottom).not.toBe("");
+    expect(menu.style.top).toBe("");
+    vi.restoreAllMocks();
   });
 });

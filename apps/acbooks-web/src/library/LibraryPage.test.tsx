@@ -438,6 +438,12 @@ describe("LibraryPage", () => {
     await user.click(
       await screen.findByRole("button", { name: /添加第一个筛选条件/ }),
     );
+    expect(
+      screen.getByText("待完善：请填写完整的筛选值"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "更多筛选" }),
+    ).toBeInTheDocument();
 
     await user.selectOptions(
       screen.getByRole("combobox", { name: "第 1 条筛选字段" }),
@@ -458,6 +464,9 @@ describe("LibraryPage", () => {
     expect(
       screen.getByRole("button", { name: /更多筛选，已启用 1 个条件/ }),
     ).toHaveTextContent("1");
+    expect(
+      screen.queryByText("待完善：请填写完整的筛选值"),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "添加条件" }));
     await user.selectOptions(
@@ -561,13 +570,217 @@ describe("LibraryPage", () => {
       screen.getByRole("combobox", { name: "条件组合方式" }),
     ).toHaveValue("ANY");
 
-    await user.click(screen.getByRole("button", { name: "清除筛选" }));
+    await user.click(
+      screen.getByRole("button", { name: "清空组合条件" }),
+    );
     await waitFor(() => {
       const cleared = latestBookRequest();
       expect(cleared?.searchParams.get("filters")).toBeNull();
       expect(cleared?.searchParams.get("offset")).toBe("0");
       expect(cleared?.searchParams.get("sort")).toBe("title");
       expect(cleared?.searchParams.get("order")).toBe("asc");
+    });
+  });
+
+  it("shows a collapsed summary and removes one filter rule", async () => {
+    window.sessionStorage.setItem(
+      "acbooks-library-view",
+      JSON.stringify({
+        filters: {
+          combinator: "ALL",
+          conditions: [
+            {
+              field: "tag",
+              id: "saved-tag",
+              operator: "equals",
+              value: "文学",
+            },
+            {
+              field: "format",
+              id: "saved-format",
+              operator: "equals",
+              value: "epub",
+            },
+          ],
+        },
+        offset: 0,
+        searchTerm: "",
+        sort: "title",
+        status: "all",
+        type: "all",
+        view: "grid",
+      }),
+    );
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1]));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+    await screen.findByRole("article", { name: "呐喊" });
+
+    const tagChip = await screen.findByRole("button", {
+      name: "移除筛选：标签 等于 文学",
+    });
+    expect(
+      screen.getByRole("button", {
+        name: "移除筛选：文件格式 等于 EPUB",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /更多筛选，已启用 2 个条件/ }),
+    ).toHaveTextContent("2");
+
+    await user.click(tagChip);
+    await waitFor(() => {
+      expect(latestFilters()).toEqual({
+        combinator: "ALL",
+        conditions: [
+          { field: "format", operator: "equals", value: "epub" },
+        ],
+      });
+    });
+    expect(
+      screen.queryByRole("button", {
+        name: "移除筛选：标签 等于 文学",
+      }),
+    ).not.toBeInTheDocument();
+    expect(latestBookRequest()?.searchParams.get("sort")).toBe("title");
+  });
+
+  it("separates clearing search, smart conditions and all filters", async () => {
+    window.sessionStorage.setItem(
+      "acbooks-library-view",
+      JSON.stringify({
+        filters: {
+          combinator: "ALL",
+          conditions: [
+            {
+              field: "tag",
+              id: "saved-tag",
+              operator: "equals",
+              value: "文学",
+            },
+          ],
+        },
+        offset: 0,
+        searchTerm: "三体",
+        sort: "title",
+        status: "done",
+        type: "all",
+        view: "grid",
+      }),
+    );
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1]));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+    await screen.findByRole("article", { name: "呐喊" });
+
+    await user.click(
+      screen.getByRole("button", { name: "清除搜索" }),
+    );
+    await waitFor(() => {
+      expect(latestBookRequest()?.searchParams.get("q")).toBeNull();
+      expect(latestFilters()?.conditions).toHaveLength(1);
+      expect(
+        latestBookRequest()?.searchParams.get("readingStatus"),
+      ).toBe("done");
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: /更多筛选，已启用 1 个条件/ }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "清空组合条件" }),
+    );
+    await waitFor(() => {
+      expect(latestBookRequest()?.searchParams.get("filters")).toBeNull();
+      expect(
+        latestBookRequest()?.searchParams.get("readingStatus"),
+      ).toBe("done");
+    });
+
+    const search = screen.getByRole("searchbox", { name: "搜索书库" });
+    await user.type(search, "边城");
+    await waitFor(() => {
+      expect(latestBookRequest()?.searchParams.get("q")).toBe("边城");
+    });
+    await user.click(
+      screen.getByRole("button", { name: "清除全部筛选" }),
+    );
+    await waitFor(() => {
+      const request = latestBookRequest();
+      expect(request?.searchParams.get("q")).toBeNull();
+      expect(request?.searchParams.get("filters")).toBeNull();
+      expect(request?.searchParams.get("readingStatus")).toBeNull();
+      expect(request?.searchParams.get("offset")).toBe("0");
+      expect(request?.searchParams.get("sort")).toBe("title");
+    });
+  });
+
+  it("cancels a pending filter update when a value is restored", async () => {
+    window.sessionStorage.setItem(
+      "acbooks-library-view",
+      JSON.stringify({
+        filters: {
+          combinator: "ALL",
+          conditions: [
+            {
+              field: "tag",
+              id: "saved-tag",
+              operator: "equals",
+              value: "文学",
+            },
+          ],
+        },
+        offset: 0,
+        searchTerm: "",
+        sort: "recent",
+        status: "all",
+        type: "all",
+        view: "grid",
+      }),
+    );
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1]));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+    await screen.findByRole("article", { name: "呐喊" });
+    await user.click(
+      screen.getByRole("button", { name: /更多筛选，已启用 1 个条件/ }),
+    );
+    const tagValue = await screen.findByRole("combobox", {
+      name: "标签筛选值",
+    });
+    const before = bookRequests().length;
+
+    fireEvent.change(tagValue, { target: { value: "文学史" } });
+    fireEvent.change(tagValue, { target: { value: "文学" } });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    });
+
+    expect(bookRequests()).toHaveLength(before);
+    expect(latestFilters()).toEqual({
+      combinator: "ALL",
+      conditions: [{ field: "tag", operator: "equals", value: "文学" }],
     });
   });
 

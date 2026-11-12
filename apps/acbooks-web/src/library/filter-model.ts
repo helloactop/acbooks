@@ -23,6 +23,29 @@ export interface SmartFilterRules {
   conditions: SmartFilterCondition[];
 }
 
+export type FilterConditionStatus = "incomplete" | "invalid" | "valid";
+
+export type FilterConditionReason =
+  | "date"
+  | "field"
+  | "number"
+  | "operator"
+  | "range"
+  | "value";
+
+export interface FilterConditionValidation {
+  reason?: FilterConditionReason;
+  status: FilterConditionStatus;
+}
+
+export interface SmartFilterSummary {
+  incompleteCount: number;
+  invalidCount: number;
+  total: number;
+  validCount: number;
+  validRules: SmartFilterRules;
+}
+
 export const EMPTY_FILTER_RULES: SmartFilterRules = {
   combinator: "ALL",
   conditions: [],
@@ -141,6 +164,159 @@ export function smartFilterConditionComplete(
   );
 }
 
+function parseNumber(value: string): number | null {
+  if (value.trim().length === 0) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseDate(value: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+  const parsed = Date.parse(`${value}T00:00:00Z`);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  return new Date(parsed).toISOString().slice(0, 10) === value
+    ? parsed
+    : null;
+}
+
+function validateScalar(
+  field: BookFilterField,
+  value: string,
+): FilterConditionValidation {
+  if (value.trim().length === 0) {
+    return { status: "incomplete" };
+  }
+  if (field.type === "number" && parseNumber(value) === null) {
+    return { reason: "number", status: "invalid" };
+  }
+  if (field.type === "date" && parseDate(value) === null) {
+    return { reason: "date", status: "invalid" };
+  }
+  if (
+    field.type === "select" &&
+    field.allowCustom === false &&
+    (field.options?.length ?? 0) > 0 &&
+    !(field.options ?? []).some((option) => option.value === value)
+  ) {
+    return { reason: "value", status: "invalid" };
+  }
+  return { status: "valid" };
+}
+
+export function validateSmartFilterCondition(
+  condition: SmartFilterCondition,
+  fields: readonly BookFilterField[],
+): FilterConditionValidation {
+  const field =
+    fields.length === 0
+      ? undefined
+      : fields.find((candidate) => candidate.key === condition.field);
+  if (fields.length > 0 && field === undefined) {
+    return { reason: "field", status: "invalid" };
+  }
+  if (
+    field !== undefined &&
+    !field.operators.includes(condition.operator)
+  ) {
+    return { reason: "operator", status: "invalid" };
+  }
+  if (!needsConditionValue(condition.operator)) {
+    return { status: "valid" };
+  }
+  if (condition.operator === "between") {
+    if (
+      !Array.isArray(condition.value) ||
+      condition.value.length !== 2 ||
+      condition.value.some((item) => item.trim().length === 0)
+    ) {
+      return smartFilterConditionComplete(condition)
+        ? { reason: "range", status: "invalid" }
+        : { status: "incomplete" };
+    }
+    if (field === undefined) {
+      return { status: "valid" };
+    }
+    const start = condition.value[0] ?? "";
+    const end = condition.value[1] ?? "";
+    const first = validateScalar(field, start);
+    if (first.status !== "valid") {
+      return first;
+    }
+    const second = validateScalar(field, end);
+    if (second.status !== "valid") {
+      return second;
+    }
+    if (field.type === "number") {
+      const startNumber = parseNumber(start);
+      const endNumber = parseNumber(end);
+      if (
+        startNumber !== null &&
+        endNumber !== null &&
+        startNumber > endNumber
+      ) {
+        return { reason: "range", status: "invalid" };
+      }
+    } else if (field.type === "date") {
+      const startDate = parseDate(start);
+      const endDate = parseDate(end);
+      if (
+        startDate !== null &&
+        endDate !== null &&
+        startDate > endDate
+      ) {
+        return { reason: "range", status: "invalid" };
+      }
+    }
+    return { status: "valid" };
+  }
+
+  if (Array.isArray(condition.value)) {
+    return { status: "invalid", reason: "value" };
+  }
+  const value = condition.value ?? "";
+  if (value.trim().length === 0) {
+    return { status: "incomplete" };
+  }
+  return field === undefined
+    ? { status: "valid" }
+    : validateScalar(field, value);
+}
+
+export function summarizeSmartFilterRules(
+  rules: SmartFilterRules,
+  fields: readonly BookFilterField[],
+): SmartFilterSummary {
+  let incompleteCount = 0;
+  let invalidCount = 0;
+  const validConditions: SmartFilterCondition[] = [];
+  for (const condition of rules.conditions) {
+    const validation = validateSmartFilterCondition(condition, fields);
+    if (validation.status === "valid") {
+      validConditions.push(condition);
+    } else if (validation.status === "incomplete") {
+      incompleteCount += 1;
+    } else {
+      invalidCount += 1;
+    }
+  }
+  return {
+    incompleteCount,
+    invalidCount,
+    total: rules.conditions.length,
+    validCount: validConditions.length,
+    validRules: {
+      combinator: rules.combinator,
+      conditions: validConditions,
+    },
+  };
+}
+
 export function applicableSmartFilterRules(
   rules: SmartFilterRules,
 ): SmartFilterRules {
@@ -152,8 +328,12 @@ export function applicableSmartFilterRules(
 
 export function serializeSmartFilterRules(
   rules: SmartFilterRules,
+  fields?: readonly BookFilterField[],
 ): string {
-  const applicable = applicableSmartFilterRules(rules);
+  const applicable =
+    fields !== undefined && fields.length > 0
+      ? summarizeSmartFilterRules(rules, fields).validRules
+      : applicableSmartFilterRules(rules);
   if (applicable.conditions.length === 0) {
     return "";
   }

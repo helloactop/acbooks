@@ -26,8 +26,8 @@ import type { SortOrder, StatusFilter, ViewMode } from "./library-view-state";
 export interface LibraryFilterToolbarProps {
   activeCount: number;
   filtersOpen: boolean;
-  hasFilters: boolean;
-  onClearFilters: () => void;
+  hasSearch: boolean;
+  onClearSearch: () => void;
   onSearchChange: (value: string) => void;
   onSortChange: (value: SortOrder) => void;
   onStatusChange: (value: StatusFilter) => void;
@@ -47,8 +47,8 @@ const VIEW_SEGMENTED =
 export function LibraryFilterToolbar({
   activeCount,
   filtersOpen,
-  hasFilters,
-  onClearFilters,
+  hasSearch,
+  onClearSearch,
   onSearchChange,
   onSortChange,
   onStatusChange,
@@ -173,7 +173,7 @@ export function LibraryFilterToolbar({
           aria-label={t("header.searchLabel")}
           className={cn(
             "pl-9 max-lg:h-11 [&::-webkit-search-cancel-button]:appearance-none",
-            hasFilters && "pr-11",
+            hasSearch && "pr-11",
           )}
           defaultValue={searchValue}
           onChange={(event) => {
@@ -199,11 +199,11 @@ export function LibraryFilterToolbar({
           ref={inputRef}
           type="search"
         />
-        {hasFilters ? (
+        {hasSearch ? (
           <IconButton
             className="absolute top-1/2 right-1 size-8 -translate-y-1/2 max-md:size-10"
-            label={t("empty.clear")}
-            onClick={onClearFilters}
+            label={t("filters.clearSearch")}
+            onClick={onClearSearch}
             variant="ghost"
           >
             <X aria-hidden="true" />
