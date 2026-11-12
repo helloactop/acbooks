@@ -215,6 +215,23 @@ with closing(sqlite3.connect(DATABASE_PATH)) as db:
     assert (
         submit_setup(client, origin, payload, expected=409)["code"] == "SETUP_ALREADY_INITIALIZED"
     )
+    login_token, _ = get_json(client, origin + API + "/auth/csrf")
+    logged_in, session_cookie = get_json(
+        client,
+        Request(
+            origin + API + "/auth/login",
+            json.dumps({"username": payload["username"], "password": password}).encode(),
+            {
+                "Content-Type": "application/json",
+                "Origin": origin,
+                "X-CSRF-Token": login_token["csrfToken"],
+            },
+        ),
+    )
+    assert logged_in == {"account": result}
+    assert session_cookie.startswith("__Host-acbooks-session=")
+    assert "Secure" in session_cookie
+    assert get_json(client, origin + API + "/auth/me")[0] == result
     account = result["id"]
     assert isinstance(account, str)
     print("Fresh migration and administrator setup via verified HTTPS passed", flush=True)
@@ -251,6 +268,16 @@ def verify_restart(deploy: Deployment, client: OpenerDirector, origin: str, acco
     deploy.compose("up", "-d", "--no-build", "--wait", "--wait-timeout", "90")
     assert deploy.container("api") != previous_api
     assert get_json(client, origin + API + "/setup/status")[0] == {"initialized": True}
+    assert get_json(client, origin + API + "/auth/me")[0]["id"] == account
+    logout_token, _ = get_json(client, origin + API + "/auth/csrf")
+    logout = Request(
+        origin + API + "/auth/logout",
+        method="POST",
+        headers={"Origin": origin, "X-CSRF-Token": logout_token["csrfToken"]},
+    )
+    with client.open(logout, timeout=10) as response:
+        assert response.status == 204 and response.read() == b""
+    get_json(client, origin + API + "/auth/me", expected=401)
     deploy.compose("exec", "-T", "api", "test", "!", "-e", CODE)
     deploy.compose(
         "exec",
