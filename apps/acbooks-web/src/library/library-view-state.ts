@@ -20,6 +20,7 @@ export interface LibraryViewState {
   view: ViewMode;
 }
 
+const LEGACY_VIEW_KEY = "acbooks-library-view";
 const VIEW_MODE_KEY = "acbooks-library-view-mode";
 const COVER_SIZE_KEY = "acbooks-library-cover-size";
 const DESCRIPTION_PREFIX = "acbooks-description-expanded:";
@@ -107,6 +108,8 @@ export function saveDescriptionExpanded(
 }
 
 export function clearLibrarySessionState(): void {
+  // Older builds kept the whole library view here; it is URL-backed now.
+  removeSession(LEGACY_VIEW_KEY);
   clearScrollRestoration();
   const keys: string[] = [];
   try {

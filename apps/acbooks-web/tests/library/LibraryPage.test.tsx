@@ -1345,6 +1345,10 @@ describe("LibraryPage", () => {
     await user.click(
       screen.getByRole("link", { name: "打开账户设置" }),
     );
+    window.sessionStorage.setItem(
+      "acbooks-library-view",
+      JSON.stringify({ offset: 12, view: "list" }),
+    );
     await user.click(
       await screen.findByRole("button", { name: "退出登录" }),
     );
@@ -1352,6 +1356,7 @@ describe("LibraryPage", () => {
     await waitFor(() => {
       expect(onLoggedOut).toHaveBeenCalledOnce();
     });
+    expect(window.sessionStorage.getItem("acbooks-library-view")).toBeNull();
     const logoutCall = findCall("POST", "/api/v1/auth/logout");
     expect(logoutCall).toBeDefined();
     const init = (logoutCall?.[1] ?? {}) as RequestInit;
