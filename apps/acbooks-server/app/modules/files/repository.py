@@ -127,3 +127,11 @@ def delete_file_rows(
     )
     session.execute(delete(BookFile).where(BookFile.id == file_id))
     session.execute(delete(StorageObject).where(StorageObject.id == storage_object_id))
+
+
+def unlink_book_file(session: Session, file_id: str) -> None:
+    # Detach the book-file association but keep the storage object and file.
+    session.execute(
+        delete(ReadingPosition).where(ReadingPosition.book_file_id == file_id)
+    )
+    session.execute(delete(BookFile).where(BookFile.id == file_id))

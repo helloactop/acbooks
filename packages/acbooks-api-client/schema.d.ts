@@ -4265,7 +4265,9 @@ export interface operations {
     };
     deleteBookFile: {
         parameters: {
-            query?: never;
+            query?: {
+                purge?: boolean;
+            };
             header?: never;
             path: {
                 bookFileId: string;

@@ -10,6 +10,7 @@ from fastapi import (
     Form,
     HTTPException,
     Path,
+    Query,
     Request,
     Response,
     UploadFile,
@@ -20,6 +21,7 @@ from app.api.errors import problem_openapi
 from app.modules.auth.dependencies import AuthDependencies
 from app.modules.auth.service import WebSession
 from app.modules.books.schemas import BookFile
+from app.modules.files import service as files_service
 from app.modules.files.service import FilesService, RangeNotSatisfiable
 
 no_store = {"Cache-Control": {"schema": {"type": "string", "const": "no-store"}}}
@@ -88,11 +90,13 @@ def files_router(
         },
     )
     def upload_book_file(
+        request: Request,
         response: Response,
         current: Annotated[WebSession, Depends(dependencies.require_write)],
         book_id: Annotated[UUID, Form(alias="bookId")],
         file: Annotated[UploadFile, File()],
     ) -> BookFile:
+        files_service.enforce_request_size(request.headers.get("content-length"))
         created = service.upload(book_id, file)
         response.headers["Cache-Control"] = "no-store"
         response.headers["Location"] = f"/api/v1/files/{created.id}/content"
@@ -155,8 +159,9 @@ def files_router(
     def delete_book_file(
         book_file_id: Annotated[UUID, Path(alias="bookFileId")],
         current: Annotated[WebSession, Depends(dependencies.require_write)],
+        purge: Annotated[bool, Query()] = True,
     ) -> Response:
-        service.delete(book_file_id)
+        service.delete(book_file_id, purge)
         return Response(status_code=204, headers={"Cache-Control": "no-store"})
 
     return router

@@ -50,7 +50,7 @@ pnpm e2e
 | pytest | Compose 部署冒烟（Ubuntu AMD64/ARM64）：镜像内 Web 静态托管与 SPA 回退、就绪探针、HTTPS 代理下的 Cookie/CSRF、迁移门禁、备份命令、Worker 与重启持久化 |
 | pytest | Books Core V1：创建书目、重复 ISBN 不合并、作者/译者/ISBN/标签/书架关联、Unicode casefold 名称匹配、数据库级搜索筛选排序分页、部分更新保留副本与阅读数据、单本/批量删除及关联清理（含阅读位置）、批量状态/标签/书架与合并上限、封面上传/替换/删除与回退、Pillow 内容与尺寸校验、封面数据库失败保留原文件、会话/CSRF、OpenAPI 契约 |
 | pytest | Copies/Locations：位置层级 CRUD 与防循环、有子级拒绝删除与副本 SET NULL、副本 CRUD 与越界校验、内联副本原子性、location 子树筛选、locations 选项源与筛选 schema、鉴权与错误码 |
-| pytest | Files：流式上传 PDF/EPUB 与 SHA-256、真实格式校验、超大与重复拒绝、默认 managed 根、全文/Range/206/416/ETag 下载、路径越界拒绝、managed 删除并清阅读位置、external 只读拒绝、鉴权/CSRF、索引失败清理已发布文件、上传中断/磁盘满/发布失败清理、恶意文件名、符号链接越界、external 下载、幂等与并发删除 |
+| pytest | Files：流式上传 PDF/EPUB 与 SHA-256、真实格式校验、超大与重复拒绝、默认 managed 根、全文/Range/206/416/ETag 下载、路径越界拒绝、managed 删除并清阅读位置、external 只读拒绝、鉴权/CSRF、索引失败清理已发布文件、上传中断/磁盘满/发布失败清理、恶意文件名、符号链接越界、external 下载、幂等与并发删除、PDF/EPUB 结构校验与 ZIP 解压/条目/元数据上限、HTTP 接收层大小限制、下载拒绝非普通文件、解除关联（purge=false）与永久删除（purge=true）区分 |
 | ESLint | Web 与共享 UI 的 TypeScript/React 代码、Hooks 规则和导入问题 |
 | tsc | Web 与共享 UI 的 TypeScript strict 类型检查 |
 | i18n:check | 共享与 Web 翻译资源的语言目录、命名空间、键集合和插值参数一致性 |

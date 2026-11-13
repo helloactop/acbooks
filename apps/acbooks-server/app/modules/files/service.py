@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import stat as statlib
 import tempfile
 import zipfile
 from dataclasses import dataclass
@@ -26,6 +27,12 @@ MEDIA_TYPES = {
     "epub": "application/epub+zip",
 }
 EPUB_MIMETYPE = b"application/epub+zip"
+EPUB_CONTAINER = "META-INF/container.xml"
+PDF_TAIL_BYTES = 2048
+MAX_EPUB_UNCOMPRESSED_BYTES = 4 * 1024 * 1024 * 1024
+MAX_EPUB_ENTRIES = 10000
+MAX_EPUB_METADATA_BYTES = 1024 * 1024
+MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + 1024 * 1024
 
 
 class RangeNotSatisfiable(Exception):
@@ -46,22 +53,55 @@ class Content:
     filename: str
 
 
-def _detect_format(path: Path) -> str | None:
+def _looks_like_pdf(path: Path, size: int) -> bool:
     try:
         with path.open("rb") as handle:
-            head = handle.read(8)
-        if head.startswith(b"%PDF-"):
-            return "pdf"
-        if head.startswith(b"PK\x03\x04"):
-            try:
-                with zipfile.ZipFile(path) as archive:
-                    mimetype = archive.read(archive.getinfo("mimetype"))
-            except (zipfile.BadZipFile, KeyError, OSError, NotImplementedError):
-                return None
-            if mimetype.strip() == EPUB_MIMETYPE:
-                return "epub"
+            if not handle.read(5).startswith(b"%PDF-"):
+                return False
+            if size > 0:
+                handle.seek(max(0, size - PDF_TAIL_BYTES))
+            return b"%%EOF" in handle.read(PDF_TAIL_BYTES)
     except OSError:
-        return None
+        return False
+
+
+def _looks_like_epub(path: Path) -> bool:
+    try:
+        with zipfile.ZipFile(path) as archive:
+            infos = archive.infolist()
+            if len(infos) > MAX_EPUB_ENTRIES:
+                return False
+            if sum(info.file_size for info in infos) > MAX_EPUB_UNCOMPRESSED_BYTES:
+                return False
+            try:
+                mimetype = archive.getinfo("mimetype")
+                container = archive.getinfo(EPUB_CONTAINER)
+            except KeyError:
+                return False
+            if mimetype.file_size > MAX_EPUB_METADATA_BYTES:
+                return False
+            if container.file_size > MAX_EPUB_METADATA_BYTES:
+                return False
+            if archive.read(mimetype).strip() != EPUB_MIMETYPE:
+                return False
+            archive.read(container)
+            return True
+    except (
+        zipfile.BadZipFile,
+        zipfile.LargeZipFile,
+        KeyError,
+        OSError,
+        RuntimeError,
+        NotImplementedError,
+    ):
+        return False
+
+
+def _detect_format(path: Path, size: int) -> str | None:
+    if _looks_like_pdf(path, size):
+        return "pdf"
+    if _looks_like_epub(path):
+        return "epub"
     return None
 
 
@@ -100,6 +140,17 @@ def _parse_range(header: str | None, size: int) -> tuple[int, int] | None:
     if size == 0 or start > end or start >= size:
         raise RangeNotSatisfiable(size)
     return start, min(end, size - 1)
+
+
+def enforce_request_size(content_length: str | None) -> None:
+    if content_length is None:
+        return
+    try:
+        length = int(content_length)
+    except ValueError:
+        return
+    if length > MAX_REQUEST_BYTES:
+        raise BusinessError(BusinessErrorCode.FILE_TOO_LARGE)
 
 
 class FilesService:
@@ -151,7 +202,7 @@ class FilesService:
                     digest.update(chunk)
                     handle.write(chunk)
 
-            file_format = _detect_format(temp)
+            file_format = _detect_format(temp, size)
             if file_format is None:
                 raise BusinessError(BusinessErrorCode.FILE_FORMAT_UNSUPPORTED)
             sha256 = digest.hexdigest()
@@ -169,6 +220,14 @@ class FilesService:
             # Hard-link the verified temp file into place; fails rather than overwrites.
             os.link(temp, final_path)
             published = True
+            if final_path.is_symlink() or not final_path.is_file():
+                raise BusinessError(BusinessErrorCode.FILE_NOT_FOUND)
+            try:
+                identity = os.path.samefile(temp, final_path)
+            except OSError as error:
+                raise BusinessError(BusinessErrorCode.FILE_NOT_FOUND) from error
+            if not identity:
+                raise BusinessError(BusinessErrorCode.FILE_NOT_FOUND)
             mtime_ms = int(final_path.stat().st_mtime * 1000)
 
             with self.write_sessions.begin() as session:
@@ -214,12 +273,14 @@ class FilesService:
             raise BusinessError(BusinessErrorCode.FILE_NOT_FOUND)
         path = _resolve_within(Path(record.root_path), record.relative_path)
         try:
-            stat = path.stat()
+            stat_result = path.stat()
         except OSError as error:
             raise BusinessError(BusinessErrorCode.FILE_NOT_FOUND) from error
-        size = stat.st_size
+        if not statlib.S_ISREG(stat_result.st_mode):
+            raise BusinessError(BusinessErrorCode.FILE_NOT_FOUND)
+        size = stat_result.st_size
         media_type = MEDIA_TYPES.get(record.format, "application/octet-stream")
-        etag = record.sha256 or f"{size}-{int(stat.st_mtime)}"
+        etag = record.sha256 or f"{size}-{int(stat_result.st_mtime)}"
         parsed = _parse_range(range_header, size)
         if parsed is None:
             start, length, partial = 0, size, False
@@ -237,25 +298,34 @@ class FilesService:
             filename=f"{record.book_id}.{record.format}",
         )
 
-    def delete(self, file_id: UUID) -> None:
+    def delete(self, file_id: UUID, purge: bool = True) -> None:
         key = str(file_id)
+        path: Path | None = None
         with self.write_sessions.begin() as session:
             record = repository.get_file(session, key)
             if record is None:
                 raise BusinessError(BusinessErrorCode.FILE_NOT_FOUND)
-            if record.root_mode != "managed":
-                raise BusinessError(BusinessErrorCode.FILE_EXTERNAL_PROTECTED)
-            path = _resolve_within(Path(record.root_path), record.relative_path)
-            repository.delete_file_rows(
-                session, key, record.storage_object_id
-            )
-        try:
-            path.unlink(missing_ok=True)
-        except OSError as error:
-            logger.warning(
-                "operation=file_delete result=cleanup_failed error=%s",
-                type(error).__qualname__,
-            )
+            if purge:
+                if record.root_mode != "managed":
+                    raise BusinessError(BusinessErrorCode.FILE_EXTERNAL_PROTECTED)
+                path = _resolve_within(
+                    Path(record.root_path), record.relative_path
+                )
+                repository.delete_file_rows(
+                    session, key, record.storage_object_id
+                )
+            else:
+                # Detach the book-file association but keep the storage object
+                # and original file so a later scan can re-index it.
+                repository.unlink_book_file(session, key)
+        if purge and path is not None:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError as error:
+                logger.warning(
+                    "operation=file_delete result=cleanup_failed error=%s",
+                    type(error).__qualname__,
+                )
 
     @staticmethod
     def _dto(record: repository.FileRecord) -> BookFileDTO:

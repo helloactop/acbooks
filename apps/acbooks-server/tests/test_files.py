@@ -772,3 +772,234 @@ def test_old_database_upgrade_preserves_files(tmp_path: Path) -> None:
         assert "cover_updated_at" in columns
     finally:
         connection.close()
+
+
+NONREGULAR_FILE_ID = "44444444-4444-4444-8444-444444444444"
+EXTERNAL_UNLINK_ID = "55555555-5555-4555-8555-555555555555"
+EXTERNAL_PURGE_ID = "66666666-6666-4666-8666-666666666666"
+
+
+def epub_with(*entries: tuple[str, bytes]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, data in entries:
+            archive.writestr(name, data)
+    return buffer.getvalue()
+
+
+def test_upload_rejects_pdf_without_eof(
+    env: tuple[TestClient, Path, Path],
+) -> None:
+    client, _database, _library = env
+    book = create_book(client, title="坏PDF")
+    assert_problem(
+        upload(client, book["id"], b"%PDF-1.4\nno eof marker"),
+        422,
+        "FILE_FORMAT_UNSUPPORTED",
+    )
+
+
+def test_upload_rejects_epub_without_container(
+    env: tuple[TestClient, Path, Path],
+) -> None:
+    client, _database, _library = env
+    book = create_book(client, title="坏EPUB")
+    data = epub_with(("mimetype", b"application/epub+zip"))
+    assert_problem(
+        upload(client, book["id"], data, "x.epub", "application/epub+zip"),
+        422,
+        "FILE_FORMAT_UNSUPPORTED",
+    )
+
+
+def test_upload_enforces_epub_resource_limits(
+    env: tuple[TestClient, Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _database, _library = env
+    book = create_book(client, title="EPUB限制")
+    data = epub_with(
+        ("mimetype", b"application/epub+zip"),
+        ("META-INF/container.xml", b"<container/>"),
+        ("content.xhtml", b"x" * 100),
+    )
+
+    monkeypatch.setattr(files_service, "MAX_EPUB_ENTRIES", 2)
+    assert_problem(
+        upload(client, book["id"], data, "x.epub", "application/epub+zip"),
+        422,
+        "FILE_FORMAT_UNSUPPORTED",
+    )
+
+    monkeypatch.setattr(files_service, "MAX_EPUB_ENTRIES", 10000)
+    monkeypatch.setattr(files_service, "MAX_EPUB_UNCOMPRESSED_BYTES", 10)
+    assert_problem(
+        upload(client, book["id"], data, "x.epub", "application/epub+zip"),
+        422,
+        "FILE_FORMAT_UNSUPPORTED",
+    )
+
+    monkeypatch.setattr(
+        files_service, "MAX_EPUB_UNCOMPRESSED_BYTES", 4 * 1024 * 1024 * 1024
+    )
+    monkeypatch.setattr(files_service, "MAX_EPUB_METADATA_BYTES", 4)
+    assert_problem(
+        upload(client, book["id"], data, "x.epub", "application/epub+zip"),
+        422,
+        "FILE_FORMAT_UNSUPPORTED",
+    )
+
+
+def test_upload_enforces_http_request_size(
+    env: tuple[TestClient, Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _database, library = env
+    book = create_book(client, title="接收层限流")
+    monkeypatch.setattr(files_service, "MAX_REQUEST_BYTES", 100)
+    assert_problem(upload(client, book["id"], PDF), 413, "FILE_TOO_LARGE")
+    assert list(library.rglob("*")) == []
+
+
+def test_unlink_keeps_storage_object_and_original(
+    env: tuple[TestClient, Path, Path],
+) -> None:
+    client, database, library = env
+    book = create_book(client, title="解除关联")
+    created = upload(client, book["id"], PDF).json()
+
+    response = client.delete(
+        f"/api/v1/files/{created['id']}?purge=false", headers=challenge(client)
+    )
+    assert response.status_code == 204
+    assert client.get(f"{BOOKS}/{book['id']}/files").json() == []
+    assert len(list(library.rglob("*.pdf"))) == 1
+    engine = create_sqlite_engine(database)
+    try:
+        with Session(engine) as session:
+            assert count(session, BookFile) == 0
+            assert count(session, StorageObject) == 1
+    finally:
+        engine.dispose()
+
+
+def test_external_can_unlink_but_not_purge(
+    env: tuple[TestClient, Path, Path],
+) -> None:
+    client, database, library = env
+    book = create_book(client, title="外部解除")
+    nas = library.parent / "nas"
+    nas.mkdir()
+    (nas / "a.pdf").write_bytes(PDF)
+    (nas / "b.pdf").write_bytes(PDF)
+    engine = create_sqlite_engine(database)
+    try:
+        with Session(engine) as session, session.begin():
+            session.add(
+                StorageRoot(
+                    id="nas-root",
+                    name="nas",
+                    root_path=str(nas.resolve()),
+                    mode="external",
+                )
+            )
+            session.flush()
+            for suffix, object_id in (("a", "obj-a"), ("b", "obj-b")):
+                session.add(
+                    StorageObject(
+                        id=object_id,
+                        root_id="nas-root",
+                        relative_path=f"{suffix}.pdf",
+                        size_bytes=len(PDF),
+                        sha256=None,
+                        file_status="present",
+                        mtime_ms=1,
+                    )
+                )
+            session.flush()
+            session.add(
+                BookFile(
+                    id=EXTERNAL_UNLINK_ID,
+                    book_id=book["id"],
+                    storage_object_id="obj-a",
+                    format="pdf",
+                )
+            )
+            session.add(
+                BookFile(
+                    id=EXTERNAL_PURGE_ID,
+                    book_id=book["id"],
+                    storage_object_id="obj-b",
+                    format="pdf",
+                )
+            )
+    finally:
+        engine.dispose()
+
+    unlink = client.delete(
+        f"/api/v1/files/{EXTERNAL_UNLINK_ID}?purge=false",
+        headers=challenge(client),
+    )
+    assert unlink.status_code == 204
+    purge = client.delete(
+        f"/api/v1/files/{EXTERNAL_PURGE_ID}?purge=true",
+        headers=challenge(client),
+    )
+    assert_problem(purge, 409, "FILE_EXTERNAL_PROTECTED")
+
+    assert (nas / "a.pdf").is_file()
+    assert (nas / "b.pdf").is_file()
+    engine = create_sqlite_engine(database)
+    try:
+        with Session(engine) as session:
+            assert count(session, StorageObject) == 2
+            assert count(session, BookFile) == 1
+    finally:
+        engine.dispose()
+
+
+def test_download_rejects_non_regular_file(
+    env: tuple[TestClient, Path, Path],
+) -> None:
+    client, database, library = env
+    book = create_book(client, title="非普通文件")
+    library.mkdir(parents=True, exist_ok=True)
+    (library / "subdir").mkdir()
+    engine = create_sqlite_engine(database)
+    try:
+        with Session(engine) as session, session.begin():
+            session.add(
+                StorageRoot(
+                    id="man",
+                    name="library",
+                    root_path=str(library.resolve()),
+                    mode="managed",
+                )
+            )
+            session.flush()
+            session.add(
+                StorageObject(
+                    id="dir-obj",
+                    root_id="man",
+                    relative_path="subdir",
+                    size_bytes=0,
+                    sha256=None,
+                    file_status="present",
+                    mtime_ms=1,
+                )
+            )
+            session.flush()
+            session.add(
+                BookFile(
+                    id=NONREGULAR_FILE_ID,
+                    book_id=book["id"],
+                    storage_object_id="dir-obj",
+                    format="pdf",
+                )
+            )
+    finally:
+        engine.dispose()
+
+    assert_problem(
+        client.get(f"/api/v1/files/{NONREGULAR_FILE_ID}/content"),
+        404,
+        "FILE_NOT_FOUND",
+    )

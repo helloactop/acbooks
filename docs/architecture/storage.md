@@ -94,6 +94,10 @@ REST 手动扫描 / 监听事件 / 定时校验
 `ACBOOKS_LIBRARY_DIR`（默认 `/data/acbooks/library`），首次上传时登记。契约见
 [Files API](../api/files.md)。扫描与阅读器尚未实现。
 
+**解除关联与永久删除**：`DELETE /files/{id}?purge=false` 仅移除 `book_files` 关联并保留
+`storage_objects` 与原始文件，供扫描重新索引；`purge=true` 才在 `managed` 根上永久删除
+原件，`external` 始终拒绝。后续扫描不得因“文件缺失/未匹配”触发永久删除。
+
 ## 6. 代码归属与接口
 
 ```text

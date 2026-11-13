@@ -25,8 +25,12 @@ CSRF/来源失败 `403 FORBIDDEN`。
 - 最终文件名由服务端生成（`{bookId}/{随机}.{扩展名}`），忽略客户端文件名，从根源杜绝
   路径穿越；发布使用同文件系统**无覆盖**链接，冲突或重复不会静默覆盖。
 - 上传先写同盘临时文件，流式计算大小与 SHA-256，校验通过后再发布；大小上限 2 GiB。
-- 仅接受真实内容为 PDF 或 EPUB（EPUB 需 ZIP 且 `mimetype=application/epub+zip`）；
-  扩展名不作数。
+- 仅接受真实内容为 PDF 或 EPUB（扩展名不作数）：PDF 须以 `%PDF-` 开头且尾部包含
+  `%%EOF`；EPUB 须为合法 ZIP、含 `mimetype=application/epub+zip` 与
+  `META-INF/container.xml`，并限制解压总量（4 GiB）、条目数（10000）与元数据单文件
+  读取（1 MiB），防止 ZIP 炸弹与资源耗尽。
+- 上传在 HTTP 接收层先按 `Content-Length` 早拒超大请求（上限 2 GiB 加少量开销），
+  流式写入时再次按累计字节限额，双重防护。
 - 同一本书已存在相同 SHA-256 的文件时拒绝重复上传。
 - `external` 根的文件只读：下载允许，删除拒绝；不修改 NAS 原始文件。
 
@@ -63,12 +67,14 @@ CSRF/来源失败 `403 FORBIDDEN`。
 
 ### 3.4 删除
 
-`DELETE /api/v1/files/{bookFileId}` → `204`
+`DELETE /api/v1/files/{bookFileId}?purge=<bool>` → `204`
 
-- 仅允许 `managed` 文件；`external` 返回 `409 FILE_EXTERNAL_PROTECTED`，不删除原件。
-- 同一事务删除该文件关联（`reading_positions` 先于 `book_files`，`storage_objects` 最后），
-  提交后清理物理文件；物理清理失败不回滚数据库。
-- 不存在返回 `404 FILE_NOT_FOUND`。
+- `purge=true`（默认）**永久删除原件**：仅允许 `managed` 文件，同一事务删除
+  `reading_positions`、`book_files`、`storage_objects`，提交后清理物理文件；`external`
+  返回 `409 FILE_EXTERNAL_PROTECTED`，不碰原件。
+- `purge=false` **仅解除书目关联**：删除 `reading_positions` 与 `book_files`，保留
+  `storage_objects` 记录与原始文件（`external` 同样允许），供后续扫描重新索引。
+- 不存在返回 `404 FILE_NOT_FOUND`；物理清理失败不回滚数据库。
 
 ## 4. 一致性与清理
 
