@@ -25,6 +25,9 @@ function isOneOf<T extends string>(
   return value !== null && values.includes(value as T);
 }
 
+const MAX_ALIGNED_OFFSET =
+  Math.floor(1_000_000 / LIBRARY_PAGE_SIZE) * LIBRARY_PAGE_SIZE;
+
 export function readLibraryUrlState(search: string): LibraryViewState {
   const params = new URLSearchParams(search);
   const initial: LibraryViewState = {
@@ -52,7 +55,10 @@ export function readLibraryUrlState(search: string): LibraryViewState {
           ),
     offset:
       Number.isInteger(offsetValue) && offsetValue >= 0
-        ? Math.floor(offsetValue / LIBRARY_PAGE_SIZE) * LIBRARY_PAGE_SIZE
+        ? Math.min(
+            Math.floor(offsetValue / LIBRARY_PAGE_SIZE) * LIBRARY_PAGE_SIZE,
+            MAX_ALIGNED_OFFSET,
+          )
         : initial.offset,
     searchTerm: initial.searchTerm,
     sort: isOneOf(SORTS, sort) ? sort : initial.sort,

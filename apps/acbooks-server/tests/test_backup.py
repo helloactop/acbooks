@@ -6,6 +6,7 @@ import pytest
 from alembic import command
 from test_database import migration_config
 
+from app.db.session import create_sqlite_engine
 from app.db.version import SCHEMA_HEAD_REVISION
 from app.modules.backup.service import (
     BackupError,
@@ -78,6 +79,27 @@ def test_restore_replaces_database_and_keeps_pre_restore_snapshot(tmp_path: Path
     assert read_titles(database) == ["Original"]
     assert read_titles(snapshot) == ["Original", "Later"]
     assert not database.with_name("acbooks.db-wal").exists()
+
+
+def test_restore_rejects_live_wal_files(tmp_path: Path) -> None:
+    database = tmp_path / "acbooks.db"
+    create_database(database, ("Original",))
+    output = tmp_path / "snapshot.db"
+    backup_database(output, database)
+
+    engine = create_sqlite_engine(database)
+    try:
+        connection = engine.connect()
+        connection.exec_driver_sql("SELECT 1").fetchone()
+        assert database.with_name("acbooks.db-shm").exists()
+        with pytest.raises(BackupError, match="in use"):
+            restore_database(output, database, offline=True)
+        connection.close()
+    finally:
+        engine.dispose()
+
+    restore_database(output, database, offline=True)
+    assert read_titles(database) == ["Original"]
 
 
 def test_restore_rejects_newer_schema(tmp_path: Path) -> None:

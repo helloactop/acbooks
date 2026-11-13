@@ -289,6 +289,14 @@ def prune_backups(keep: Path, older_than_ms: int) -> list[Path]:
 def _prepare_offline(database: Path) -> None:
     if not database.is_file():
         return
+    # A live API/Worker keeps SQLite WAL/SHM files open even while idle.
+    if any(
+        database.with_name(f"{database.name}{suffix}").exists()
+        for suffix in ("-wal", "-shm")
+    ):
+        raise BackupError(
+            "Database files are in use; stop API and Worker before restoring."
+        )
     try:
         connection = sqlite3.connect(database)
     except sqlite3.Error as error:
@@ -310,15 +318,13 @@ def _prepare_offline(database: Path) -> None:
         ) from error
     finally:
         connection.close()
-    # Remove journals only after a successful checkpoint and exclusive probe,
-    # so committed WAL data is never discarded.
+    # Never remove a WAL that belongs to another connection. If SQLite leaves
+    # journals after the checkpoint, treat the database as still in use.
     for suffix in ("-wal", "-shm"):
-        try:
-            database.with_name(f"{database.name}{suffix}").unlink(missing_ok=True)
-        except OSError as error:
+        if database.with_name(f"{database.name}{suffix}").exists():
             raise BackupError(
                 "Database files are still open; stop API and Worker before restoring."
-            ) from error
+            )
 
 
 def restore_database(

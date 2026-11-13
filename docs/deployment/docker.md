@@ -21,6 +21,9 @@ Cookie 会话和 CSRF 来源校验保持现有行为，不需要 CORS 或额外�
 已升级到当前版本，数据库或迁移异常时返回 `503`。Compose 健康检查使用 `/ready`，
 外部探针也应使用它判断是否接入流量。
 
+API 必须保持**单 Worker**：CSRF 挑战签名和登录限速状态保存在进程内，多 Worker
+会导致校验随机失败。Compose 已固定 `--workers 1`，自行部署时不要调高。
+
 `migrate` 先执行 `alembic upgrade head`，并为尚未初始化的数据库准备一次性初始化码。
 它成功退出后，Compose 才会启动 API 和 Worker。预期状态为 `migrate` 退出码 0、
 `api` 和 `worker` 健康。Worker 获取排他锁并检查任务表后才通过健康探针，

@@ -9,6 +9,7 @@ python -m uvicorn app.main:create_app --factory --no-access-log
 
 默认监听 `127.0.0.1:8000`。应用访问日志记录请求 ID、状态码和耗时；
 启动参数 `--no-access-log` 关闭 Uvicorn 自带的请求行日志。
+请保持单 Worker；CSRF 与登录限速状态是进程内状态，多 Worker 会随机拒绝请求。
 
 环境变量 `ACBOOKS_ENABLE_DOCS` 默认为 `false`，设为 `true` 可开启
 `/docs`。OpenAPI 始终在 `/openapi.json` 提供。健康检查见
