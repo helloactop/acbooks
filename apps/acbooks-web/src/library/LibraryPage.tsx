@@ -80,6 +80,9 @@ export function LibraryPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<ApiError | null>(null);
+  // Snapshot the targets when a batch dialog opens so a background reload
+  // cannot change which books the confirmation applies to.
+  const [batchTargetIds, setBatchTargetIds] = useState<string[]>([]);
   const filterSchema = useBookFilterSchema(true, expireSession);
   const fields = filterSchema.schema?.fields ?? [];
   const appliedFilters = serializeSmartFilterRules(appliedRules, fields);
@@ -198,6 +201,9 @@ export function LibraryPage() {
   };
 
   const toggleBookSelection = (bookId: string) => {
+    if (loading) {
+      return;
+    }
     setSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(bookId)) {
@@ -232,18 +238,19 @@ export function LibraryPage() {
     setBatchEditOpen(false);
     setDeleteOpen(false);
     setDeleteError(null);
+    setBatchTargetIds([]);
     leaveSelection();
     reload();
   };
 
   const confirmBatchDelete = async () => {
-    if (selectedIds.size === 0 || deleteBusy) {
+    if (batchTargetIds.length === 0 || deleteBusy) {
       return;
     }
     setDeleteBusy(true);
     setDeleteError(null);
     try {
-      await batchDeleteBooks(Array.from(selectedIds));
+      await batchDeleteBooks(batchTargetIds);
       setDeleteBusy(false);
       finishBatch();
     } catch (cause) {
@@ -421,14 +428,16 @@ export function LibraryPage() {
         <LibraryBatchBar
           allSelected={allSelected}
           count={selectedIds.size}
-          disabled={deleteBusy}
+          disabled={deleteBusy || loading}
           onClear={() => {
             setSelectedIds(new Set());
           }}
           onDelete={() => {
+            setBatchTargetIds(Array.from(selectedIds));
             setDeleteOpen(true);
           }}
           onEdit={() => {
+            setBatchTargetIds(Array.from(selectedIds));
             setBatchEditOpen(true);
           }}
           onSelectAll={togglePageSelection}
@@ -547,6 +556,7 @@ export function LibraryPage() {
               onSelect={toggleBookSelection}
               selectable={selecting}
               selected={selectedIds.has(book.id)}
+              selectionDisabled={loading}
             />
           ))}
         </div>
@@ -557,6 +567,7 @@ export function LibraryPage() {
           onSelect={toggleBookSelection}
           selectable={selecting}
           selectedIds={selectedIds}
+          selectionDisabled={loading}
         />
       )}
 
@@ -581,7 +592,7 @@ export function LibraryPage() {
 
       {batchEditOpen ? (
         <BatchEditDialog
-          bookIds={Array.from(selectedIds)}
+          bookIds={batchTargetIds}
           onClose={() => {
             setBatchEditOpen(false);
           }}
@@ -593,7 +604,7 @@ export function LibraryPage() {
       {deleteOpen ? (
         <DeleteBooksDialog
           busy={deleteBusy}
-          count={selectedIds.size}
+          count={batchTargetIds.length}
           error={
             deleteError === null
               ? undefined

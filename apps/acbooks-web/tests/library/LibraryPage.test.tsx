@@ -493,6 +493,66 @@ describe("LibraryPage", () => {
     });
   });
 
+  it("clamps an oversized URL offset to the last aligned page", async () => {
+    window.history.replaceState({}, "", "/library?offset=1000001");
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1], 2_000_000, 999_996));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(latestBookRequest()?.searchParams.get("offset")).toBe("999996");
+    });
+    await waitFor(() => {
+      expect(currentLocation).toContain("offset=999996");
+    });
+  });
+
+  it("selects a card when it is clicked in selection mode", async () => {
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1]));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+
+    await screen.findByRole("article", { name: "呐喊" });
+    await user.click(screen.getByRole("button", { name: "选择" }));
+    await user.click(screen.getByRole("link", { name: "查看《呐喊》详情" }));
+    expect(screen.getByText("已选 1 本")).toBeInTheDocument();
+  });
+
+  it("exposes list-view checkboxes to assistive technology", async () => {
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1]));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+
+    await screen.findByRole("article", { name: "呐喊" });
+    await user.click(screen.getByRole("button", { name: "视图" }));
+    await user.click(await screen.findByRole("menuitem", { name: "列表视图" }));
+    await screen.findByRole("table", { name: "书籍列表" });
+    await user.click(screen.getByRole("button", { name: "选择" }));
+    expect(
+      screen.getByRole("checkbox", { name: "选择《呐喊》" }),
+    ).toBeInTheDocument();
+  });
+
   it("aligns a non-page URL offset with the library page size", async () => {
     window.history.replaceState({}, "", "/library?offset=13");
     installApi(
@@ -1568,5 +1628,123 @@ describe("LibraryPage", () => {
     expect(
       await screen.findByRole("button", { name: "选择" }),
     ).toBeInTheDocument();
+  });
+
+  it("disables selection controls while the library is reloading", async () => {
+    let resolveReload: ((response: Response) => void) | undefined;
+    let listRequests = 0;
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          listRequests += 1;
+          if (listRequests === 1) {
+            return jsonResponse(makePage([BOOK1, BOOK2]));
+          }
+          return new Promise<Response>((resolve) => {
+            resolveReload = resolve;
+          });
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+    await screen.findByRole("article", { name: "呐喊" });
+
+    await user.click(screen.getByRole("button", { name: "选择" }));
+    await user.click(screen.getByRole("checkbox", { name: "选择《呐喊》" }));
+    expect(screen.getByText("已选 1 本")).toBeInTheDocument();
+
+    await chooseOption(user, "状态", "已读");
+    await waitFor(() => {
+      expect(resolveReload).toBeDefined();
+    });
+
+    expect(
+      screen.getByRole("checkbox", { name: "选择《呐喊》" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("checkbox", { name: "选择《边城》" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "全选本页" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "清除选择" })).toBeDisabled();
+    await user.click(screen.getByRole("link", { name: "查看《呐喊》详情" }));
+    expect(screen.getByText("已选 0 本")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveReload?.(jsonResponse(makePage([BOOK1, BOOK2])));
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole("checkbox", { name: "选择《呐喊》" }),
+      ).toBeEnabled();
+    });
+  });
+
+  it("keeps batch delete targets fixed when a background reset clears the selection", async () => {
+    window.history.replaceState({}, "", "/library?offset=12");
+    let listRequests = 0;
+    installApi(
+      baseHandler((url, init) => {
+        const method = methodOf(init);
+        if (url.pathname === "/api/v1/books" && method === "GET") {
+          listRequests += 1;
+          const offset = Number(url.searchParams.get("offset") ?? "0");
+          if (listRequests === 1) {
+            return jsonResponse(makePage([BOOK1, BOOK2], 30, offset));
+          }
+          return jsonResponse(
+            offset === 12
+              ? makePage([], 2, 12)
+              : makePage([BOOK1, BOOK2], 2, 0),
+          );
+        }
+        if (
+          url.pathname === "/api/v1/books/batch-delete" &&
+          method === "POST"
+        ) {
+          return jsonResponse({ updated: 0, deleted: 1 });
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+    await screen.findByRole("article", { name: "呐喊" });
+
+    await user.click(screen.getByRole("button", { name: "选择" }));
+    await user.click(screen.getByRole("checkbox", { name: "选择《呐喊》" }));
+    await user.click(screen.getByRole("button", { name: "删除" }));
+    expect(
+      await screen.findByRole("heading", { name: "删除 1 本书？" }),
+    ).toBeInTheDocument();
+
+    // A bfcache restore refetches the page; the shrunken total resets the
+    // offset and clears the live selection while the dialog stays open.
+    const pageShow = new Event("pageshow");
+    Object.defineProperty(pageShow, "persisted", { value: true });
+    await act(async () => {
+      window.dispatchEvent(pageShow);
+    });
+    await waitFor(() => {
+      expect(latestBookRequest()?.searchParams.get("offset")).toBe("0");
+    });
+    expect(screen.getByText("已选 0 本")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "删除 1 本书？" }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "删除" }),
+    );
+    await waitFor(() => {
+      expect(
+        findCall("POST", "/api/v1/books/batch-delete"),
+      ).toBeDefined();
+    });
+    const call = findCall("POST", "/api/v1/books/batch-delete");
+    expect(
+      JSON.parse(String((call?.[1] as RequestInit).body)),
+    ).toEqual({ bookIds: [BOOK1.id] });
   });
 });

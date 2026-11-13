@@ -17,6 +17,8 @@ export interface MultiValueInputProps {
   className?: string;
   disabled?: boolean;
   id?: string;
+  maxLength?: number;
+  maxValues?: number;
   onChange: (values: string[]) => void;
   placeholder?: string;
   values: readonly string[];
@@ -30,6 +32,8 @@ export function MultiValueInput({
   className,
   disabled = false,
   id,
+  maxLength,
+  maxValues,
   onChange,
   placeholder,
   values,
@@ -44,8 +48,13 @@ export function MultiValueInput({
       setDraft("");
       return;
     }
-    if (!values.includes(trimmed)) {
-      onChange([...values, trimmed]);
+    const value =
+      maxLength === undefined ? trimmed : trimmed.slice(0, maxLength);
+    if (
+      (maxValues === undefined || values.length < maxValues) &&
+      !values.includes(value)
+    ) {
+      onChange([...values, value]);
     }
     setDraft("");
   };
@@ -121,6 +130,7 @@ export function MultiValueInput({
         className="h-6 min-w-[8rem] flex-1 border-0 bg-transparent p-0 text-[13px] text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed max-md:text-base"
         disabled={disabled}
         id={id}
+        maxLength={maxLength}
         onBlur={commitDraft}
         onChange={(event) => {
           setDraft(event.target.value);

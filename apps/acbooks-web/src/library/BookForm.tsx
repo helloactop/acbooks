@@ -14,6 +14,8 @@ import { useTranslation } from "react-i18next";
 import { toApiError, type ApiError } from "../api/client";
 import {
   createBook,
+  NAME_LIST_LIMIT,
+  NAME_MAX_LENGTH,
   updateBook,
   type BookCreate,
   type BookDetail,
@@ -269,6 +271,8 @@ export function BookForm({
                 <MultiValueInput
                   disabled={busy}
                   id="book-authors"
+                  maxLength={NAME_MAX_LENGTH}
+                  maxValues={NAME_LIST_LIMIT}
                   onChange={(values) => {
                     setAuthors(values);
                     clearError();
@@ -286,6 +290,8 @@ export function BookForm({
                 <MultiValueInput
                   disabled={busy}
                   id="book-translators"
+                  maxLength={NAME_MAX_LENGTH}
+                  maxValues={NAME_LIST_LIMIT}
                   onChange={(values) => {
                     setTranslators(values);
                     clearError();
@@ -336,6 +342,8 @@ export function BookForm({
                 <MultiValueInput
                   disabled={busy}
                   id="book-tags"
+                  maxLength={NAME_MAX_LENGTH}
+                  maxValues={NAME_LIST_LIMIT}
                   onChange={(values) => {
                     setTags(values);
                     clearError();
@@ -353,6 +361,8 @@ export function BookForm({
                 <MultiValueInput
                   disabled={busy}
                   id="book-shelves"
+                  maxLength={NAME_MAX_LENGTH}
+                  maxValues={NAME_LIST_LIMIT}
                   onChange={(values) => {
                     setShelves(values);
                     clearError();

@@ -6,10 +6,20 @@ import { describe, expect, it } from "vitest";
 import { MultiValueInput } from "../../src/components/multi-value-input";
 import { renderWithI18n } from "../render-with-i18n";
 
-function Harness({ initial = [] }: { initial?: string[] }) {
+function Harness({
+  initial = [],
+  maxLength,
+  maxValues,
+}: {
+  initial?: string[];
+  maxLength?: number;
+  maxValues?: number;
+}) {
   const [values, setValues] = useState<string[]>(initial);
   return (
     <MultiValueInput
+      maxLength={maxLength}
+      maxValues={maxValues}
       onChange={setValues}
       placeholder="添加名称"
       values={values}
@@ -70,5 +80,36 @@ describe("MultiValueInput", () => {
 
     expect(screen.getByPlaceholderText("添加名称")).toBeDisabled();
     expect(screen.getByRole("button", { name: "移除 鲁迅" })).toBeDisabled();
+  });
+
+  it("stops adding values at maxValues but keeps removal available", async () => {
+    const user = userEvent.setup();
+    renderWithI18n(<Harness initial={["鲁迅"]} maxValues={2} />);
+    const input = screen.getByPlaceholderText("添加名称");
+
+    await user.type(input, "沈从文{Enter}");
+    expect(screen.getByText("沈从文")).toBeInTheDocument();
+
+    await user.type(input, "巴金{Enter}");
+    expect(screen.queryByText("巴金")).not.toBeInTheDocument();
+    expect(input).toHaveValue("");
+    expect(input).toBeEnabled();
+
+    fireEvent.keyDown(input, { key: "Backspace" });
+    expect(screen.queryByText("沈从文")).not.toBeInTheDocument();
+    await user.type(input, "巴金{Enter}");
+    expect(screen.getByText("巴金")).toBeInTheDocument();
+  });
+
+  it("limits the draft length and truncates committed values to maxLength", async () => {
+    const user = userEvent.setup();
+    renderWithI18n(<Harness maxLength={4} />);
+    const input = screen.getByPlaceholderText("添加名称");
+    expect(input).toHaveAttribute("maxlength", "4");
+
+    fireEvent.change(input, { target: { value: "abcdefgh" } });
+    await user.type(input, "{Enter}");
+    expect(screen.getByText("abcd")).toBeInTheDocument();
+    expect(screen.queryByText("abcdefgh")).not.toBeInTheDocument();
   });
 });

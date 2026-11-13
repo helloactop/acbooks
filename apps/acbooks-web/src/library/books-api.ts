@@ -28,6 +28,10 @@ export type BookListQuery = NonNullable<
 >;
 export type ReadingStatus = BookSummary["readingStatus"];
 
+// Mirrors the server-side name normalization limits shared by single and batch edits.
+export const NAME_MAX_LENGTH = 200;
+export const NAME_LIST_LIMIT = 20;
+
 function appendParam(
   params: URLSearchParams,
   key: string,

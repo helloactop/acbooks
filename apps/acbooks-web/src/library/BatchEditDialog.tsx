@@ -11,6 +11,8 @@ import { useTranslation } from "react-i18next";
 import { toApiError, type ApiError } from "../api/client";
 import {
   batchUpdateBooks,
+  NAME_LIST_LIMIT,
+  NAME_MAX_LENGTH,
   type ReadingStatus,
 } from "./books-api";
 import { libraryErrorMessage } from "./errors";
@@ -91,6 +93,7 @@ export function BatchEditDialog({
           <Field htmlFor="batch-status" label={t("batch.status")}>
             <Select
               ariaLabel={t("batch.status")}
+              disabled={busy}
               id="batch-status"
               onValueChange={setStatus}
               options={[
@@ -106,7 +109,10 @@ export function BatchEditDialog({
 
           <Field htmlFor="batch-add-tags" label={t("batch.addTags")}>
             <MultiValueInput
+              disabled={busy}
               id="batch-add-tags"
+              maxLength={NAME_MAX_LENGTH}
+              maxValues={NAME_LIST_LIMIT}
               onChange={setAddTags}
               placeholder={t("form.multiValuePlaceholder")}
               values={addTags}
@@ -114,7 +120,10 @@ export function BatchEditDialog({
           </Field>
           <Field htmlFor="batch-remove-tags" label={t("batch.removeTags")}>
             <MultiValueInput
+              disabled={busy}
               id="batch-remove-tags"
+              maxLength={NAME_MAX_LENGTH}
+              maxValues={NAME_LIST_LIMIT}
               onChange={setRemoveTags}
               placeholder={t("form.multiValuePlaceholder")}
               values={removeTags}
@@ -122,7 +131,10 @@ export function BatchEditDialog({
           </Field>
           <Field htmlFor="batch-add-shelves" label={t("batch.addShelves")}>
             <MultiValueInput
+              disabled={busy}
               id="batch-add-shelves"
+              maxLength={NAME_MAX_LENGTH}
+              maxValues={NAME_LIST_LIMIT}
               onChange={setAddShelves}
               placeholder={t("form.multiValuePlaceholder")}
               values={addShelves}
@@ -130,7 +142,10 @@ export function BatchEditDialog({
           </Field>
           <Field htmlFor="batch-remove-shelves" label={t("batch.removeShelves")}>
             <MultiValueInput
+              disabled={busy}
               id="batch-remove-shelves"
+              maxLength={NAME_MAX_LENGTH}
+              maxValues={NAME_LIST_LIMIT}
               onChange={setRemoveShelves}
               placeholder={t("form.multiValuePlaceholder")}
               values={removeShelves}

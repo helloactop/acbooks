@@ -18,7 +18,12 @@ from app.db.models.books import (
     Tag,
 )
 from app.db.models.copies import BookCopy, Location
-from app.db.models.reading import Annotation, Bookmark, ReadingSession
+from app.db.models.reading import (
+    Annotation,
+    Bookmark,
+    ReadingPosition,
+    ReadingSession,
+)
 from app.db.models.storage import BookFile, StorageObject
 from app.modules.books.filtering import (
     BookFilterExpression,
@@ -290,11 +295,11 @@ def get_books(session: Session, book_ids: Sequence[str]) -> list[Book]:
 
 
 def delete_books(session: Session, book_ids: Sequence[str]) -> None:
+    file_ids = select(BookFile.id).where(BookFile.book_id.in_(book_ids))
     for table in (
         Annotation,
         Bookmark,
         ReadingSession,
-        BookFile,
         BookCopy,
         BookContributor,
         BookIdentifier,
@@ -302,6 +307,11 @@ def delete_books(session: Session, book_ids: Sequence[str]) -> None:
         ShelfBook,
     ):
         session.execute(delete(table).where(table.book_id.in_(book_ids)))
+    # reading_positions restrict book_files, so they must go before the file rows.
+    session.execute(
+        delete(ReadingPosition).where(ReadingPosition.book_file_id.in_(file_ids))
+    )
+    session.execute(delete(BookFile).where(BookFile.book_id.in_(book_ids)))
     session.execute(delete(Book).where(Book.id.in_(book_ids)))
 
 

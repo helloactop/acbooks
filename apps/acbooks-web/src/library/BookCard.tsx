@@ -15,6 +15,7 @@ export interface BookCardProps {
   onSelect?: (bookId: string) => void;
   selectable?: boolean;
   selected?: boolean;
+  selectionDisabled?: boolean;
 }
 
 const COVER_TITLE: Record<CoverSize, string> = {
@@ -36,6 +37,7 @@ export function BookCard({
   onSelect,
   selectable = false,
   selected = false,
+  selectionDisabled = false,
 }: BookCardProps) {
   const { t } = useTranslation("library");
   const { resolvedLanguage } = useLanguage();
@@ -46,13 +48,14 @@ export function BookCard({
   return (
     <article aria-labelledby={titleId} className="relative min-w-0">
       {selectable ? (
-        <label className="absolute top-1.5 right-1.5 z-10 flex size-8 cursor-pointer items-center justify-center rounded-control bg-background/90 shadow-overlay">
+        <label className="absolute top-1.5 right-1.5 z-10 flex size-8 cursor-pointer items-center justify-center rounded-control bg-background/90 shadow-overlay max-md:size-11">
           <span className="sr-only">
             {t("selection.select", { title: book.title })}
           </span>
           <input
             checked={selected}
             className="size-4 accent-accent-text"
+            disabled={selectionDisabled}
             onChange={() => {
               onSelect?.(book.id);
             }}
@@ -63,7 +66,14 @@ export function BookCard({
       <Link
         aria-label={t("detail.open", { title: book.title })}
         className="group block w-full rounded-cover text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
-        onClick={() => {
+        onClick={(event) => {
+          if (selectable) {
+            event.preventDefault();
+            if (!selectionDisabled) {
+              onSelect?.(book.id);
+            }
+            return;
+          }
           onOpen(book.id);
         }}
         to={bookDetailHref(book.id)}

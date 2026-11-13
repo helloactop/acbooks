@@ -2,11 +2,14 @@ import json
 import logging
 import os
 import tempfile
+from io import BytesIO
 from pathlib import Path
+from threading import Lock
 from time import time_ns
 from typing import cast
 from uuid import UUID, uuid4
 
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy import Engine
 
 from app.core.errors import BusinessError, BusinessErrorCode
@@ -22,6 +25,7 @@ from app.modules.books.filtering import (
     InvalidBookFilter,
     parse_filter_expression,
 )
+from app.modules.books.normalization import normalize_name_list
 from app.modules.books.repository import BookListQuery, BookRecord
 from app.modules.books.schemas import (
     BatchResult,
@@ -45,21 +49,41 @@ from app.modules.books.types import BookOrder, BookSort, MediaType
 
 logger = logging.getLogger("uvicorn.error")
 MAX_COVER_BYTES = 5 * 1024 * 1024
+MAX_COVER_DIMENSION = 4096
+COVER_LOCK = Lock()
 COVER_MEDIA_TYPES = {
     "jpg": "image/jpeg",
     "png": "image/png",
     "webp": "image/webp",
 }
+COVER_FORMAT_SUFFIXES = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}
 
 
 def _cover_suffix(content: bytes) -> str | None:
-    if content.startswith(b"\x89PNG\r\n\x1a\n"):
-        return "png"
-    if content.startswith(b"\xff\xd8\xff"):
-        return "jpg"
-    if len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP":
-        return "webp"
-    return None
+    try:
+        with Image.open(BytesIO(content)) as image:
+            if image.format is None:
+                return None
+            suffix = COVER_FORMAT_SUFFIXES.get(image.format)
+            if suffix is None:
+                return None
+            width, height = image.size
+            if not (
+                1 <= width <= MAX_COVER_DIMENSION
+                and 1 <= height <= MAX_COVER_DIMENSION
+            ):
+                return None
+            # Decode the pixels so truncated or corrupt content is rejected.
+            image.load()
+            return suffix
+    except (
+        UnidentifiedImageError,
+        OSError,
+        ValueError,
+        SyntaxError,
+        Image.DecompressionBombError,
+    ):
+        return None
 
 
 def _merged_names(
@@ -74,6 +98,13 @@ def _merged_names(
             merged.append(name)
             seen.add(key)
     return merged
+
+
+def _batch_names(current: list[str], add: list[str], remove: list[str], field: str) -> list[str]:
+    try:
+        return normalize_name_list(_merged_names(current, add, remove), field)
+    except ValueError as error:
+        raise BusinessError(BusinessErrorCode.BATCH_LIMIT_EXCEEDED) from error
 
 
 class BooksService:
@@ -351,18 +382,19 @@ class BooksService:
                     repository.replace_tags(
                         session,
                         book.id,
-                        _merged_names(
-                            record.tags, payload.add_tags, payload.remove_tags
+                        _batch_names(
+                            record.tags, payload.add_tags, payload.remove_tags, "tags"
                         ),
                     )
                 if payload.add_shelves or payload.remove_shelves:
                     repository.replace_shelves(
                         session,
                         book.id,
-                        _merged_names(
+                        _batch_names(
                             record.shelves,
                             payload.add_shelves,
                             payload.remove_shelves,
+                            "shelves",
                         ),
                     )
                 book.updated_at = now
@@ -381,7 +413,10 @@ class BooksService:
                 if book.cover_path is not None and book.cover_path.strip()
             ]
             repository.delete_books(session, ids)
-        self._remove_cover_files(covers)
+        with COVER_LOCK:
+            self._remove_cover_files(covers)
+            for book_id in ids:
+                self._remove_all_covers(book_id)
         return BatchResult(deleted=len(ids))
 
     def delete_book(self, book_id: UUID) -> None:
@@ -411,7 +446,9 @@ class BooksService:
                     type(error).__qualname__,
                 )
 
-    def _remove_all_covers(self, book_id: UUID, keep: str | None = None) -> None:
+    def _remove_all_covers(
+        self, book_id: UUID | str, keep: str | None = None
+    ) -> None:
         self._remove_cover_files(
             [f"{book_id}.{suffix}" for suffix in COVER_MEDIA_TYPES], keep=keep
         )
@@ -422,55 +459,65 @@ class BooksService:
         suffix = _cover_suffix(content)
         if suffix is None:
             raise BusinessError(BusinessErrorCode.INVALID_COVER)
-        with self.read_sessions() as session:
-            if repository.get_book(session, str(book_id)) is None:
-                raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
 
-        self.covers_dir.mkdir(parents=True, exist_ok=True)
-        target = self.covers_dir / f"{book_id}.{suffix}"
-        descriptor, temp_name = tempfile.mkstemp(
-            prefix=f".{book_id}.", suffix=".tmp", dir=self.covers_dir
-        )
-        temp = Path(temp_name)
-        try:
-            os.close(descriptor)
-            temp.write_bytes(content)
-            os.replace(temp, target)
-        finally:
-            temp.unlink(missing_ok=True)
+        with COVER_LOCK:
+            self.covers_dir.mkdir(parents=True, exist_ok=True)
+            # A unique target keeps the previous file intact until the DB commits.
+            target = (
+                self.covers_dir / f"{book_id}-{uuid4().hex}.{suffix}"
+            )
+            descriptor, temp_name = tempfile.mkstemp(
+                prefix=f".{book_id}-", suffix=".tmp", dir=self.covers_dir
+            )
+            temp = Path(temp_name)
+            try:
+                os.close(descriptor)
+                temp.write_bytes(content)
+                os.replace(temp, target)
+            finally:
+                temp.unlink(missing_ok=True)
 
-        now = time_ns() // 1_000_000
-        try:
+            now = time_ns() // 1_000_000
+            old_name: str | None = None
+            try:
+                with self.write_sessions.begin() as session:
+                    book = repository.get_book(session, str(book_id))
+                    if book is None:
+                        raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
+                    old_name = book.cover_path
+                    book.cover_path = target.name
+                    book.cover_updated_at = now
+                    book.updated_at = now
+                    session.flush()
+                    record = repository.load_records(session, [book])[0]
+                    detail = self._detail(record)
+            except Exception:
+                target.unlink(missing_ok=True)
+                raise
+            if old_name is not None and old_name != target.name:
+                self._remove_cover_files([old_name])
+            self._remove_all_covers(book_id, keep=target.name)
+            return detail
+
+    def delete_cover(self, book_id: UUID) -> BookDetail:
+        with COVER_LOCK:
+            now = time_ns() // 1_000_000
+            old_name: str | None = None
             with self.write_sessions.begin() as session:
                 book = repository.get_book(session, str(book_id))
                 if book is None:
                     raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
-                book.cover_path = target.name
+                old_name = book.cover_path
+                book.cover_path = None
                 book.cover_updated_at = now
                 book.updated_at = now
                 session.flush()
                 record = repository.load_records(session, [book])[0]
                 detail = self._detail(record)
-        except Exception:
-            target.unlink(missing_ok=True)
-            raise
-        self._remove_all_covers(book_id, keep=target.name)
-        return detail
-
-    def delete_cover(self, book_id: UUID) -> BookDetail:
-        now = time_ns() // 1_000_000
-        with self.write_sessions.begin() as session:
-            book = repository.get_book(session, str(book_id))
-            if book is None:
-                raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
-            book.cover_path = None
-            book.cover_updated_at = now
-            book.updated_at = now
-            session.flush()
-            record = repository.load_records(session, [book])[0]
-            detail = self._detail(record)
-        self._remove_all_covers(book_id)
-        return detail
+            if old_name is not None:
+                self._remove_cover_files([old_name])
+            self._remove_all_covers(book_id)
+            return detail
 
     def get_cover(self, book_id: UUID) -> tuple[Path, str]:
         with self.read_sessions() as session:

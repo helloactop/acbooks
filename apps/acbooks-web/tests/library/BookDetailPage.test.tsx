@@ -812,4 +812,110 @@ describe("BookDetailPage", () => {
       ).toBeNull();
     });
   });
+
+  it("blocks cover and edit actions while a status save is in flight", async () => {
+    let resolvePatch: ((response: Response) => void) | undefined;
+    installApi(
+      baseHandler((url, init) => {
+        const method = methodOf(init);
+        if (
+          url.pathname === `/api/v1/books/${BOOK_ID}` &&
+          method === "GET"
+        ) {
+          return jsonResponse(BOOK);
+        }
+        if (
+          url.pathname === `/api/v1/books/${BOOK_ID}` &&
+          method === "PATCH"
+        ) {
+          return new Promise<Response>((resolve) => {
+            resolvePatch = resolve;
+          });
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetail();
+    await screen.findByRole("heading", { level: 1, name: BOOK.title });
+
+    await chooseReadingStatus(user, "已读");
+    await waitFor(() => {
+      expect(resolvePatch).toBeDefined();
+    });
+
+    expect(screen.getByRole("button", { name: "上传封面" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "编辑" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "阅读状态" })).toBeDisabled();
+
+    await act(async () => {
+      resolvePatch?.(jsonResponse({ ...BOOK, readingStatus: "done" }));
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "上传封面" })).toBeEnabled();
+    });
+    expect(
+      screen.getByRole("combobox", { name: "阅读状态" }),
+    ).toHaveTextContent("已读");
+    expect(findCall("PUT", `/api/v1/books/${BOOK_ID}/cover`)).toBeUndefined();
+  });
+
+  it("blocks status and edit actions while a cover upload is in flight", async () => {
+    let resolveCover: ((response: Response) => void) | undefined;
+    installApi(
+      baseHandler((url, init) => {
+        const method = methodOf(init);
+        if (
+          url.pathname === `/api/v1/books/${BOOK_ID}` &&
+          method === "GET"
+        ) {
+          return jsonResponse(BOOK);
+        }
+        if (
+          url.pathname === `/api/v1/books/${BOOK_ID}/cover` &&
+          method === "PUT"
+        ) {
+          return new Promise<Response>((resolve) => {
+            resolveCover = resolve;
+          });
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetail();
+    await screen.findByRole("heading", { level: 1, name: BOOK.title });
+
+    const input = document.querySelector<HTMLInputElement>(
+      'input[type="file"]',
+    );
+    expect(input).not.toBeNull();
+    const file = new File([new Uint8Array([137, 80, 78, 71])], "cover.png", {
+      type: "image/png",
+    });
+    await user.upload(input!, file);
+    await waitFor(() => {
+      expect(resolveCover).toBeDefined();
+    });
+
+    expect(screen.getByRole("combobox", { name: "阅读状态" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "编辑" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "上传封面" })).toBeDisabled();
+
+    await act(async () => {
+      resolveCover?.(
+        jsonResponse({
+          ...BOOK,
+          hasCover: true,
+          coverUpdatedAt: 1_700_000_200_000,
+        }),
+      );
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole("combobox", { name: "阅读状态" }),
+      ).toBeEnabled();
+    });
+    expect(findCall("PATCH", `/api/v1/books/${BOOK_ID}`)).toBeUndefined();
+  });
 });

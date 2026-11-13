@@ -169,6 +169,7 @@ def test_business_error_contract(code: BusinessErrorCode) -> None:
         BusinessErrorCode.COVER_NOT_FOUND: ("COVER_NOT_FOUND", 404),
         BusinessErrorCode.INVALID_BOOK_FILTER: ("INVALID_BOOK_FILTER", 422),
         BusinessErrorCode.INVALID_COVER: ("INVALID_COVER", 422),
+        BusinessErrorCode.BATCH_LIMIT_EXCEEDED: ("BATCH_LIMIT_EXCEEDED", 422),
     }[code]
     app = create_app()
 

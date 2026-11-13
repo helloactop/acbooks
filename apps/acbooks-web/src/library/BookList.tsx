@@ -10,6 +10,7 @@ export interface BookListProps {
   onSelect?: (bookId: string) => void;
   selectable?: boolean;
   selectedIds?: ReadonlySet<string>;
+  selectionDisabled?: boolean;
 }
 
 export function BookList({
@@ -18,6 +19,7 @@ export function BookList({
   onSelect,
   selectable = false,
   selectedIds,
+  selectionDisabled = false,
 }: BookListProps) {
   const { t } = useTranslation("library");
 
@@ -49,6 +51,7 @@ export function BookList({
           onSelect={onSelect}
           selectable={selectable}
           selected={selectedIds?.has(book.id) ?? false}
+          selectionDisabled={selectionDisabled}
         />
       ))}
     </div>

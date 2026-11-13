@@ -38,12 +38,16 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
   const { expireSession } = useAppShell();
   const navigate = useNavigate();
   const coverInput = useRef<HTMLInputElement>(null);
+  const activeBookId = useRef(bookId);
   const [detail, setDetail] = useState<BookDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [editing, setEditing] = useState(false);
-  const [statusDraft, setStatusDraft] = useState<ReadingStatus | null>(null);
+  const [statusDraft, setStatusDraft] = useState<{
+    bookId: string;
+    status: ReadingStatus;
+  } | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
   const [actionError, setActionError] = useState<ApiError | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);
@@ -57,6 +61,7 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
     : t("detail.backToLibrary");
 
   useEffect(() => {
+    activeBookId.current = bookId;
     const controller = new AbortController();
     getBook(bookId, controller.signal)
       .then((book) => {
@@ -106,16 +111,28 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
     setAttempt((current) => current + 1);
   };
 
+  // Ignore save responses for a book the user has already navigated away from.
+  const applyDetail = (saved: BookDetail) => {
+    if (saved.id === activeBookId.current) {
+      setDetail(saved);
+    }
+  };
+
   const changeStatus = async (next: ReadingStatus) => {
-    if (detail === null || detail.readingStatus === next || statusSaving) {
+    if (
+      detail === null ||
+      detail.readingStatus === next ||
+      statusSaving ||
+      coverBusy
+    ) {
       return;
     }
-    setStatusDraft(next);
+    setStatusDraft({ bookId: detail.id, status: next });
     setStatusSaving(true);
     setActionError(null);
     try {
       const saved = await updateBook(detail.id, { readingStatus: next });
-      setDetail(saved);
+      applyDetail(saved);
       setStatusDraft(null);
     } catch (cause) {
       const apiError = toApiError(cause);
@@ -131,13 +148,13 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
   };
 
   const changeCover = async (file: File) => {
-    if (detail === null || coverBusy) {
+    if (detail === null || coverBusy || statusSaving) {
       return;
     }
     setCoverBusy(true);
     setActionError(null);
     try {
-      setDetail(await uploadBookCover(detail.id, file));
+      applyDetail(await uploadBookCover(detail.id, file));
     } catch (cause) {
       const apiError = toApiError(cause);
       if (apiError.status === 401) {
@@ -154,13 +171,13 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
   };
 
   const removeCover = async () => {
-    if (detail === null || coverBusy) {
+    if (detail === null || coverBusy || statusSaving) {
       return;
     }
     setCoverBusy(true);
     setActionError(null);
     try {
-      setDetail(await deleteBookCover(detail.id));
+      applyDetail(await deleteBookCover(detail.id));
     } catch (cause) {
       const apiError = toApiError(cause);
       if (apiError.status === 401) {
@@ -181,7 +198,7 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
     setDeleteError(null);
     try {
       await deleteBook(detail.id);
-      navigate("/library", { replace: true });
+      navigate(backHref, { replace: true });
     } catch (cause) {
       const apiError = toApiError(cause);
       setDeleteBusy(false);
@@ -194,8 +211,10 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
   };
 
   const headerDetail =
-    detail !== null && statusDraft !== null
-      ? { ...detail, readingStatus: statusDraft }
+    detail !== null &&
+    statusDraft !== null &&
+    statusDraft.bookId === detail.id
+      ? { ...detail, readingStatus: statusDraft.status }
       : detail;
 
   const errorMessage =
@@ -312,7 +331,7 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
           }}
           onSaved={(saved) => {
             setEditing(false);
-            setDetail(saved);
+            applyDetail(saved);
           }}
           onSessionExpired={expireSession}
         />

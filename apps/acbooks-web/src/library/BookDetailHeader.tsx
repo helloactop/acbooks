@@ -56,7 +56,7 @@ export function BookDetailHeader({
         />
         <div className="mt-2 flex flex-wrap justify-center gap-1.5 @min-[640px]:justify-start">
           <Button
-            disabled={coverBusy}
+            disabled={coverBusy || statusSaving}
             onClick={onUploadCover}
             size="sm"
             variant="outline"
@@ -65,7 +65,7 @@ export function BookDetailHeader({
           </Button>
           {detail.hasCover ? (
             <Button
-              disabled={coverBusy}
+              disabled={coverBusy || statusSaving}
               onClick={onDeleteCover}
               size="sm"
               variant="ghost"
@@ -127,6 +127,7 @@ export function BookDetailHeader({
 
       <div className="w-full @min-[640px]:col-start-2 @min-[640px]:row-start-2 @min-[1000px]:col-start-3 @min-[1000px]:row-span-2 @min-[1000px]:row-start-1 @min-[1000px]:flex @min-[1000px]:flex-col @min-[1000px]:justify-start @min-[1000px]:self-stretch">
         <BookDetailActions
+          coverBusy={coverBusy}
           detail={detail}
           onDelete={onDelete}
           onEdit={onEdit}

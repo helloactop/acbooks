@@ -1,10 +1,12 @@
 from collections.abc import Iterator
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 import pytest
 from alembic import command
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from test_books import BOOKS, create_book
@@ -26,13 +28,25 @@ from app.db.models.books import (
     ShelfBook,
 )
 from app.db.models.copies import BookCopy
-from app.db.models.reading import Annotation, Bookmark, ReadingSession
+from app.db.models.reading import (
+    Annotation,
+    Bookmark,
+    ReadingPosition,
+    ReadingSession,
+)
 from app.db.models.storage import BookFile, StorageObject, StorageRoot
 from app.db.session import create_sqlite_engine
 from app.modules.auth.provision import main as provision_installation
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"cover-data"
-JPEG = b"\xff\xd8\xff\xe0" + b"cover-data"
+
+def _image_bytes(format: str, size: tuple[int, int] = (1, 1)) -> bytes:
+    buffer = BytesIO()
+    Image.new("RGB", size, (180, 60, 40)).save(buffer, format=format)
+    return buffer.getvalue()
+
+
+PNG = _image_bytes("PNG")
+JPEG = _image_bytes("JPEG")
 
 
 @pytest.fixture
@@ -79,8 +93,9 @@ def test_delete_removes_library_relations_but_keeps_stored_files(
         headers=challenge(browser),
     )
     assert upload.status_code == 200
-    cover_file = covers / f"{book_id}.png"
-    assert cover_file.is_file()
+    cover_files = list(covers.glob(f"{book_id}-*.png"))
+    assert len(cover_files) == 1
+    cover_file = cover_files[0]
     assert not (covers / "evil.png").exists()
 
     engine = create_sqlite_engine(database)
@@ -105,6 +120,7 @@ def test_delete_removes_library_relations_but_keeps_stored_files(
                     id="file", book_id=book_id, storage_object_id="object", format="epub"
                 )
             )
+            session.flush()
             session.add(BookCopy(id="copy", book_id=book_id))
             session.add(
                 ReadingSession(
@@ -121,6 +137,15 @@ def test_delete_removes_library_relations_but_keeps_stored_files(
             )
             session.add(
                 Annotation(id="annotation", book_id=book_id, created_at=1, updated_at=1)
+            )
+            session.add(
+                ReadingPosition(
+                    id="position",
+                    book_file_id="file",
+                    locator_json="{}",
+                    revision=1,
+                    updated_at=1,
+                )
             )
 
         response = browser.delete(f"{BOOKS}/{book_id}", headers=challenge(browser))
@@ -142,6 +167,14 @@ def test_delete_removes_library_relations_but_keeps_stored_files(
                 assert count(session, model, book_id) == 0
             assert (
                 session.scalar(select(func.count()).select_from(StorageObject)) == 1
+            )
+            assert (
+                session.scalar(
+                    select(func.count())
+                    .select_from(ReadingPosition)
+                    .where(ReadingPosition.book_file_id == "file")
+                )
+                == 0
             )
         assert not cover_file.exists()
     finally:
@@ -253,7 +286,9 @@ def test_cover_upload_replace_delete_and_fallback(
     detail = uploaded.json()
     assert detail["hasCover"] is True
     assert detail["coverUpdatedAt"] is not None
-    assert (covers / f"{book_id}.png").read_bytes() == PNG
+    png_files = list(covers.glob(f"{book_id}-*.png"))
+    assert len(png_files) == 1
+    assert png_files[0].read_bytes() == PNG
     assert browser.get(f"{BOOKS}").json()["items"][0]["hasCover"] is True
 
     cover = browser.get(f"{BOOKS}/{book_id}/cover")
@@ -267,8 +302,8 @@ def test_cover_upload_replace_delete_and_fallback(
         headers=challenge(browser),
     )
     assert replaced.status_code == 200
-    assert (covers / f"{book_id}.jpg").is_file()
-    assert not (covers / f"{book_id}.png").exists()
+    assert len(list(covers.glob(f"{book_id}-*.jpg"))) == 1
+    assert list(covers.glob(f"{book_id}-*.png")) == []
     assert browser.get(f"{BOOKS}/{book_id}/cover").content == JPEG
 
     invalid = browser.put(
@@ -287,7 +322,131 @@ def test_cover_upload_replace_delete_and_fallback(
     removed = browser.delete(f"{BOOKS}/{book_id}/cover", headers=challenge(browser))
     assert removed.status_code == 200
     assert removed.json()["hasCover"] is False
-    assert not (covers / f"{book_id}.jpg").exists()
+    assert list(covers.glob(f"{book_id}-*")) == []
     assert_problem(
         browser.get(f"{BOOKS}/{book_id}/cover"), 404, "COVER_NOT_FOUND"
     )
+
+
+def test_cover_database_failure_keeps_the_existing_file(
+    management: tuple[TestClient, Path, Path],
+) -> None:
+    browser, database, covers = management
+    book = create_book(browser, title="封面失败")
+    book_id = book["id"]
+    first = browser.put(
+        f"{BOOKS}/{book_id}/cover",
+        files={"file": ("cover.png", PNG, "image/png")},
+        headers=challenge(browser),
+    )
+    assert first.status_code == 200
+    old_files = list(covers.glob(f"{book_id}-*.png"))
+    assert len(old_files) == 1
+
+    engine = create_sqlite_engine(database)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "CREATE TRIGGER fail_cover BEFORE UPDATE OF cover_updated_at ON books"
+                " BEGIN SELECT RAISE(ABORT, 'fail'); END"
+            )
+        failed = browser.put(
+            f"{BOOKS}/{book_id}/cover",
+            files={"file": ("cover.png", PNG, "image/png")},
+            headers=challenge(browser),
+        )
+        assert_problem(failed, 500, "INTERNAL_ERROR")
+        assert old_files[0].is_file()
+        cover = browser.get(f"{BOOKS}/{book_id}/cover")
+        assert cover.status_code == 200
+        assert cover.content == PNG
+    finally:
+        engine.dispose()
+
+
+def test_cover_rejects_corrupt_unsupported_and_oversized_images(
+    management: tuple[TestClient, Path, Path],
+) -> None:
+    browser, _, covers = management
+    book = create_book(browser, title="封面校验")
+    book_id = book["id"]
+
+    rejected_content = (
+        (b"\x89PNG\r\n\x1a\n" + b"not-a-real-png", "image/png"),
+        (PNG[: len(PNG) // 2], "image/png"),
+        (_image_bytes("GIF"), "image/gif"),
+        (_image_bytes("PNG", (4097, 1)), "image/png"),
+    )
+    for content, mime in rejected_content:
+        rejected = browser.put(
+            f"{BOOKS}/{book_id}/cover",
+            files={"file": ("cover.png", content, mime)},
+            headers=challenge(browser),
+        )
+        assert_problem(rejected, 422, "INVALID_COVER")
+    assert list(covers.glob("*")) == []
+    assert browser.get(f"{BOOKS}/{book_id}").json()["hasCover"] is False
+
+    boundary = browser.put(
+        f"{BOOKS}/{book_id}/cover",
+        files={
+            "file": ("cover.png", _image_bytes("PNG", (4096, 1)), "image/png")
+        },
+        headers=challenge(browser),
+    )
+    assert boundary.status_code == 200
+    webp = browser.put(
+        f"{BOOKS}/{book_id}/cover",
+        files={"file": ("cover.webp", _image_bytes("WEBP"), "image/webp")},
+        headers=challenge(browser),
+    )
+    assert webp.status_code == 200
+    served = browser.get(f"{BOOKS}/{book_id}/cover")
+    assert served.status_code == 200
+    assert served.headers["content-type"] == "image/webp"
+
+
+def test_batch_update_enforces_per_book_name_limits(
+    management: tuple[TestClient, Path, Path],
+) -> None:
+    browser, _, _ = management
+    tags = [f"标签{index}" for index in range(20)]
+    shelves = [f"书架{index}" for index in range(20)]
+    full = create_book(browser, title="已满", tags=tags, shelves=shelves)
+    room = create_book(
+        browser, title="有空位", tags=tags[:19], shelves=shelves[:19]
+    )
+
+    overflow_tags = browser.patch(
+        f"{BOOKS}/batch-update",
+        json={"bookIds": [full["id"]], "addTags": ["新标签"]},
+        headers=challenge(browser),
+    )
+    assert_problem(overflow_tags, 422, "BATCH_LIMIT_EXCEEDED")
+    overflow_shelves = browser.patch(
+        f"{BOOKS}/batch-update",
+        json={"bookIds": [full["id"]], "addShelves": ["新书架"]},
+        headers=challenge(browser),
+    )
+    assert_problem(overflow_shelves, 422, "BATCH_LIMIT_EXCEEDED")
+    detail = browser.get(f"{BOOKS}/{full['id']}").json()
+    assert sorted(detail["tags"]) == sorted(tags)
+    assert sorted(detail["shelves"]) == sorted(shelves)
+
+    mixed = browser.patch(
+        f"{BOOKS}/batch-update",
+        json={"bookIds": [room["id"], full["id"]], "addTags": ["新标签"]},
+        headers=challenge(browser),
+    )
+    assert_problem(mixed, 422, "BATCH_LIMIT_EXCEEDED")
+    assert len(browser.get(f"{BOOKS}/{room['id']}").json()["tags"]) == 19
+
+    boundary = browser.patch(
+        f"{BOOKS}/batch-update",
+        json={"bookIds": [room["id"]], "addTags": ["新标签"], "addShelves": ["新书架"]},
+        headers=challenge(browser),
+    )
+    assert boundary.status_code == 200
+    filled = browser.get(f"{BOOKS}/{room['id']}").json()
+    assert len(filled["tags"]) == 20
+    assert len(filled["shelves"]) == 20

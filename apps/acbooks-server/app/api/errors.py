@@ -33,6 +33,10 @@ _BUSINESS_PROBLEMS = {
         HTTPStatus.UNPROCESSABLE_ENTITY,
         "Invalid cover image.",
     ),
+    BusinessErrorCode.BATCH_LIMIT_EXCEEDED: (
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        "Batch change exceeds the per-book limit.",
+    ),
 }
 
 

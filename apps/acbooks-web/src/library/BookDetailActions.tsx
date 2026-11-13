@@ -31,6 +31,7 @@ async function copyToClipboard(value: string): Promise<void> {
 }
 
 export interface BookDetailActionsProps {
+  coverBusy: boolean;
   detail: BookDetail;
   onDelete: () => void;
   onEdit: () => void;
@@ -39,6 +40,7 @@ export interface BookDetailActionsProps {
 }
 
 export function BookDetailActions({
+  coverBusy,
   detail,
   onDelete,
   onEdit,
@@ -46,6 +48,7 @@ export function BookDetailActions({
   statusSaving,
 }: BookDetailActionsProps) {
   const { t } = useTranslation("library");
+  const busy = statusSaving || coverBusy;
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const copyTimer = useRef<number | undefined>(undefined);
 
@@ -84,6 +87,7 @@ export function BookDetailActions({
     <div className="flex w-full flex-col gap-2 @min-[640px]:flex-row @min-[640px]:flex-wrap @min-[640px]:items-center @min-[1000px]:flex-col @min-[1000px]:items-stretch">
       <Button
         className="w-full @min-[640px]:w-auto @min-[1000px]:w-full"
+        disabled={busy}
         onClick={onEdit}
         size="lg"
         variant="soft"
@@ -100,7 +104,7 @@ export function BookDetailActions({
           ariaLabel={t("detail.readingStatus")}
           className="h-11 @min-[640px]:h-8"
           containerClassName="min-w-0 flex-1"
-          disabled={statusSaving}
+          disabled={busy}
           id="book-reading-status"
           onValueChange={(value) => {
             onStatusChange(value as ReadingStatus);

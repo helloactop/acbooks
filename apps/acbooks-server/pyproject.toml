@@ -11,6 +11,7 @@ dependencies = [
     "alembic>=1.16,<2",
     "argon2-cffi>=25.1,<26",
     "fastapi>=0.115,<1",
+    "pillow>=11,<13",
     "pydantic>=2.10,<3",
     "pydantic-settings>=2.7,<3",
     "python-multipart>=0.0.20,<1",
@@ -19,7 +20,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["httpx>=0.28,<1", "mypy>=1.15,<3", "pytest>=8,<10", "ruff>=0.11,<1"]
+dev = [
+    "httpx>=0.28,<1",
+    "mypy>=1.15,<3",
+    "pytest>=8,<10",
+    "ruff>=0.11,<1",
+    "types-Pillow>=10.2,<11",
+]
 
 [tool.setuptools.packages.find]
 include = ["app", "app.*"]

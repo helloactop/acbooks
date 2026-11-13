@@ -19,6 +19,7 @@ export interface BookListItemProps {
   onSelect?: (bookId: string) => void;
   selectable?: boolean;
   selected?: boolean;
+  selectionDisabled?: boolean;
 }
 
 export function BookListItem({
@@ -27,6 +28,7 @@ export function BookListItem({
   onSelect,
   selectable = false,
   selected = false,
+  selectionDisabled = false,
 }: BookListItemProps) {
   const { t } = useTranslation("library");
   const { resolvedLanguage } = useLanguage();
@@ -39,18 +41,18 @@ export function BookListItem({
       role="row"
     >
       <div
-        aria-hidden="true"
         className="relative flex justify-center"
         role="cell"
       >
         {selectable ? (
-          <label className="absolute top-1/2 left-0 z-10 flex size-5 -translate-y-1/2 cursor-pointer items-center justify-center rounded bg-background/90">
+          <label className="absolute top-1/2 left-0 z-10 flex size-5 -translate-y-1/2 cursor-pointer items-center justify-center rounded bg-background/90 max-md:size-11">
             <span className="sr-only">
               {t("selection.select", { title: book.title })}
             </span>
             <input
               checked={selected}
               className="size-4 accent-accent-text"
+              disabled={selectionDisabled}
               onChange={() => {
                 onSelect?.(book.id);
               }}
@@ -70,7 +72,14 @@ export function BookListItem({
         <Link
           aria-label={t("detail.open", { title: book.title })}
           className="block max-w-full truncate text-left text-[13px] font-medium after:absolute after:inset-0 after:content-[''] hover:text-accent-text focus-visible:outline-none"
-          onClick={() => {
+          onClick={(event) => {
+            if (selectable) {
+              event.preventDefault();
+              if (!selectionDisabled) {
+                onSelect?.(book.id);
+              }
+              return;
+            }
             onOpen(book.id);
           }}
           to={bookDetailHref(book.id)}
