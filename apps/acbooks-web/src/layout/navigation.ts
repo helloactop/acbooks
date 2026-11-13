@@ -1,4 +1,5 @@
 import {
+  HardDrive,
   House,
   Languages,
   LibraryBig,
@@ -8,7 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { homeHref, libraryHref, locationsHref } from "./routes";
+import { homeHref, libraryHref, locationsHref, storageHref } from "./routes";
 
 export interface NavItem {
   href: string;
@@ -20,6 +21,7 @@ export const APP_NAV_ITEMS: readonly NavItem[] = [
   { href: homeHref(), icon: House, labelKey: "nav.home" },
   { href: libraryHref(), icon: LibraryBig, labelKey: "nav.library" },
   { href: locationsHref(), icon: MapPin, labelKey: "nav.locations" },
+  { href: storageHref(), icon: HardDrive, labelKey: "nav.storage" },
 ];
 
 export type SettingsSection = "account" | "appearance" | "language";

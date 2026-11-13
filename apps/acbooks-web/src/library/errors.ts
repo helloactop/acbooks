@@ -27,6 +27,14 @@ export function libraryErrorMessage(
       return t("errors.fileDuplicate");
     case "FILE_EXTERNAL_PROTECTED":
       return t("errors.fileExternal");
+    case "STORAGE_ROOT_INVALID":
+      return t("errors.storageInvalid");
+    case "STORAGE_ROOT_OVERLAP":
+      return t("errors.storageOverlap");
+    case "STORAGE_ROOT_IN_USE":
+      return t("errors.storageInUse");
+    case "STORAGE_ROOT_NOT_FOUND":
+      return t("errors.storageNotFound");
     case "VALIDATION_ERROR":
       return t("errors.validation");
     case "INVALID_COVER":

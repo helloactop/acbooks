@@ -40,6 +40,10 @@ export function locationsHref(): string {
   return "/locations";
 }
 
+export function storageHref(): string {
+  return "/storage";
+}
+
 export function locationBooksHref(locationId: string): string {
   const filters = JSON.stringify({
     combinator: "ALL",
