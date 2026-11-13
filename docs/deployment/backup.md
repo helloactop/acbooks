@@ -6,8 +6,11 @@ acbooks 内置 `app.modules.backup`，使用 SQLite Online Backup API 生成一�
 Alembic revision。每个备份旁生成同名 `.json` 清单，包含大小、SHA-256、schema 版本和
 创建时间；恢复前会核对清单，避免使用被截断或混入其他版本的备份。
 
-备份只包含 SQLite 数据库。`storage_roots` 指向的电子书、封面等文件仍需按 NAS
-快照或文件备份单独保护；`.env`、反向代理证书和 `/data/acbooks/secrets/` 也应一并备份。
+备份只包含 SQLite 数据库。`storage_roots` 指向的电子书与 `covers/` 封面仍需按 NAS
+快照或文件备份单独保护；`.env`、反向代理证书和 `/data/acbooks/secrets/` 也应一并
+备份。为避免数据库与文件不一致，恢复前会校验备份库引用的 **managed** 电子书与封面
+文件是否存在于当前文件系统：存在缺失时默认拒绝恢复（`external` 根文件可能离线，
+不计入）；确认另行恢复或接受缺失时可用 `--allow-missing-files` 放行。
 
 ## 创建备份
 
@@ -71,6 +74,10 @@ curl -fsS http://127.0.0.1:8000/api/v1/ready
 5. 若目标数据库存在，先创建 `<数据库名>.pre-restore-<UTC 时间>` 快照及清单。
 6. 通过 SQLite Backup API 写入唯一临时文件，再次校验后原子替换数据库。
 7. 备份版本较旧时可直接恢复，随后由 `migrate` 升级；升级前仍应先创建新备份。
+
+恢复前还会核对备份库引用的 managed 电子书与封面文件：`--covers` 可指定封面目录
+（默认由数据库路径推导为同级的 `covers/`）；存在缺失时默认拒绝恢复，
+`--allow-missing-files` 可显式放行（仅在你已另行恢复文件或接受缺失时使用）。
 
 恢复后检查 `/api/v1/ready` 为 `200`，登录并抽查书库、阅读记录与实体副本；
 如结果不符合预期，可用 `pre-restore` 快照按同样步骤回退。

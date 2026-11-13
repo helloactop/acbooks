@@ -174,6 +174,11 @@ def test_business_error_contract(code: BusinessErrorCode) -> None:
         BusinessErrorCode.LOCATION_NOT_FOUND: ("LOCATION_NOT_FOUND", 404),
         BusinessErrorCode.LOCATION_HAS_CHILDREN: ("LOCATION_HAS_CHILDREN", 409),
         BusinessErrorCode.LOCATION_CYCLE: ("LOCATION_CYCLE", 422),
+        BusinessErrorCode.FILE_NOT_FOUND: ("FILE_NOT_FOUND", 404),
+        BusinessErrorCode.FILE_FORMAT_UNSUPPORTED: ("FILE_FORMAT_UNSUPPORTED", 422),
+        BusinessErrorCode.FILE_TOO_LARGE: ("FILE_TOO_LARGE", 413),
+        BusinessErrorCode.FILE_DUPLICATE: ("FILE_DUPLICATE", 409),
+        BusinessErrorCode.FILE_EXTERNAL_PROTECTED: ("FILE_EXTERNAL_PROTECTED", 409),
     }[code]
     app = create_app()
 

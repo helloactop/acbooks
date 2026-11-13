@@ -50,6 +50,17 @@ def main(argv: Sequence[str] | None = None) -> None:
         action="store_true",
         help="confirm API and Worker are stopped",
     )
+    restore.add_argument(
+        "--covers",
+        type=Path,
+        default=None,
+        help="covers directory for the file consistency check",
+    )
+    restore.add_argument(
+        "--allow-missing-files",
+        action="store_true",
+        help="restore even if referenced ebook/cover files are missing",
+    )
     _database_argument(restore)
 
     args = parser.parse_args(argv)
@@ -73,7 +84,12 @@ def main(argv: Sequence[str] | None = None) -> None:
             result = asdict(verify_backup(args.backup, args.manifest))
         else:
             snapshot = restore_database(
-                args.backup, args.database, args.manifest, offline=args.offline
+                args.backup,
+                args.database,
+                args.manifest,
+                offline=args.offline,
+                covers_dir=args.covers,
+                allow_missing_files=args.allow_missing_files,
             )
             result = {
                 "database": str(args.database),

@@ -47,6 +47,23 @@ _BUSINESS_PROBLEMS = {
         HTTPStatus.UNPROCESSABLE_ENTITY,
         "Location parent would create a cycle.",
     ),
+    BusinessErrorCode.FILE_NOT_FOUND: (HTTPStatus.NOT_FOUND, "File not found."),
+    BusinessErrorCode.FILE_FORMAT_UNSUPPORTED: (
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        "Unsupported file format.",
+    ),
+    BusinessErrorCode.FILE_TOO_LARGE: (
+        HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+        "File exceeds the maximum upload size.",
+    ),
+    BusinessErrorCode.FILE_DUPLICATE: (
+        HTTPStatus.CONFLICT,
+        "This file is already attached to the book.",
+    ),
+    BusinessErrorCode.FILE_EXTERNAL_PROTECTED: (
+        HTTPStatus.CONFLICT,
+        "External files cannot be deleted.",
+    ),
 }
 
 

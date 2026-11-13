@@ -87,6 +87,13 @@ REST 手动扫描 / 监听事件 / 定时校验
 - 文件系统操作与 SQLite 提交分步执行并记录可恢复任务；不得靠一个数据库事务宣称文件也已原子变更。未完成操作须有清晰的错误、补偿或重新执行路径。
 - WebDAV、REST、Worker 均调用**同一个文件业务 Service**，不建立其他绕过权限或只读限制的实现。
 
+**已实现（文件后端）**：`app/modules/files/` 提供 `GET /api/v1/books/{bookId}/files`、
+`POST /api/v1/uploads`（流式写临时文件、SHA-256、真实格式校验、同盘无覆盖发布）、
+`GET /api/v1/files/{bookFileId}/content`（流式、`Range`/`206`/`416`、`ETag`）与
+`DELETE /api/v1/files/{bookFileId}`（仅 `managed`，`external` 拒绝）。默认 managed 根位于
+`ACBOOKS_LIBRARY_DIR`（默认 `/data/acbooks/library`），首次上传时登记。契约见
+[Files API](../api/files.md)。扫描与阅读器尚未实现。
+
 ## 6. 代码归属与接口
 
 ```text

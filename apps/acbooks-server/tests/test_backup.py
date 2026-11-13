@@ -228,3 +228,58 @@ def test_prune_backups_removes_only_old_managed_files(tmp_path: Path) -> None:
     assert manifest_path(backups[2]).is_file()
     assert unmanaged.is_file()
     assert not list(tmp_path.glob(".*.tmp"))
+
+
+def test_restore_checks_managed_ebook_and_cover_files(tmp_path: Path) -> None:
+    database = tmp_path / "acbooks.db"
+    create_database(database, ("Book",))
+    library = tmp_path / "library"
+    covers = tmp_path / "covers"
+    covers.mkdir()
+    ebook = library / "book" / "a.pdf"
+    ebook.parent.mkdir(parents=True)
+    ebook.write_bytes(b"%PDF-x")
+    (covers / "cover.png").write_bytes(b"\x89PNG")
+
+    connection = sqlite3.connect(database)
+    try:
+        connection.execute(
+            "INSERT INTO storage_roots (id, name, root_path, mode) "
+            "VALUES ('root', 'library', ?, 'managed')",
+            (str(library.resolve()),),
+        )
+        connection.execute(
+            "INSERT INTO storage_objects "
+            "(id, root_id, relative_path, size_bytes, file_status, mtime_ms) "
+            "VALUES ('obj', 'root', 'book/a.pdf', 6, 'present', 1)"
+        )
+        connection.execute(
+            "INSERT INTO book_files (id, book_id, storage_object_id, format) "
+            "VALUES ('file', 'book-0', 'obj', 'pdf')"
+        )
+        connection.execute(
+            "UPDATE books SET cover_path = 'cover.png' WHERE id = 'book-0'"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    output = tmp_path / "snapshot.db"
+    backup_database(output, database)
+
+    # Referenced files exist: restore succeeds.
+    restore_database(output, database, covers_dir=covers, offline=True)
+
+    # A missing managed ebook makes the backup inconsistent with the filesystem.
+    ebook.unlink()
+    with pytest.raises(BackupError, match="missing managed"):
+        restore_database(output, database, covers_dir=covers, offline=True)
+
+    # Explicit override restores even when files are handled separately.
+    restore_database(
+        output,
+        database,
+        covers_dir=covers,
+        offline=True,
+        allow_missing_files=True,
+    )

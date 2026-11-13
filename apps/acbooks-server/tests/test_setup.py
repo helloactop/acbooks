@@ -50,6 +50,7 @@ def make_client(
     address: str = "192.0.2.10",
     *,
     covers_dir: Path | None = None,
+    library_dir: Path | None = None,
 ) -> TestClient:
     database, code_path = paths
     app = create_app(
@@ -57,6 +58,7 @@ def make_client(
         database_path=database,
         setup_code_path=code_path,
         covers_dir=covers_dir,
+        library_dir=library_dir,
     )
 
     async def simulate_client(scope: Scope, receive: Receive, send: Send) -> None:

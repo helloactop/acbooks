@@ -327,12 +327,51 @@ def _prepare_offline(database: Path) -> None:
             )
 
 
+def _covers_dir(database: Path) -> Path:
+    return database.parent.parent / "covers"
+
+
+def missing_managed_files(
+    database: Path, covers_dir: Path | None = None
+) -> list[str]:
+    database = _resolve(database)
+    covers = _resolve(covers_dir) if covers_dir is not None else _covers_dir(database)
+    try:
+        connection = _connect(database, read_only=True)
+    except sqlite3.Error as error:
+        raise BackupError(f"Cannot open database {database.name}.") from error
+    missing: list[str] = []
+    try:
+        for (cover,) in connection.execute(
+            "SELECT cover_path FROM books "
+            "WHERE cover_path IS NOT NULL AND trim(cover_path) <> ''"
+        ):
+            if not covers.joinpath(str(cover)).is_file():
+                missing.append(f"cover:{cover}")
+        for relative_path, root_path in connection.execute(
+            "SELECT so.relative_path, sr.root_path FROM storage_objects so "
+            "JOIN storage_roots sr ON sr.id = so.root_id "
+            "WHERE sr.mode = 'managed'"
+        ):
+            if not Path(str(root_path)).joinpath(str(relative_path)).is_file():
+                missing.append(f"file:{relative_path}")
+    except sqlite3.Error as error:
+        raise BackupError(
+            f"Cannot read file references from {database.name}."
+        ) from error
+    finally:
+        connection.close()
+    return missing
+
+
 def restore_database(
     backup: Path,
     database: Path = DATABASE_PATH,
     manifest: Path | None = None,
     *,
     offline: bool = False,
+    covers_dir: Path | None = None,
+    allow_missing_files: bool = False,
 ) -> Path | None:
     if not offline:
         raise BackupError(
@@ -348,6 +387,17 @@ def restore_database(
         raise BackupError(
             f"Backup schema {expected.schema_revision} is newer than "
             f"{SCHEMA_HEAD_REVISION}; upgrade the server before restoring."
+        )
+    target_covers = (
+        _resolve(covers_dir) if covers_dir is not None else _covers_dir(database)
+    )
+    missing = missing_managed_files(backup, target_covers)
+    if missing and not allow_missing_files:
+        sample = ", ".join(missing[:5])
+        raise BackupError(
+            f"Backup references {len(missing)} missing managed ebook/cover "
+            f"file(s): {sample}. Restore the matching files first or pass "
+            "--allow-missing-files."
         )
 
     with database_lock(database):
