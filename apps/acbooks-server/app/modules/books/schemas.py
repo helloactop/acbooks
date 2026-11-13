@@ -23,6 +23,9 @@ from app.modules.books.normalization import (
 from app.modules.books.types import BookOrder, BookSort, MediaType, ReadingStatus
 
 __all__ = [
+    "BatchResult",
+    "BookBatchDelete",
+    "BookBatchUpdate",
     "BookCopy",
     "BookCreate",
     "BookDetail",
@@ -49,6 +52,21 @@ class ApiModel(BaseModel):
         extra="forbid",
         strict=True,
     )
+
+
+class LaxApiModel(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        extra="forbid",
+        strict=False,
+    )
+
+
+def _unique_ids(value: list[UUID]) -> list[UUID]:
+    if len(set(value)) != len(value):
+        raise ValueError("Book ids must be unique.")
+    return value
 
 
 class BookCreate(ApiModel):
@@ -156,6 +174,59 @@ class BookUpdate(ApiModel):
         return self
 
 
+class BookBatchUpdate(LaxApiModel):
+    book_ids: Annotated[list[UUID], Field(min_length=1, max_length=100)]
+    reading_status: ReadingStatus | None = None
+    add_tags: Annotated[list[str], Field(max_length=20)] = Field(default_factory=list)
+    remove_tags: Annotated[list[str], Field(max_length=20)] = Field(
+        default_factory=list
+    )
+    add_shelves: Annotated[list[str], Field(max_length=20)] = Field(
+        default_factory=list
+    )
+    remove_shelves: Annotated[list[str], Field(max_length=20)] = Field(
+        default_factory=list
+    )
+
+    @field_validator("book_ids")
+    @classmethod
+    def validate_ids(cls, value: list[UUID]) -> list[UUID]:
+        return _unique_ids(value)
+
+    @field_validator("add_tags", "remove_tags", "add_shelves", "remove_shelves")
+    @classmethod
+    def validate_names(
+        cls, value: list[str], info: ValidationInfo
+    ) -> list[str]:
+        return normalize_name_list(value, info.field_name or "names")
+
+    @model_validator(mode="after")
+    def validate_changes(self) -> Self:
+        if (
+            self.reading_status is None
+            and not self.add_tags
+            and not self.remove_tags
+            and not self.add_shelves
+            and not self.remove_shelves
+        ):
+            raise ValueError("At least one change must be provided.")
+        return self
+
+
+class BookBatchDelete(LaxApiModel):
+    book_ids: Annotated[list[UUID], Field(min_length=1, max_length=100)]
+
+    @field_validator("book_ids")
+    @classmethod
+    def validate_ids(cls, value: list[UUID]) -> list[UUID]:
+        return _unique_ids(value)
+
+
+class BatchResult(ApiModel):
+    updated: int = 0
+    deleted: int = 0
+
+
 class BookIdentifier(ApiModel):
     scheme: str
     value: str
@@ -188,6 +259,8 @@ class BookSummary(ApiModel):
     copy_count: int
     file_count: int
     formats: list[str]
+    has_cover: bool
+    cover_updated_at: int | None
     created_at: int
     updated_at: int
 

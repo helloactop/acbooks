@@ -11,6 +11,8 @@ export function libraryErrorMessage(
       return t("errors.notFound");
     case "VALIDATION_ERROR":
       return t("errors.validation");
+    case "INVALID_COVER":
+      return t("errors.invalidCover");
     case "FORBIDDEN":
       return t("errors.forbidden");
     case "RATE_LIMITED":

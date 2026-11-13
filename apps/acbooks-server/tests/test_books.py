@@ -876,7 +876,7 @@ def test_books_require_session_and_csrf(
         "FORBIDDEN",
     )
     assert_problem(
-        browser.delete(f"{BOOKS}/{uuid4()}"), 405, "METHOD_NOT_ALLOWED"
+        browser.delete(f"{BOOKS}/{uuid4()}"), 403, "FORBIDDEN"
     )
 
 
@@ -956,7 +956,15 @@ def test_books_openapi_contract(browser: TestClient) -> None:
     assert collection["post"]["operationId"] == "createBook"
     assert item["get"]["operationId"] == "getBook"
     assert item["patch"]["operationId"] == "updateBook"
-    assert "delete" not in item
+    assert item["delete"]["operationId"] == "deleteBook"
+    assert (
+        paths[f"{BOOKS}/batch-update"]["patch"]["operationId"]
+        == "batchUpdateBooks"
+    )
+    assert (
+        paths[f"{BOOKS}/batch-delete"]["post"]["operationId"]
+        == "batchDeleteBooks"
+    )
     assert (
         paths[f"{BOOKS}/filter-schema"]["get"]["operationId"]
         == "getBookFilterSchema"
@@ -964,6 +972,10 @@ def test_books_openapi_contract(browser: TestClient) -> None:
     assert (
         paths[f"{BOOKS}/filter-options"]["get"]["operationId"]
         == "getBookFilterOptions"
+    )
+    assert (
+        paths[f"{BOOKS}/{{bookId}}/cover"]["get"]["operationId"]
+        == "getBookCover"
     )
 
     security = {

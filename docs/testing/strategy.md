@@ -48,7 +48,7 @@ pnpm e2e
 | pytest | Web 密码登录与限速、Cookie 属性、会话摘要与过期、重启持久化、会话轮换、CSRF 来源与绑定、单会话注销、登录时清理过期与撤销凭据 |
 | pytest | 数据库备份：在线快照与清单、完整性/外键校验、篡改检测、恢复前快照、原子替换、拒绝更新版本的备份 |
 | pytest | Compose 部署冒烟（Ubuntu AMD64/ARM64）：镜像内 Web 静态托管与 SPA 回退、就绪探针、HTTPS 代理下的 Cookie/CSRF、迁移门禁、备份命令、Worker 与重启持久化 |
-| pytest | Books Core V1：创建书目、重复 ISBN 不合并、作者/译者/ISBN/标签/书架关联、Unicode casefold 名称匹配、数据库级搜索筛选排序分页、部分更新保留副本与阅读数据、会话/CSRF、OpenAPI 契约 |
+| pytest | Books Core V1：创建书目、重复 ISBN 不合并、作者/译者/ISBN/标签/书架关联、Unicode casefold 名称匹配、数据库级搜索筛选排序分页、部分更新保留副本与阅读数据、单本/批量删除及关联清理、批量状态/标签/书架、封面上传/替换/删除与回退、会话/CSRF、OpenAPI 契约 |
 | ESLint | Web 与共享 UI 的 TypeScript/React 代码、Hooks 规则和导入问题 |
 | tsc | Web 与共享 UI 的 TypeScript strict 类型检查 |
 | i18n:check | 共享与 Web 翻译资源的语言目录、命名空间、键集合和插值参数一致性 |
@@ -57,7 +57,7 @@ pnpm e2e
 | Vitest | Web 初始化/登录状态机、CSRF 请求头与 Cookie 同源请求、错误码与 `Retry-After` 映射、加载禁用、初始化成功后返回登录、已有会话跳转 `/library`、认证页双语切换 |
 | Vitest | Web 全部书籍界面：真实 Books API 的会话守卫、服务端搜索/筛选/排序/分页、加载/空库/无结果/失败重试、添加/详情/编辑、CSRF 保存、退出登录/会话失效、标签与格式/副本区分、IME 组合处理、双语与响应式结构 |
 | Vite | Web 生产构建、共享 UI 源码解析与 Tailwind 样式生成 |
-| Playwright | 真实服务端与同源静态托管下的登录（失败/成功/刷新恢复）、添加书籍、阅读状态筛选、详情编辑弹窗、Dialog 内 Select、Escape 关闭顺序、搜索 A→B→A、高级筛选、浏览器返回、390px 移动端抽屉与下拉菜单 |
+| Playwright | 真实服务端与同源静态托管下的登录（失败/成功/刷新恢复）、添加书籍、阅读状态筛选、详情编辑弹窗、批量选择/修改/删除、封面上传与删除、Dialog 内 Select、Escape 关闭顺序、搜索 A→B→A、高级筛选、浏览器返回、390px 移动端抽屉与下拉菜单 |
 
 测试使用 pytest 的临时目录创建数据库，不需要真实书库、NAS 挂载或服务凭据。
 前端测试使用 jsdom，不连接真实 API。Windows 客户端和 Android 工程初始化后，

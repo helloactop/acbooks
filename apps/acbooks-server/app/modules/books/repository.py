@@ -18,6 +18,7 @@ from app.db.models.books import (
     Tag,
 )
 from app.db.models.copies import BookCopy, Location
+from app.db.models.reading import Annotation, Bookmark, ReadingSession
 from app.db.models.storage import BookFile, StorageObject
 from app.modules.books.filtering import (
     BookFilterExpression,
@@ -282,6 +283,26 @@ def list_filter_options(
 
 def get_book(session: Session, book_id: str) -> Book | None:
     return session.get(Book, book_id)
+
+
+def get_books(session: Session, book_ids: Sequence[str]) -> list[Book]:
+    return list(session.scalars(select(Book).where(Book.id.in_(book_ids))).all())
+
+
+def delete_books(session: Session, book_ids: Sequence[str]) -> None:
+    for table in (
+        Annotation,
+        Bookmark,
+        ReadingSession,
+        BookFile,
+        BookCopy,
+        BookContributor,
+        BookIdentifier,
+        BookTag,
+        ShelfBook,
+    ):
+        session.execute(delete(table).where(table.book_id.in_(book_ids)))
+    session.execute(delete(Book).where(Book.id.in_(book_ids)))
 
 
 def add_book(session: Session, book: Book) -> None:

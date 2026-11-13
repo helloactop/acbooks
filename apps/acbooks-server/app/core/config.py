@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ACBOOKS_", frozen=True)
 
+    covers_dir: Path = Path("/data/acbooks/covers")
     enable_docs: bool = False
     public_origin: str = "http://127.0.0.1:8000"
     web_dist_path: Path | None = None

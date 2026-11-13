@@ -34,6 +34,8 @@ const BOOK: BookDetail = {
   copyCount: 2,
   fileCount: 2,
   formats: ["epub", "pdf"],
+  hasCover: false,
+  coverUpdatedAt: null,
   createdAt: 1_700_000_000_000,
   updatedAt: 1_700_000_100_000,
   description: "第一段简介。\n\n第二段简介。",
@@ -155,6 +157,7 @@ function renderDetail(
               element={<BookDetailPage bookId={bookId} />}
               path="/library/books/:bookId"
             />
+            <Route element={<div>书库占位</div>} path="/library" />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -723,5 +726,90 @@ describe("BookDetailPage", () => {
     expect(screen.getByText("Physical copies")).toBeInTheDocument();
     expect(screen.getByText("Electronic files")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+  });
+
+  it("deletes the book after confirmation", async () => {
+    installApi(
+      baseHandler((url, init) => {
+        const method = methodOf(init);
+        if (url.pathname === `/api/v1/books/${BOOK_ID}` && method === "GET") {
+          return jsonResponse(BOOK);
+        }
+        if (url.pathname === `/api/v1/books/${BOOK_ID}` && method === "DELETE") {
+          return new Response(null, { status: 204 });
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(
+      await screen.findByRole("button", { name: "删除书籍" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "删除 1 本书？" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "删除" }));
+
+    await waitFor(() => {
+      expect(findCall("DELETE", `/api/v1/books/${BOOK_ID}`)).toBeDefined();
+    });
+    expect(await screen.findByText("书库占位")).toBeInTheDocument();
+  });
+
+  it("uploads and removes a cover", async () => {
+    let current = { ...BOOK };
+    installApi(
+      baseHandler((url, init) => {
+        const method = methodOf(init);
+        if (url.pathname === `/api/v1/books/${BOOK_ID}` && method === "GET") {
+          return jsonResponse(current);
+        }
+        if (url.pathname === `/api/v1/books/${BOOK_ID}/cover` && method === "PUT") {
+          current = {
+            ...current,
+            hasCover: true,
+            coverUpdatedAt: 1_700_000_200_000,
+          };
+          return jsonResponse(current);
+        }
+        if (
+          url.pathname === `/api/v1/books/${BOOK_ID}/cover` &&
+          method === "DELETE"
+        ) {
+          current = { ...current, hasCover: false, coverUpdatedAt: null };
+          return jsonResponse(current);
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByRole("heading", { level: 1, name: BOOK.title });
+    expect(
+      screen.queryByRole("img", { name: "" }),
+    ).not.toBeInTheDocument();
+    const input = document.querySelector<HTMLInputElement>(
+      'input[type="file"]',
+    );
+    expect(input).not.toBeNull();
+    const file = new File([new Uint8Array([137, 80, 78, 71])], "cover.png", {
+      type: "image/png",
+    });
+    await user.upload(input!, file);
+
+    await waitFor(() => {
+      expect(
+        document.querySelector(`img[src*="/books/${BOOK_ID}/cover?v="]`),
+      ).not.toBeNull();
+    });
+    await user.click(screen.getByRole("button", { name: "删除封面" }));
+    await waitFor(() => {
+      expect(
+        document.querySelector(`img[src*="/books/${BOOK_ID}/cover?v="]`),
+      ).toBeNull();
+    });
   });
 });

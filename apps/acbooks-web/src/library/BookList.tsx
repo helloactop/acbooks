@@ -7,9 +7,18 @@ import { ROW_GRID } from "./presentation";
 export interface BookListProps {
   books: readonly BookSummary[];
   onOpen: (bookId: string) => void;
+  onSelect?: (bookId: string) => void;
+  selectable?: boolean;
+  selectedIds?: ReadonlySet<string>;
 }
 
-export function BookList({ books, onOpen }: BookListProps) {
+export function BookList({
+  books,
+  onOpen,
+  onSelect,
+  selectable = false,
+  selectedIds,
+}: BookListProps) {
   const { t } = useTranslation("library");
 
   return (
@@ -33,7 +42,14 @@ export function BookList({ books, onOpen }: BookListProps) {
       </div>
 
       {books.map((book) => (
-        <BookListItem key={book.id} book={book} onOpen={onOpen} />
+        <BookListItem
+          book={book}
+          key={book.id}
+          onOpen={onOpen}
+          onSelect={onSelect}
+          selectable={selectable}
+          selected={selectedIds?.has(book.id) ?? false}
+        />
       ))}
     </div>
   );

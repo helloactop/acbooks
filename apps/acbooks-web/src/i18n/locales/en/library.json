@@ -35,6 +35,38 @@
     "more": "More actions",
     "refresh": "Refresh"
   },
+  "selection": {
+    "start": "Select",
+    "done": "Done",
+    "count": "{{count}} selected",
+    "selectPage": "Select this page",
+    "clearPage": "Deselect this page",
+    "clear": "Clear selection",
+    "edit": "Edit selected",
+    "delete": "Delete",
+    "select": "Select {{title}}"
+  },
+  "batch": {
+    "editTitle": "Edit {{count}} books",
+    "editDescription": "Only chosen or filled fields change; tags and shelves are added or removed.",
+    "status": "Reading status",
+    "statusUnchanged": "Do not change",
+    "addTags": "Add tags",
+    "removeTags": "Remove tags",
+    "addShelves": "Add shelves",
+    "removeShelves": "Remove shelves",
+    "saving": "Saving",
+    "save": "Save changes",
+    "deleteTitle": "Delete {{count}} books?",
+    "deleteDescription": "This removes the books, their tags, shelves, copies, file index entries, reading sessions, bookmarks, highlights, and notes. Files on the NAS are kept; cover images are deleted.",
+    "deleteConfirm": "Delete",
+    "deleting": "Deleting"
+  },
+  "cover": {
+    "upload": "Upload cover",
+    "replace": "Replace cover",
+    "remove": "Remove cover"
+  },
   "filters": {
     "type": "Type",
     "allTypes": "All types",
@@ -197,6 +229,7 @@
   "errors": {
     "notFound": "This book no longer exists.",
     "validation": "Check the form and try again.",
+    "invalidCover": "Use a PNG, JPEG, or WebP image up to 5 MB.",
     "forbidden": "This request did not pass the security check. Refresh the page and try again.",
     "rateLimited": "Too many attempts. Try again later.",
     "network": "Cannot reach the server. Try again later.",
@@ -225,6 +258,7 @@
     "backHome": "Back to home",
     "open": "View details for {{title}}",
     "edit": "Edit",
+    "delete": "Delete book",
     "close": "Close",
     "authors": "Authors",
     "translators": "Translators",

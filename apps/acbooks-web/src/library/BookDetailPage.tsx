@@ -1,8 +1,8 @@
 import { Button, Spinner, buttonVariants } from "@acbooks/ui";
 import { ArrowLeft } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { isAbortError, toApiError, type ApiError } from "../api/client";
 import { useAppShell } from "../layout/app-shell-context";
@@ -17,11 +17,15 @@ import { BookDetailHeader } from "./BookDetailHeader";
 import { BookDetailTabs } from "./BookDetailTabs";
 import { BookFormDialog } from "./BookFormDialog";
 import {
+  deleteBook,
+  deleteBookCover,
   getBook,
   updateBook,
+  uploadBookCover,
   type BookDetail,
   type ReadingStatus,
 } from "./books-api";
+import { DeleteBooksDialog } from "./DeleteBooksDialog";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
 import { LibraryAlert } from "./LibraryAlert";
 
@@ -32,6 +36,8 @@ export interface BookDetailPageProps {
 export function BookDetailPage({ bookId }: BookDetailPageProps) {
   const { t } = useTranslation("library");
   const { expireSession } = useAppShell();
+  const navigate = useNavigate();
+  const coverInput = useRef<HTMLInputElement>(null);
   const [detail, setDetail] = useState<BookDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
@@ -40,6 +46,10 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
   const [statusDraft, setStatusDraft] = useState<ReadingStatus | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
   const [actionError, setActionError] = useState<ApiError | null>(null);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<ApiError | null>(null);
   useDocumentTitle(detail?.title ?? t("detail.title"));
   const backHref = detailReturnHref();
   const backLabel = isDetailReturnFromHome()
@@ -120,6 +130,69 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
     }
   };
 
+  const changeCover = async (file: File) => {
+    if (detail === null || coverBusy) {
+      return;
+    }
+    setCoverBusy(true);
+    setActionError(null);
+    try {
+      setDetail(await uploadBookCover(detail.id, file));
+    } catch (cause) {
+      const apiError = toApiError(cause);
+      if (apiError.status === 401) {
+        expireSession();
+        return;
+      }
+      setActionError(apiError);
+    } finally {
+      setCoverBusy(false);
+      if (coverInput.current !== null) {
+        coverInput.current.value = "";
+      }
+    }
+  };
+
+  const removeCover = async () => {
+    if (detail === null || coverBusy) {
+      return;
+    }
+    setCoverBusy(true);
+    setActionError(null);
+    try {
+      setDetail(await deleteBookCover(detail.id));
+    } catch (cause) {
+      const apiError = toApiError(cause);
+      if (apiError.status === 401) {
+        expireSession();
+        return;
+      }
+      setActionError(apiError);
+    } finally {
+      setCoverBusy(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (detail === null || deleteBusy) {
+      return;
+    }
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await deleteBook(detail.id);
+      navigate("/library", { replace: true });
+    } catch (cause) {
+      const apiError = toApiError(cause);
+      setDeleteBusy(false);
+      if (apiError.status === 401) {
+        expireSession();
+        return;
+      }
+      setDeleteError(apiError);
+    }
+  };
+
   const headerDetail =
     detail !== null && statusDraft !== null
       ? { ...detail, readingStatus: statusDraft }
@@ -187,14 +260,36 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
       ) : headerDetail !== null ? (
         <>
           <BookDetailHeader
+            coverBusy={coverBusy}
             detail={headerDetail}
+            onDelete={() => {
+              setDeleteOpen(true);
+            }}
+            onDeleteCover={() => {
+              void removeCover();
+            }}
             onEdit={() => {
               setEditing(true);
             }}
             onStatusChange={(next) => {
               void changeStatus(next);
             }}
+            onUploadCover={() => {
+              coverInput.current?.click();
+            }}
             statusSaving={statusSaving}
+          />
+          <input
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file !== undefined) {
+                void changeCover(file);
+              }
+            }}
+            ref={coverInput}
+            type="file"
           />
 
           {actionErrorMessage !== undefined ? (
@@ -220,6 +315,27 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
             setDetail(saved);
           }}
           onSessionExpired={expireSession}
+        />
+      ) : null}
+
+      {deleteOpen && detail !== null ? (
+        <DeleteBooksDialog
+          busy={deleteBusy}
+          count={1}
+          error={
+            deleteError === null
+              ? undefined
+              : libraryErrorMessage(t, deleteError)
+          }
+          onCancel={() => {
+            if (!deleteBusy) {
+              setDeleteOpen(false);
+              setDeleteError(null);
+            }
+          }}
+          onConfirm={() => {
+            void confirmDelete();
+          }}
         />
       ) : null}
     </div>

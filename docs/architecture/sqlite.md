@@ -15,7 +15,7 @@
 
 | 分组 | 表（主要字段） | 关系/职责 |
 | --- | --- | --- |
-| 书目 | `books(id, title, description, reading_status, cover_path, created_at, updated_at)` | 唯一书籍主记录；允许无实体副本、无电子文件 |
+| 书目 | `books(id, title, description, reading_status, cover_path, cover_updated_at, created_at, updated_at)` | 唯一书籍主记录；允许无实体副本、无电子文件 |
 | 书目 | `contributors(id, name)`、`book_contributors(book_id, contributor_id, role)` | 作者、译者等；多对多 |
 | 书目 | `book_identifiers(id, book_id, scheme, value)` | ISBN/外部 ID；**不按 ISBN 自动合并** |
 | 分类 | `tags`、`book_tags`、`shelves`、`shelf_books` | 标签与书架，多对多 |
@@ -53,6 +53,16 @@
 - 单用户**不等于**使用全局超级令牌：应用凭据只读、与登录凭据隔离，支持过期、手动撤销；`devices` 仍只表达阅读同步的设备身份，不替代 `auth_tokens`。
 - `auth_sessions` 与 `auth_tokens` 应定期清理已过期、已撤销的历史行，但不得删当前有效凭据；当前实现在每次成功登录的写事务中同时清理两类凭据，密码变更和撤销要在下一次请求时立即生效。索引以唯一 token hash 为主，不引入不必要的会话缓存。
 - 首次建库通过**初始 Alembic revision** 纳入这三表；如果项目已存在已发布 schema，必须**新增** revision，绝不改写已发布 migration。测试需覆盖“旧库升级、空库初始化、并发抢注、账号唯一性、撤销及恢复”。
+
+**封面存储**：封面文件保存在 `ACBOOKS_COVERS_DIR`（默认 `/data/acbooks/covers`），
+`books.cover_path` 只保存服务端生成的文件名，`cover_updated_at` 为替换版本（UTC 毫秒）。
+迁移 `0005` 仅用 `ALTER TABLE` 增加 `cover_updated_at`，保留既有行与触发器。
+上传/替换/删除封面由 Books 服务完成，先写临时文件再原子替换；数据库或文件失败时
+不得留下半写文件，也不得把客户端文件名写入数据库。
+
+**显式删除**：用户确认删除书目时，同一事务内删除标签/书架/作者/标识关联、实体副本、
+电子文件索引、阅读会话、书签、划线和笔记，再删除书目；`storage_objects` 与 NAS
+原始文件保留，封面文件在提交后清理。批量删除任一 ID 不存在时整体回滚。
 
 **删除与扫描规则**：扫描不到文件时将 `storage_objects.file_status` 标为 `missing`，不自动删除 `Book`、笔记或阅读历史；移动文件尽量更新存储索引并保持书籍/文件 ID 稳定。ISBN、书名、文件哈希只用于候选匹配，歧义需人工确认。
 

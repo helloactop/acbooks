@@ -1,4 +1,4 @@
-import { useLanguage } from "@acbooks/ui";
+import { Button, useLanguage } from "@acbooks/ui";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -12,16 +12,24 @@ import { libraryHref } from "../layout/routes";
 import { joinNames } from "./presentation";
 
 export interface BookDetailHeaderProps {
+  coverBusy: boolean;
   detail: BookDetail;
+  onDelete: () => void;
+  onDeleteCover: () => void;
   onEdit: () => void;
   onStatusChange: (status: ReadingStatus) => void;
+  onUploadCover: () => void;
   statusSaving: boolean;
 }
 
 export function BookDetailHeader({
+  coverBusy,
   detail,
+  onDelete,
+  onDeleteCover,
   onEdit,
   onStatusChange,
+  onUploadCover,
   statusSaving,
 }: BookDetailHeaderProps) {
   const { t } = useTranslation("library");
@@ -46,6 +54,26 @@ export function BookDetailHeader({
           className="w-[132px] @min-[1000px]:w-[150px]"
           titleClassName="text-[22px] leading-[1.25] @min-[1000px]:text-2xl"
         />
+        <div className="mt-2 flex flex-wrap justify-center gap-1.5 @min-[640px]:justify-start">
+          <Button
+            disabled={coverBusy}
+            onClick={onUploadCover}
+            size="sm"
+            variant="outline"
+          >
+            {detail.hasCover ? t("cover.replace") : t("cover.upload")}
+          </Button>
+          {detail.hasCover ? (
+            <Button
+              disabled={coverBusy}
+              onClick={onDeleteCover}
+              size="sm"
+              variant="ghost"
+            >
+              {t("cover.remove")}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="w-full min-w-0 @min-[640px]:col-start-2 @min-[640px]:row-start-1">
@@ -100,6 +128,7 @@ export function BookDetailHeader({
       <div className="w-full @min-[640px]:col-start-2 @min-[640px]:row-start-2 @min-[1000px]:col-start-3 @min-[1000px]:row-span-2 @min-[1000px]:row-start-1 @min-[1000px]:flex @min-[1000px]:flex-col @min-[1000px]:justify-start @min-[1000px]:self-stretch">
         <BookDetailActions
           detail={detail}
+          onDelete={onDelete}
           onEdit={onEdit}
           onStatusChange={onStatusChange}
           statusSaving={statusSaving}

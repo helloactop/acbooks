@@ -16,9 +16,18 @@ import { ROW_GRID, joinNames } from "./presentation";
 export interface BookListItemProps {
   book: BookSummary;
   onOpen: (bookId: string) => void;
+  onSelect?: (bookId: string) => void;
+  selectable?: boolean;
+  selected?: boolean;
 }
 
-export function BookListItem({ book, onOpen }: BookListItemProps) {
+export function BookListItem({
+  book,
+  onOpen,
+  onSelect,
+  selectable = false,
+  selected = false,
+}: BookListItemProps) {
   const { t } = useTranslation("library");
   const { resolvedLanguage } = useLanguage();
   const authors =
@@ -29,7 +38,26 @@ export function BookListItem({ book, onOpen }: BookListItemProps) {
       className={`${ROW_GRID} relative min-h-14 border-b border-border px-2 py-1 transition-colors duration-150 ease-out hover:bg-surface-hover focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background`}
       role="row"
     >
-      <div aria-hidden="true" className="flex justify-center" role="cell">
+      <div
+        aria-hidden="true"
+        className="relative flex justify-center"
+        role="cell"
+      >
+        {selectable ? (
+          <label className="absolute top-1/2 left-0 z-10 flex size-5 -translate-y-1/2 cursor-pointer items-center justify-center rounded bg-background/90">
+            <span className="sr-only">
+              {t("selection.select", { title: book.title })}
+            </span>
+            <input
+              checked={selected}
+              className="size-4 accent-accent-text"
+              onChange={() => {
+                onSelect?.(book.id);
+              }}
+              type="checkbox"
+            />
+          </label>
+        ) : null}
         <BookCover
           book={book}
           className="w-8"

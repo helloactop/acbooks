@@ -12,6 +12,9 @@ export interface BookCardProps {
   book: BookSummary;
   coverSize?: CoverSize;
   onOpen: (bookId: string) => void;
+  onSelect?: (bookId: string) => void;
+  selectable?: boolean;
+  selected?: boolean;
 }
 
 const COVER_TITLE: Record<CoverSize, string> = {
@@ -30,6 +33,9 @@ export function BookCard({
   book,
   coverSize = "medium",
   onOpen,
+  onSelect,
+  selectable = false,
+  selected = false,
 }: BookCardProps) {
   const { t } = useTranslation("library");
   const { resolvedLanguage } = useLanguage();
@@ -38,7 +44,22 @@ export function BookCard({
     joinNames(book.authors, resolvedLanguage) || t("labels.unknownAuthor");
 
   return (
-    <article aria-labelledby={titleId} className="min-w-0">
+    <article aria-labelledby={titleId} className="relative min-w-0">
+      {selectable ? (
+        <label className="absolute top-1.5 right-1.5 z-10 flex size-8 cursor-pointer items-center justify-center rounded-control bg-background/90 shadow-overlay">
+          <span className="sr-only">
+            {t("selection.select", { title: book.title })}
+          </span>
+          <input
+            checked={selected}
+            className="size-4 accent-accent-text"
+            onChange={() => {
+              onSelect?.(book.id);
+            }}
+            type="checkbox"
+          />
+        </label>
+      ) : null}
       <Link
         aria-label={t("detail.open", { title: book.title })}
         className="group block w-full rounded-cover text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"

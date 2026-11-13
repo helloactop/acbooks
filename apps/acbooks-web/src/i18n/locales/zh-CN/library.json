@@ -35,6 +35,38 @@
     "more": "更多操作",
     "refresh": "刷新"
   },
+  "selection": {
+    "start": "选择",
+    "done": "完成",
+    "count": "已选 {{count}} 本",
+    "selectPage": "全选本页",
+    "clearPage": "取消全选本页",
+    "clear": "清除选择",
+    "edit": "批量修改",
+    "delete": "删除",
+    "select": "选择《{{title}}》"
+  },
+  "batch": {
+    "editTitle": "批量修改 {{count}} 本书",
+    "editDescription": "只修改已选择或填写的字段；标签和书架按添加、移除处理。",
+    "status": "阅读状态",
+    "statusUnchanged": "不修改",
+    "addTags": "添加标签",
+    "removeTags": "移除标签",
+    "addShelves": "添加书架",
+    "removeShelves": "移除书架",
+    "saving": "正在保存",
+    "save": "保存修改",
+    "deleteTitle": "删除 {{count}} 本书？",
+    "deleteDescription": "将删除书目及其标签、书架、实体副本、电子文件索引、阅读会话、书签、划线和笔记；NAS 上的原始文件保留，封面会删除。",
+    "deleteConfirm": "删除",
+    "deleting": "正在删除"
+  },
+  "cover": {
+    "upload": "上传封面",
+    "replace": "更换封面",
+    "remove": "删除封面"
+  },
   "filters": {
     "type": "类型",
     "allTypes": "全部类型",
@@ -197,6 +229,7 @@
   "errors": {
     "notFound": "书籍不存在或已被删除。",
     "validation": "请检查输入内容后重试。",
+    "invalidCover": "封面必须是 5 MB 以内的 PNG、JPEG 或 WebP 图片。",
     "forbidden": "请求未通过安全校验，请刷新页面后重试。",
     "rateLimited": "尝试次数过多，请稍后重试。",
     "network": "无法连接到服务器，请稍后重试。",
@@ -225,6 +258,7 @@
     "backHome": "返回首页",
     "open": "查看《{{title}}》详情",
     "edit": "编辑",
+    "delete": "删除书籍",
     "close": "关闭",
     "authors": "作者",
     "translators": "译者",

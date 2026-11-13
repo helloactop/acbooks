@@ -7,17 +7,15 @@
 
 ## 1. 范围与鉴权
 
-Books Core V1 提供书目创建、列表、详情和部分更新。所有端点位于
-`/api/v1/books`，返回 `Cache-Control: no-store`。
+Books Core V1 提供书目创建、列表、详情、部分更新、单本/批量删除、批量修改和封面管理。
+所有端点位于 `/api/v1/books`，返回 `Cache-Control: no-store`（封面文件除外）。
 
 | 操作 | 鉴权 |
 | --- | --- |
-| 列表 / 详情 | 有效 Web 会话 Cookie（`WebSession`） |
-| 创建 / 更新 | 有效 Web 会话 Cookie + `X-CSRF-Token` + 可信 `Origin`/`Referer` |
+| 列表 / 详情 / 封面读取 | 有效 Web 会话 Cookie（`WebSession`） |
+| 创建 / 更新 / 删除 / 批量 / 封面上传与删除 | 有效 Web 会话 Cookie + `X-CSRF-Token` + 可信 `Origin`/`Referer` |
 
 - 未认证返回 `401 UNAUTHORIZED`；CSRF、来源或传输校验失败返回 `403 FORBIDDEN`。
-- 书目删除不包含在 V1 中，`DELETE /api/v1/books/{bookId}` 返回
-  `405 METHOD_NOT_ALLOWED`。
 
 ## 2. 数据与规范化
 
@@ -32,6 +30,13 @@ Books Core V1 提供书目创建、列表、详情和部分更新。所有端点
   Unicode casefold，与服务端写入保持同一匹配语义。
 - 列表和详情只读返回副本、文件摘要；不返回 `cover_path`、存储根路径或内部
   文件路径。副本/文件本身由后续 Copies/Files 模块管理。
+- 封面由服务端保存在 `ACBOOKS_COVERS_DIR`（默认 `/data/acbooks/covers`），数据库只存
+  生成的文件名和 `cover_updated_at` 版本。列表/详情返回 `hasCover` 与
+  `coverUpdatedAt`，客户端通过 `GET /api/v1/books/{bookId}/cover?v=...` 展示；
+  未上传或文件缺失时保留占位封面。
+- 删除是显式破坏性操作：删除书目时同时删除其标签/书架/作者/标识关联、实体副本、
+  电子文件索引、阅读会话、书签、划线和笔记，并删除封面文件；`storage_objects`
+  与 NAS 上的原始文件**不删除**，后续扫描可重新发现。
 - 时间戳为 UTC Unix 毫秒整数。多作者排序按姓名排序后的第一个姓名。
 
 ## 3. 端点
@@ -169,6 +174,52 @@ Books Core V1 提供书目创建、列表、详情和部分更新。所有端点
 - 空对象 `{}` 返回 `422 VALIDATION_ERROR`。
 - 更新不会删除副本、文件、阅读会话、书签、划线或笔记。
 
+### 3.6 删除书目
+
+`DELETE /api/v1/books/{bookId}` → `204`
+
+- 删除书目及关联的标签/书架/作者/标识、实体副本、电子文件索引、阅读会话、书签、
+  划线和笔记，并删除封面文件；`storage_objects` 和 NAS 原始文件保留。
+- 不存在时返回 `404 BOOK_NOT_FOUND`。
+
+### 3.7 批量修改与删除
+
+`PATCH /api/v1/books/batch-update` → `200 {"updated": n, "deleted": 0}`
+
+```json
+{
+  "bookIds": ["..."],
+  "readingStatus": "done",
+  "addTags": ["文学"],
+  "removeTags": ["旧标签"],
+  "addShelves": ["书房"],
+  "removeShelves": ["旧书架"]
+}
+```
+
+- `bookIds` 1–100 个且不可重复；至少提交一项变更。
+- 标签/书架按添加、移除处理；同名同时出现在添加与移除时以移除为准。
+- 任一书目不存在时整体返回 `404 BOOK_NOT_FOUND`，不产生部分修改。
+
+`POST /api/v1/books/batch-delete` → `200 {"updated": 0, "deleted": n}`
+
+```json
+{"bookIds": ["..."]}
+```
+
+删除语义与单本删除一致；任一 ID 不存在时不删除任何书目并返回 `404`。
+
+### 3.8 封面
+
+- `PUT /api/v1/books/{bookId}/cover`：`multipart/form-data`，字段名 `file`。
+  仅接受 PNG、JPEG、WebP 魔数，最大 5 MB；成功后返回 `BookDetail` 并更新
+  `hasCover` / `coverUpdatedAt`。替换会删除旧封面。
+- `DELETE /api/v1/books/{bookId}/cover` → `200 BookDetail`，清除封面并删除文件；
+  未设置封面时同样返回当前详情。
+- `GET /api/v1/books/{bookId}/cover` → 图片内容；无封面或文件缺失返回
+  `404 COVER_NOT_FOUND`，客户端回退到占位封面。
+- 数据库不保存客户端文件名或路径；服务端按书籍 ID 生成文件名并限制在封面目录内。
+
 ## 4. 错误响应
 
 所有错误使用 `application/problem+json`，`code` 为稳定业务码：
@@ -178,26 +229,31 @@ Books Core V1 提供书目创建、列表、详情和部分更新。所有端点
 | 401 | `UNAUTHORIZED` | 缺少或过期 Web 会话 |
 | 403 | `FORBIDDEN` | CSRF、来源或传输校验失败 |
 | 404 | `BOOK_NOT_FOUND` | 书目不存在 |
-| 405 | `METHOD_NOT_ALLOWED` | 使用 V1 未提供的删除方法 |
-| 422 | `VALIDATION_ERROR` | 输入、查询参数或空 PATCH 不合法 |
+| 404 | `COVER_NOT_FOUND` | 封面未设置或文件缺失 |
+| 422 | `VALIDATION_ERROR` | 输入、查询参数、空 PATCH/批量请求不合法 |
 | 422 | `INVALID_BOOK_FILTER` | `filters` JSON、字段或运算符不合法 |
+| 422 | `INVALID_COVER` | 封面格式不支持或超过 5 MB |
 | 500 | `INTERNAL_ERROR` | 服务端异常；通过 `requestId` 关联日志 |
 
 ## 5. 删除策略
 
-V1 不开放书目删除。后续实现删除时必须满足：
+删除必须由用户显式确认，并在同一数据库事务内完成：
 
-1. 先检查实体副本、电子文件、阅读会话、书签、划线和笔记等关联；
-2. 存在关联时返回 `409`，不隐式级联删除；
-3. 删除书目元数据不得删除 NAS 文件、阅读历史或阅读数据；
-4. 文件缺失、扫描失败或 NAS 掉线不得触发书目删除。
+1. 先确认所有目标书目存在；任一缺失时返回 `404` 且不产生部分删除。
+2. 删除标签/书架/作者/标识关联、实体副本、电子文件索引、阅读会话、书签、
+   划线和笔记，最后删除书目。
+3. **不删除** `storage_objects`、NAS 原始文件、存储根目录或扫描索引；文件缺失、
+   扫描失败或 NAS 掉线本身不会触发删除。
+4. 数据库事务提交后删除封面文件；文件清理失败不回滚书目删除。
+5. 批量删除使用同一语义，全有或全无。
 
 ## 6. OpenAPI 与客户端类型
 
 实现由 FastAPI `/openapi.json` 发布，操作 ID：
 
 - `listBooks`、`createBook`、`getBookFilterSchema`、`getBookFilterOptions`、
-  `getBook`、`updateBook`
+  `getBook`、`updateBook`、`deleteBook`、`batchUpdateBooks`、`batchDeleteBooks`、
+  `getBookCover`、`uploadBookCover`、`deleteBookCover`
 
 TypeScript 类型由生成工具写入 `packages/acbooks-api-client/schema.d.ts`，不得手改：
 

@@ -19,6 +19,7 @@ class Book(Base):
     description: Mapped[str | None] = mapped_column(Text)
     reading_status: Mapped[str] = mapped_column(Text, server_default="unread")
     cover_path: Mapped[str | None] = mapped_column(Text)
+    cover_updated_at: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[int] = mapped_column(Integer)
     updated_at: Mapped[int] = mapped_column(Integer)
 

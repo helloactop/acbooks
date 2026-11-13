@@ -1,13 +1,17 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Path, Query, Response
+from fastapi import APIRouter, Depends, File, Path, Query, Response, UploadFile
+from fastapi.responses import FileResponse
 
 from app.api.errors import problem_openapi
 from app.modules.auth.dependencies import AuthDependencies
 from app.modules.auth.service import WebSession
 from app.modules.books.filtering import BookFilterOptionSource
 from app.modules.books.schemas import (
+    BatchResult,
+    BookBatchDelete,
+    BookBatchUpdate,
     BookCreate,
     BookDetail,
     BookFilterOptionPage,
@@ -19,7 +23,7 @@ from app.modules.books.schemas import (
     MediaType,
     ReadingStatus,
 )
-from app.modules.books.service import BooksService
+from app.modules.books.service import MAX_COVER_BYTES, BooksService
 
 no_store = {"Cache-Control": {"schema": {"type": "string", "const": "no-store"}}}
 created_headers = {
@@ -147,6 +151,46 @@ def books_router(
             source=source, query=query, limit=limit
         )
 
+    @router.patch(
+        "/batch-update",
+        operation_id="batchUpdateBooks",
+        response_model=BatchResult,
+        responses={
+            200: {"headers": no_store},
+            **{
+                status: problem_openapi(status)
+                for status in (401, 403, 404, 422, 500)
+            },
+        },
+    )
+    def batch_update_books(
+        payload: BookBatchUpdate,
+        response: Response,
+        current: Annotated[WebSession, Depends(dependencies.require_write)],
+    ) -> BatchResult:
+        response.headers["Cache-Control"] = "no-store"
+        return service.batch_update(payload)
+
+    @router.post(
+        "/batch-delete",
+        operation_id="batchDeleteBooks",
+        response_model=BatchResult,
+        responses={
+            200: {"headers": no_store},
+            **{
+                status: problem_openapi(status)
+                for status in (401, 403, 404, 422, 500)
+            },
+        },
+    )
+    def batch_delete_books(
+        payload: BookBatchDelete,
+        response: Response,
+        current: Annotated[WebSession, Depends(dependencies.require_write)],
+    ) -> BatchResult:
+        response.headers["Cache-Control"] = "no-store"
+        return service.batch_delete(payload)
+
     @router.get(
         "/{bookId}",
         operation_id="getBook",
@@ -187,5 +231,90 @@ def books_router(
     ) -> BookDetail:
         response.headers["Cache-Control"] = "no-store"
         return service.update_book(book_id, payload)
+
+    @router.delete(
+        "/{bookId}",
+        status_code=204,
+        operation_id="deleteBook",
+        response_class=Response,
+        responses={
+            204: {"headers": no_store},
+            **{
+                status: problem_openapi(status)
+                for status in (401, 403, 404, 500)
+            },
+        },
+    )
+    def delete_book(
+        book_id: Annotated[UUID, Path(alias="bookId")],
+        current: Annotated[WebSession, Depends(dependencies.require_write)],
+    ) -> Response:
+        service.delete_book(book_id)
+        return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+    @router.get(
+        "/{bookId}/cover",
+        operation_id="getBookCover",
+        response_class=FileResponse,
+        responses={
+            200: {"content": {"image/*": {}}},
+            **{
+                status: problem_openapi(status)
+                for status in (401, 404, 500)
+            },
+        },
+    )
+    def get_book_cover(
+        book_id: Annotated[UUID, Path(alias="bookId")],
+        current: Annotated[WebSession, Depends(dependencies.require_session)],
+    ) -> FileResponse:
+        path, media_type = service.get_cover(book_id)
+        return FileResponse(
+            path,
+            media_type=media_type,
+            headers={"Cache-Control": "private, max-age=0, must-revalidate"},
+        )
+
+    @router.put(
+        "/{bookId}/cover",
+        operation_id="uploadBookCover",
+        response_model=BookDetail,
+        responses={
+            200: {"headers": no_store},
+            **{
+                status: problem_openapi(status)
+                for status in (401, 403, 404, 422, 500)
+            },
+        },
+    )
+    def upload_book_cover(
+        book_id: Annotated[UUID, Path(alias="bookId")],
+        response: Response,
+        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        file: Annotated[UploadFile, File()],
+    ) -> BookDetail:
+        content = file.file.read(MAX_COVER_BYTES + 1)
+        response.headers["Cache-Control"] = "no-store"
+        return service.save_cover(book_id, content)
+
+    @router.delete(
+        "/{bookId}/cover",
+        operation_id="deleteBookCover",
+        response_model=BookDetail,
+        responses={
+            200: {"headers": no_store},
+            **{
+                status: problem_openapi(status)
+                for status in (401, 403, 404, 500)
+            },
+        },
+    )
+    def delete_book_cover(
+        book_id: Annotated[UUID, Path(alias="bookId")],
+        response: Response,
+        current: Annotated[WebSession, Depends(dependencies.require_write)],
+    ) -> BookDetail:
+        response.headers["Cache-Control"] = "no-store"
+        return service.delete_cover(book_id)
 
     return router

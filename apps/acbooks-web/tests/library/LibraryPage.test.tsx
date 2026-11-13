@@ -42,6 +42,8 @@ function summary(overrides: Partial<BookSummary> = {}): BookSummary {
     copyCount: 0,
     fileCount: 0,
     formats: [],
+    hasCover: false,
+    coverUpdatedAt: null,
     createdAt: 1_700_000_000_000,
     updatedAt: 1_700_000_000_000,
     ...overrides,
@@ -1465,5 +1467,106 @@ describe("LibraryPage", () => {
     await screen.findByRole("table", { name: "Book list" });
     expect(screen.getAllByText("Physical ×2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Reading").length).toBeGreaterThan(0);
+  });
+
+  it("selects books and applies a batch update", async () => {
+    installApi(
+      baseHandler((url, init) => {
+        const method = methodOf(init);
+        if (url.pathname === "/api/v1/books" && method === "GET") {
+          return jsonResponse(makePage([BOOK1, BOOK2]));
+        }
+        if (
+          url.pathname === "/api/v1/books/batch-update" &&
+          method === "PATCH"
+        ) {
+          return jsonResponse({ updated: 2, deleted: 0 });
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+
+    await screen.findByRole("article", { name: "呐喊" });
+    await user.click(screen.getByRole("button", { name: "选择" }));
+    await user.click(screen.getByRole("checkbox", { name: "选择《呐喊》" }));
+    await user.click(screen.getByRole("checkbox", { name: "选择《边城》" }));
+    expect(screen.getByText("已选 2 本")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "批量修改" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(
+      within(dialog).getByRole("combobox", { name: "阅读状态" }),
+    );
+    await user.click(await screen.findByRole("option", { name: "已读" }));
+    await user.click(within(dialog).getByRole("button", { name: "保存修改" }));
+
+    await waitFor(() => {
+      expect(
+        findCall("PATCH", "/api/v1/books/batch-update"),
+      ).toBeDefined();
+    });
+    const call = findCall("PATCH", "/api/v1/books/batch-update");
+    const body = JSON.parse(
+      String((call?.[1] as RequestInit).body),
+    ) as Record<string, unknown>;
+    expect(body).toEqual({
+      bookIds: [BOOK1.id, BOOK2.id],
+      readingStatus: "done",
+      addTags: [],
+      removeTags: [],
+      addShelves: [],
+      removeShelves: [],
+    });
+    expect(
+      await screen.findByRole("button", { name: "选择" }),
+    ).toBeInTheDocument();
+  });
+
+  it("deletes the selected books after confirmation", async () => {
+    installApi(
+      baseHandler((url, init) => {
+        const method = methodOf(init);
+        if (url.pathname === "/api/v1/books" && method === "GET") {
+          return jsonResponse(makePage([BOOK1, BOOK2]));
+        }
+        if (
+          url.pathname === "/api/v1/books/batch-delete" &&
+          method === "POST"
+        ) {
+          return jsonResponse({ updated: 0, deleted: 1 });
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+
+    await screen.findByRole("article", { name: "呐喊" });
+    await user.click(screen.getByRole("button", { name: "选择" }));
+    await user.click(screen.getByRole("checkbox", { name: "选择《呐喊》" }));
+    await user.click(screen.getByRole("button", { name: "删除" }));
+    expect(
+      await screen.findByRole("heading", { name: "删除 1 本书？" }),
+    ).toBeInTheDocument();
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "删除",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(
+        findCall("POST", "/api/v1/books/batch-delete"),
+      ).toBeDefined();
+    });
+    const call = findCall("POST", "/api/v1/books/batch-delete");
+    expect(
+      JSON.parse(String((call?.[1] as RequestInit).body)),
+    ).toEqual({ bookIds: [BOOK1.id] });
+    expect(
+      await screen.findByRole("button", { name: "选择" }),
+    ).toBeInTheDocument();
   });
 });

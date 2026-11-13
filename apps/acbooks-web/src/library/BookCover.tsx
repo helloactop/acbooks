@@ -1,12 +1,21 @@
 import { cn } from "@acbooks/ui";
+import { useState } from "react";
 
-import type { BookSummary } from "./books-api";
+import { coverUrl, type BookSummary } from "./books-api";
 import { COVER_FONT, coverFor } from "./presentation";
 
 export interface BookCoverProps {
   authorClassName?: string;
   authorLabel?: string;
-  book: Pick<BookSummary, "authors" | "id" | "title">;
+  book: Pick<
+    BookSummary,
+    | "authors"
+    | "coverUpdatedAt"
+    | "hasCover"
+    | "id"
+    | "title"
+    | "updatedAt"
+  >;
   className?: string;
   flat?: boolean;
   titleClassName?: string;
@@ -21,12 +30,15 @@ export function BookCover({
   titleClassName,
 }: BookCoverProps) {
   const cover = coverFor(book);
+  const src = coverUrl(book);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const imageFailed = src !== null && failedSrc === src;
 
   return (
     <div
       aria-hidden="true"
       className={cn(
-        "relative aspect-[2/3] overflow-hidden rounded-cover",
+        "relative aspect-[2/3] overflow-hidden rounded-cover bg-surface",
         !flat && "shadow-cover",
         className,
       )}
@@ -53,6 +65,16 @@ export function BookCover({
           </div>
         ) : null}
       </div>
+      {src !== null && !imageFailed ? (
+        <img
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={() => {
+            setFailedSrc(src);
+          }}
+          src={src}
+        />
+      ) : null}
     </div>
   );
 }

@@ -24,9 +24,14 @@ _BUSINESS_PROBLEMS = {
     ),
     BusinessErrorCode.RATE_LIMITED: (HTTPStatus.TOO_MANY_REQUESTS, "Too many requests."),
     BusinessErrorCode.BOOK_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Book not found."),
+    BusinessErrorCode.COVER_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Cover not found."),
     BusinessErrorCode.INVALID_BOOK_FILTER: (
         HTTPStatus.UNPROCESSABLE_ENTITY,
         "Invalid book filter.",
+    ),
+    BusinessErrorCode.INVALID_COVER: (
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        "Invalid cover image.",
     ),
 }
 

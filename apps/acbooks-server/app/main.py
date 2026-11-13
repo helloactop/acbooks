@@ -31,9 +31,11 @@ def create_app(
     database_path: Path = DATABASE_PATH,
     setup_code_path: Path = SETUP_CODE_PATH,
     web_dist_path: Path | None = None,
+    covers_dir: Path | None = None,
 ) -> FastAPI:
     settings = settings if settings is not None else Settings()
     web_dist = web_dist_path if web_dist_path is not None else settings.web_dist_path
+    covers = covers_dir if covers_dir is not None else settings.covers_dir
     if web_dist is not None and not web_dist.is_dir():
         raise RuntimeError(f"Web build directory does not exist: {web_dist}")
     engine = create_sqlite_engine(database_path)
@@ -67,7 +69,7 @@ def create_app(
         prefix="/api/v1",
     )
     app.include_router(
-        books_router(BooksService(engine), dependencies),
+        books_router(BooksService(engine, covers), dependencies),
         prefix="/api/v1",
     )
     if web_dist is not None:

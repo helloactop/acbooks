@@ -45,11 +45,18 @@ def paths(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def make_client(
-    paths: tuple[Path, Path], origin: str = ORIGIN, address: str = "192.0.2.10"
+    paths: tuple[Path, Path],
+    origin: str = ORIGIN,
+    address: str = "192.0.2.10",
+    *,
+    covers_dir: Path | None = None,
 ) -> TestClient:
     database, code_path = paths
     app = create_app(
-        Settings(public_origin=origin), database_path=database, setup_code_path=code_path
+        Settings(public_origin=origin),
+        database_path=database,
+        setup_code_path=code_path,
+        covers_dir=covers_dir,
     )
 
     async def simulate_client(scope: Scope, receive: Receive, send: Send) -> None:

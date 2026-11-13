@@ -140,6 +140,30 @@ export async function patchWithCsrf<T>(
   });
 }
 
+export async function deleteWithCsrf<T>(
+  path: string,
+): Promise<T> {
+  const csrfToken = await getCsrfToken();
+  return apiRequest<T>(path, {
+    method: "DELETE",
+    headers: { "X-CSRF-Token": csrfToken },
+  });
+}
+
+export async function putFileWithCsrf<T>(
+  path: string,
+  file: File,
+): Promise<T> {
+  const csrfToken = await getCsrfToken();
+  const body = new FormData();
+  body.append("file", file, file.name);
+  return apiRequest<T>(path, {
+    method: "PUT",
+    headers: { "X-CSRF-Token": csrfToken },
+    body,
+  });
+}
+
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiRequestError) {
     return error;

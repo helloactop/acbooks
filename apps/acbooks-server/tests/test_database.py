@@ -616,14 +616,14 @@ def test_batch_migration_must_preserve_status_triggers(tmp_path: Path, table: st
     )
     config.set_main_option("script_location", str(scripts))
     command.upgrade(config, "0003")
-    migration = scripts / "versions/0005_test_batch.py"
+    migration = scripts / "versions/0006_test_batch.py"
     migration.write_text(
         f"""
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0005"
-down_revision = "0004"
+revision = "0006"
+down_revision = "0005"
 branch_labels = None
 depends_on = None
 
@@ -688,7 +688,7 @@ def upgrade():
         with engine.begin() as connection:
             assert (
                 connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one()
-                == "0005"
+                == "0006"
             )
             with pytest.raises(IntegrityError, match=f"Invalid {table}"):
                 connection.exec_driver_sql(insert, invalid)
@@ -714,7 +714,7 @@ def downgrade():
         with engine.connect() as connection:
             assert (
                 connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one()
-                == "0005"
+                == "0006"
             )
             assert connection.exec_driver_sql(select_state).scalar_one() == valid
 

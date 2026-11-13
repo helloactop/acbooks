@@ -6,21 +6,26 @@ import {
   useLanguage,
 } from "@acbooks/ui";
 import { BookOpen, Search, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { toApiError, type ApiError } from "../api/client";
 import { useAppShell } from "../layout/app-shell-context";
 import { PageHeader } from "../layout/PageHeader";
 import { rememberDetailReturn } from "../layout/routes";
 import { rememberReturnScroll } from "../layout/scroll-restoration";
 import { useDocumentTitle } from "../layout/use-document-title";
+import { BatchEditDialog } from "./BatchEditDialog";
 import { BookCard } from "./BookCard";
 import { BookFormDialog } from "./BookFormDialog";
 import { BookList } from "./BookList";
+import { batchDeleteBooks } from "./books-api";
+import { DeleteBooksDialog } from "./DeleteBooksDialog";
 import { ActiveFilterSummary } from "./ActiveFilterSummary";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
 import { serializeSmartFilterRules } from "./filter-model";
 import { LibraryAlert } from "./LibraryAlert";
+import { LibraryBatchBar } from "./LibraryBatchBar";
 import { LibraryFilterToolbar } from "./LibraryFilterToolbar";
 import {
   coverSizePx,
@@ -67,6 +72,14 @@ export function LibraryPage() {
   const view = hasViewParam ? urlView : preferences.defaultView;
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
+  const [batchEditOpen, setBatchEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<ApiError | null>(null);
   const filterSchema = useBookFilterSchema(true, expireSession);
   const fields = filterSchema.schema?.fields ?? [];
   const appliedFilters = serializeSmartFilterRules(appliedRules, fields);
@@ -165,6 +178,85 @@ export function LibraryPage() {
     reload();
   };
 
+  useEffect(() => {
+    // Selection applies to the current query; leaving it is an external reset.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedIds(new Set());
+  }, [appliedFilters, offset, searchTerm, sort, status, type]);
+
+  const leaveSelection = () => {
+    setSelecting(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelection = () => {
+    if (selecting) {
+      leaveSelection();
+    } else {
+      setSelecting(true);
+    }
+  };
+
+  const toggleBookSelection = (bookId: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(bookId)) {
+        next.delete(bookId);
+      } else {
+        next.add(bookId);
+      }
+      return next;
+    });
+  };
+
+  const allSelected =
+    books.length > 0 && books.every((book) => selectedIds.has(book.id));
+
+  const togglePageSelection = () => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (allSelected) {
+        for (const book of books) {
+          next.delete(book.id);
+        }
+      } else {
+        for (const book of books) {
+          next.add(book.id);
+        }
+      }
+      return next;
+    });
+  };
+
+  const finishBatch = () => {
+    setBatchEditOpen(false);
+    setDeleteOpen(false);
+    setDeleteError(null);
+    leaveSelection();
+    reload();
+  };
+
+  const confirmBatchDelete = async () => {
+    if (selectedIds.size === 0 || deleteBusy) {
+      return;
+    }
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await batchDeleteBooks(Array.from(selectedIds));
+      setDeleteBusy(false);
+      finishBatch();
+    } catch (cause) {
+      const apiError = toApiError(cause);
+      setDeleteBusy(false);
+      if (apiError.status === 401) {
+        expireSession();
+        return;
+      }
+      setDeleteError(apiError);
+    }
+  };
+
   const handleCreated = () => {
     setCreateOpen(false);
     refreshLibrary();
@@ -215,14 +307,23 @@ export function LibraryPage() {
     <>
       <PageHeader
         actions={
-          <Button
-            onClick={() => {
-              setCreateOpen(true);
-            }}
-            variant="soft"
-          >
-            {t("actions.addBook")}
-          </Button>
+          <>
+            <Button
+              aria-pressed={selecting}
+              onClick={toggleSelection}
+              variant="outline"
+            >
+              {selecting ? t("selection.done") : t("selection.start")}
+            </Button>
+            <Button
+              onClick={() => {
+                setCreateOpen(true);
+              }}
+              variant="soft"
+            >
+              {t("actions.addBook")}
+            </Button>
+          </>
         }
         description={
           <span className="flex flex-wrap items-center gap-2">
@@ -315,6 +416,24 @@ export function LibraryPage() {
           </div>
         </div>
       </div>
+
+      {selecting ? (
+        <LibraryBatchBar
+          allSelected={allSelected}
+          count={selectedIds.size}
+          disabled={deleteBusy}
+          onClear={() => {
+            setSelectedIds(new Set());
+          }}
+          onDelete={() => {
+            setDeleteOpen(true);
+          }}
+          onEdit={() => {
+            setBatchEditOpen(true);
+          }}
+          onSelectAll={togglePageSelection}
+        />
+      ) : null}
 
       <div className="flex flex-col gap-2">
         {filtersOpen ? (
@@ -425,11 +544,20 @@ export function LibraryPage() {
               coverSize={preferences.coverSize}
               key={book.id}
               onOpen={openBook}
+              onSelect={toggleBookSelection}
+              selectable={selecting}
+              selected={selectedIds.has(book.id)}
             />
           ))}
         </div>
       ) : (
-        <BookList books={books} onOpen={openBook} />
+        <BookList
+          books={books}
+          onOpen={openBook}
+          onSelect={toggleBookSelection}
+          selectable={selecting}
+          selectedIds={selectedIds}
+        />
       )}
 
       <Pagination
@@ -448,6 +576,38 @@ export function LibraryPage() {
           }}
           onSaved={handleCreated}
           onSessionExpired={expireSession}
+        />
+      ) : null}
+
+      {batchEditOpen ? (
+        <BatchEditDialog
+          bookIds={Array.from(selectedIds)}
+          onClose={() => {
+            setBatchEditOpen(false);
+          }}
+          onSaved={finishBatch}
+          onSessionExpired={expireSession}
+        />
+      ) : null}
+
+      {deleteOpen ? (
+        <DeleteBooksDialog
+          busy={deleteBusy}
+          count={selectedIds.size}
+          error={
+            deleteError === null
+              ? undefined
+              : libraryErrorMessage(t, deleteError)
+          }
+          onCancel={() => {
+            if (!deleteBusy) {
+              setDeleteOpen(false);
+              setDeleteError(null);
+            }
+          }}
+          onConfirm={() => {
+            void confirmBatchDelete();
+          }}
         />
       ) : null}
     </>

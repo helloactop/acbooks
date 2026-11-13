@@ -32,6 +32,7 @@ async function copyToClipboard(value: string): Promise<void> {
 
 export interface BookDetailActionsProps {
   detail: BookDetail;
+  onDelete: () => void;
   onEdit: () => void;
   onStatusChange: (status: ReadingStatus) => void;
   statusSaving: boolean;
@@ -39,6 +40,7 @@ export interface BookDetailActionsProps {
 
 export function BookDetailActions({
   detail,
+  onDelete,
   onEdit,
   onStatusChange,
   statusSaving,
@@ -147,6 +149,15 @@ export function BookDetailActions({
             : t("detail.isbnCopied")}
         </p>
       ) : null}
+
+      <Button
+        className="w-full text-destructive-text @min-[640px]:w-auto @min-[1000px]:w-full"
+        onClick={onDelete}
+        size="lg"
+        variant="ghost"
+      >
+        {t("detail.delete")}
+      </Button>
     </div>
   );
 }

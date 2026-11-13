@@ -15,6 +15,9 @@ python -m uvicorn app.main:create_app --factory --no-access-log
 [后端健康检查](../../docs/api/health.md)，Books Core V1 见
 [Books API](../../docs/api/books.md)。
 
+封面保存在 `ACBOOKS_COVERS_DIR`（默认 `/data/acbooks/covers`），本地上传依赖
+`python-multipart`（已包含在项目依赖中）。
+
 设置 `ACBOOKS_WEB_DIST_PATH` 指向 Web 构建目录后，服务端在同源下托管静态文件，
 并为非 `/api` 的前端路由回退到 `index.html`；未设置时仅提供 API。
 该变量由仓库的 Docker 镜像默认启用。

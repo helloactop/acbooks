@@ -97,6 +97,7 @@ const child = spawn(
       ACBOOKS_E2E_DATABASE: database,
       ACBOOKS_E2E_ORIGIN: origin,
       ACBOOKS_E2E_WEB: distDir,
+      ACBOOKS_E2E_COVERS: path.join(dataDir, "covers"),
     },
     stdio: "inherit",
   },
