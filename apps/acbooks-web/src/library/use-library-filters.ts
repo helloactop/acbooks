@@ -12,7 +12,6 @@ import {
 const COMMIT_DELAY_MS = 300;
 
 export interface LibraryFilters {
-  appliedFilters: string;
   changeRules: (rules: SmartFilterRules, immediate?: boolean) => void;
   removeCondition: (id: string) => void;
   resetDraft: () => void;
@@ -21,6 +20,7 @@ export interface LibraryFilters {
 }
 
 export interface LibraryFiltersOptions {
+  appliedFilters: string;
   appliedRules: SmartFilterRules;
   externalRevision: number;
   fields: readonly BookFilterField[];
@@ -28,6 +28,7 @@ export interface LibraryFiltersOptions {
 }
 
 export function useLibraryFilters({
+  appliedFilters,
   appliedRules,
   externalRevision,
   fields,
@@ -36,7 +37,6 @@ export function useLibraryFilters({
   const [rules, setRules] = useState<SmartFilterRules>(appliedRules);
   const timer = useRef<number | undefined>(undefined);
   const lastExternalRevision = useRef(externalRevision);
-  const appliedFilters = serializeSmartFilterRules(appliedRules, fields);
   const summary = summarizeSmartFilterRules(rules, fields);
 
   useEffect(
@@ -101,7 +101,6 @@ export function useLibraryFilters({
   };
 
   return {
-    appliedFilters,
     changeRules,
     removeCondition,
     resetDraft,

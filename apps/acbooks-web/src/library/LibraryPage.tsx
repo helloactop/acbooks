@@ -6,30 +6,20 @@ import {
   useLanguage,
 } from "@acbooks/ui";
 import { BookOpen, Search, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation, useNavigationType } from "react-router-dom";
 
-import { isAbortError, toApiError, type ApiError } from "../api/client";
 import { useAppShell } from "../layout/app-shell-context";
 import { PageHeader } from "../layout/PageHeader";
 import { rememberDetailReturn } from "../layout/routes";
-import {
-  readScrollPosition,
-  rememberReturnScroll,
-  takeReturnScroll,
-} from "../layout/scroll-restoration";
+import { rememberReturnScroll } from "../layout/scroll-restoration";
 import { useDocumentTitle } from "../layout/use-document-title";
 import { BookCard } from "./BookCard";
 import { BookFormDialog } from "./BookFormDialog";
 import { BookList } from "./BookList";
-import {
-  getBooks,
-  type BookListQuery,
-  type BookSummary,
-} from "./books-api";
 import { ActiveFilterSummary } from "./ActiveFilterSummary";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
+import { serializeSmartFilterRules } from "./filter-model";
 import { LibraryAlert } from "./LibraryAlert";
 import { LibraryFilterToolbar } from "./LibraryFilterToolbar";
 import {
@@ -43,7 +33,9 @@ import {
 import { Pagination } from "./Pagination";
 import { SmartFilterBuilder } from "./SmartFilterBuilder";
 import { useBookFilterSchema } from "./use-book-filter-schema";
+import { useLibraryBooks } from "./use-library-books";
 import { useLibraryFilters } from "./use-library-filters";
+import { useLibraryScrollRestoration } from "./use-library-scroll-restoration";
 import { useLibraryUrlState } from "./use-library-url-state";
 import { useLibraryViewPreferences } from "./use-library-view-preferences";
 
@@ -53,8 +45,6 @@ export function LibraryPage() {
   const { t } = useTranslation("library");
   const { resolvedLanguage } = useLanguage();
   const { expireSession, mainRef } = useAppShell();
-  const location = useLocation();
-  const navigationType = useNavigationType();
   const preferences = useLibraryViewPreferences();
   const {
     clearAll,
@@ -76,153 +66,46 @@ export function LibraryPage() {
     view: urlView,
   } = useLibraryUrlState();
   const view = hasViewParam ? urlView : preferences.defaultView;
-  const [books, setBooks] = useState<BookSummary[]>([]);
-  const [total, setTotal] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<ApiError | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
-  const scrollRestored = useRef(false);
   const filterSchema = useBookFilterSchema(true, expireSession);
   const fields = filterSchema.schema?.fields ?? [];
-  const {
-    appliedFilters,
-    changeRules,
-    removeCondition,
-    resetDraft,
-    rules,
-    summary,
-  } = useLibraryFilters({
-    appliedRules,
-    externalRevision,
-    fields,
-    onApply: (next) => {
-      setLoading(true);
-      setError(null);
-      setFilters(next);
-    },
-  });
+  const appliedFilters = serializeSmartFilterRules(appliedRules, fields);
   const waitingForSchema =
     appliedRules.conditions.length > 0 &&
     fields.length === 0 &&
     filterSchema.error === null;
-
-  useEffect(() => {
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        setLoading(true);
-        setError(null);
-        setReloadKey((current) => current + 1);
-      }
-    };
-    window.addEventListener("pageshow", handlePageShow);
-    return () => {
-      window.removeEventListener("pageshow", handlePageShow);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (loading || scrollRestored.current) {
-      return;
-    }
-    scrollRestored.current = true;
-    const returnScroll = takeReturnScroll();
-    // Browser back/forward restores the entry's own position; waiting for the loaded
-    // list avoids clamping it against the loading placeholder.
-    const entryScroll =
-      navigationType === "POP" ? readScrollPosition(location) : 0;
-    const scrollTop = Math.max(returnScroll, entryScroll);
-    if (scrollTop <= 0) {
-      return;
-    }
-    const frame = window.requestAnimationFrame(() => {
-      mainRef.current?.scrollTo({ top: scrollTop });
+  const { beginUpdate, books, error, loading, reload, total } =
+    useLibraryBooks({
+      appliedFilters,
+      expireSession,
+      offset,
+      pageSize: PAGE_SIZE,
+      searchTerm,
+      setOffset,
+      sort,
+      status,
+      type,
+      waitingForSchema,
     });
-    return () => {
-      window.cancelAnimationFrame(frame);
-    };
-  }, [loading, location, mainRef, navigationType]);
-
-  useEffect(() => {
-    if (waitingForSchema) {
-      return;
-    }
-    // The request effect owns loading for URL-driven changes (back/forward, search).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    setError(null);
-    const controller = new AbortController();
-    let corrected = false;
-    const query: BookListQuery = {
-      q: searchTerm.length > 0 ? searchTerm : undefined,
-      readingStatus: status === "all" ? undefined : status,
-      mediaType: type === "all" ? undefined : type,
-      filters: appliedFilters.length > 0 ? appliedFilters : undefined,
-      sort: sort === "recent" ? "createdAt" : sort,
-      order: sort === "recent" ? "desc" : "asc",
-      limit: PAGE_SIZE,
-      offset: offset,
-    };
-
-    getBooks(query, controller.signal)
-      .then((page) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        const pageSize = page.limit > 0 ? page.limit : PAGE_SIZE;
-        const maxOffset =
-          page.total > 0
-            ? Math.floor((page.total - 1) / pageSize) * pageSize
-            : 0;
-        if (offset > maxOffset) {
-          corrected = true;
-          setTotal(page.total);
-          setError(null);
-          setOffset(maxOffset);
-          return;
-        }
-        setBooks(page.items);
-        setTotal(page.total);
-        setError(null);
-      })
-      .catch((cause) => {
-        if (isAbortError(cause)) {
-          return;
-        }
-        const apiError = toApiError(cause);
-        if (apiError.status === 401) {
-          expireSession();
-          return;
-        }
-        setError(apiError);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted && !corrected) {
-          setLoading(false);
-        }
-      });
-
-    return () => controller.abort();
-  }, [
-    appliedFilters,
-    expireSession,
-    reloadKey,
-    offset,
-    searchTerm,
-    setOffset,
-    sort,
-    status,
-    type,
-    waitingForSchema,
-  ]);
+  useLibraryScrollRestoration({ loading, mainRef });
+  const { changeRules, removeCondition, resetDraft, rules, summary } =
+    useLibraryFilters({
+      appliedFilters,
+      appliedRules,
+      externalRevision,
+      fields,
+      onApply: (next) => {
+        beginUpdate();
+        setFilters(next);
+      },
+    });
 
   const changeStatus = (value: StatusFilter) => {
     if (value === status) {
       return;
     }
-    setLoading(true);
-    setError(null);
+    beginUpdate();
     setStatus(value);
   };
 
@@ -230,8 +113,7 @@ export function LibraryPage() {
     if (value === type) {
       return;
     }
-    setLoading(true);
-    setError(null);
+    beginUpdate();
     setType(value);
   };
 
@@ -239,8 +121,7 @@ export function LibraryPage() {
     if (value === sort) {
       return;
     }
-    setLoading(true);
-    setError(null);
+    beginUpdate();
     setSort(value);
   };
 
@@ -262,8 +143,7 @@ export function LibraryPage() {
     if (searchTerm.length === 0) {
       return;
     }
-    setLoading(true);
-    setError(null);
+    beginUpdate();
     clearSearchUrl();
   };
 
@@ -276,23 +156,14 @@ export function LibraryPage() {
       type !== "all" ||
       offset !== 0;
     if (queryChanged) {
-      setLoading(true);
-      setError(null);
+      beginUpdate();
     }
     clearAll();
   };
 
-  const retry = () => {
-    setLoading(true);
-    setError(null);
-    setReloadKey((current) => current + 1);
-  };
-
   const refreshLibrary = () => {
-    setLoading(true);
-    setError(null);
     setOffset(0);
-    setReloadKey((current) => current + 1);
+    reload();
   };
 
   const handleCreated = () => {
@@ -309,8 +180,7 @@ export function LibraryPage() {
     if (nextOffset === offset) {
       return;
     }
-    setLoading(true);
-    setError(null);
+    beginUpdate();
     setOffset(nextOffset);
     const main = mainRef.current;
     if (main !== null && typeof main.scrollTo === "function") {
@@ -479,7 +349,7 @@ export function LibraryPage() {
             {errorMessage}
           </LibraryAlert>
           <div>
-            <Button onClick={retry} size="sm" variant="outline">
+            <Button onClick={reload} size="sm" variant="outline">
               {t("errors.retry")}
             </Button>
           </div>
@@ -496,7 +366,7 @@ export function LibraryPage() {
           <LibraryAlert requestId={errorRequestId}>
             {errorMessage}
           </LibraryAlert>
-          <Button onClick={retry} variant="soft">
+          <Button onClick={reload} variant="soft">
             {t("errors.retry")}
           </Button>
         </div>
