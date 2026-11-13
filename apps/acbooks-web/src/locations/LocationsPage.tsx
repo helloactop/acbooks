@@ -204,50 +204,54 @@ export function LocationsPage() {
         >
           {rows.map(({ depth, hasChildren, node }) => (
             <li
-              className="flex flex-wrap items-center gap-x-2 gap-y-1 p-3"
+              className="flex flex-col gap-2 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2"
               key={node.id}
               style={{ paddingLeft: 12 + depth * 20 }}
             >
-              <span className="min-w-0 flex-1 truncate font-medium">
-                {node.name}
-              </span>
-              <span className="text-xs tabular-nums text-muted-foreground">
-                {t("copyCount", { count: node.copyCount })}
-              </span>
-              <Link
-                className={buttonVariants({ size: "sm", variant: "ghost" })}
-                to={locationBooksHref(node.id)}
-              >
-                <BookOpen aria-hidden="true" className="size-4" />
-                {t("viewBooks")}
-              </Link>
-              <IconButton
-                label={t("addChild")}
-                onClick={() => {
-                  setDialog({ parentId: node.id });
-                }}
-              >
-                <Plus aria-hidden="true" />
-              </IconButton>
-              <IconButton
-                label={t("edit")}
-                onClick={() => {
-                  setDialog({ editing: node, parentId: node.parentId });
-                }}
-              >
-                <Pencil aria-hidden="true" />
-              </IconButton>
-              {hasChildren ? null : (
+              <div className="flex min-w-0 items-center gap-2 sm:flex-1">
+                <span className="min-w-0 flex-1 truncate font-medium">
+                  {node.name}
+                </span>
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                  {t("copyCount", { count: node.copyCount })}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Link
+                  className={buttonVariants({ size: "sm", variant: "ghost" })}
+                  to={locationBooksHref(node.id)}
+                >
+                  <BookOpen aria-hidden="true" className="size-4" />
+                  {t("viewBooks")}
+                </Link>
                 <IconButton
-                  label={t("delete")}
+                  label={t("addChild")}
                   onClick={() => {
-                    setDeleteError(null);
-                    setDeleteTarget(node);
+                    setDialog({ parentId: node.id });
                   }}
                 >
-                  <Trash2 aria-hidden="true" />
+                  <Plus aria-hidden="true" />
                 </IconButton>
-              )}
+                <IconButton
+                  label={t("edit")}
+                  onClick={() => {
+                    setDialog({ editing: node, parentId: node.parentId });
+                  }}
+                >
+                  <Pencil aria-hidden="true" />
+                </IconButton>
+                {hasChildren ? null : (
+                  <IconButton
+                    label={t("delete")}
+                    onClick={() => {
+                      setDeleteError(null);
+                      setDeleteTarget(node);
+                    }}
+                  >
+                    <Trash2 aria-hidden="true" />
+                  </IconButton>
+                )}
+              </div>
             </li>
           ))}
         </ul>
