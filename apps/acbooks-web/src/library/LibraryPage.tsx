@@ -8,11 +8,7 @@ import {
 import { BookOpen, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  useLocation,
-  useNavigate,
-  useNavigationType,
-} from "react-router-dom";
+import { useLocation, useNavigationType } from "react-router-dom";
 
 import { isAbortError, toApiError, type ApiError } from "../api/client";
 import { useAppShell } from "../layout/app-shell-context";
@@ -35,6 +31,7 @@ import {
 import { ActiveFilterSummary } from "./ActiveFilterSummary";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
 import {
+  EMPTY_FILTER_RULES,
   serializeSmartFilterRules,
   summarizeSmartFilterRules,
   type SmartFilterRules,
@@ -42,15 +39,7 @@ import {
 import { LibraryAlert } from "./LibraryAlert";
 import { LibraryFilterToolbar } from "./LibraryFilterToolbar";
 import {
-  libraryUrlSearch,
-  readLibraryUrlState,
-} from "./library-url-state";
-import {
   coverSizePx,
-  readCoverSize,
-  readViewMode,
-  saveCoverSize,
-  saveViewMode,
   type CoverSize,
   type SortOrder,
   type StatusFilter,
@@ -60,6 +49,8 @@ import {
 import { Pagination } from "./Pagination";
 import { SmartFilterBuilder } from "./SmartFilterBuilder";
 import { useBookFilterSchema } from "./use-book-filter-schema";
+import { useLibraryUrlState } from "./use-library-url-state";
+import { useLibraryViewPreferences } from "./use-library-view-preferences";
 
 const PAGE_SIZE = 12;
 
@@ -68,28 +59,31 @@ export function LibraryPage() {
   const { resolvedLanguage } = useLanguage();
   const { expireSession, mainRef } = useAppShell();
   const location = useLocation();
-  const navigate = useNavigate();
   const navigationType = useNavigationType();
-  const [initialView] = useState(() => {
-    const parsed = readLibraryUrlState(location.search);
-    return new URLSearchParams(location.search).has("view")
-      ? parsed
-      : { ...parsed, view: readViewMode() };
-  });
-  const [syncedSearch, setSyncedSearch] = useState(location.search);
+  const preferences = useLibraryViewPreferences();
+  const {
+    clearAll,
+    clearSearch: clearSearchUrl,
+    externalRevision,
+    filters: appliedRules,
+    hasViewParam,
+    offset,
+    searchTerm,
+    setFilters,
+    setOffset,
+    setSort,
+    setStatus,
+    setType,
+    setView,
+    sort,
+    status,
+    type,
+    view: urlView,
+  } = useLibraryUrlState();
+  const view = hasViewParam ? urlView : preferences.defaultView;
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(initialView.offset);
-  const [searchTerm, setSearchTerm] = useState(initialView.searchTerm);
-  const [type, setType] = useState(initialView.type);
-  const [status, setStatus] = useState<StatusFilter>(initialView.status);
-  const [rules, setRules] = useState<SmartFilterRules>(initialView.filters);
-  const [appliedRules, setAppliedRules] = useState<SmartFilterRules>(
-    initialView.filters,
-  );
-  const [sort, setSort] = useState<SortOrder>(initialView.sort);
-  const [view, setView] = useState<ViewMode>(initialView.view);
-  const [coverSize, setCoverSize] = useState<CoverSize>(readCoverSize);
+  const [rules, setRules] = useState<SmartFilterRules>(appliedRules);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
@@ -97,7 +91,7 @@ export function LibraryPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const scrollRestored = useRef(false);
   const filterTimer = useRef<number | undefined>(undefined);
-  const pendingWrites = useRef<string[]>([]);
+  const lastExternalRevision = useRef(externalRevision);
   const filterSchema = useBookFilterSchema(true, expireSession);
   const fields = filterSchema.schema?.fields ?? [];
   const summary = summarizeSmartFilterRules(rules, fields);
@@ -106,11 +100,6 @@ export function LibraryPage() {
     appliedRules.conditions.length > 0 &&
     fields.length === 0 &&
     filterSchema.error === null;
-
-  const beginRequest = () => {
-    setLoading(true);
-    setError(null);
-  };
 
   useEffect(
     () => () => {
@@ -122,78 +111,16 @@ export function LibraryPage() {
   );
 
   useEffect(() => {
-    if (location.search === syncedSearch) {
+    if (externalRevision === lastExternalRevision.current) {
       return;
     }
-    // Router transitions commit after local state, so a URL this page just wrote
-    // must not be treated as external navigation.
-    const pendingIndex = pendingWrites.current.indexOf(location.search);
-    if (pendingIndex >= 0) {
-      pendingWrites.current.splice(pendingIndex, 1);
-      setSyncedSearch(location.search);
-      return;
-    }
-    pendingWrites.current = [];
+    lastExternalRevision.current = externalRevision;
     if (filterTimer.current !== undefined) {
       window.clearTimeout(filterTimer.current);
       filterTimer.current = undefined;
     }
-    const parsed = readLibraryUrlState(location.search);
-    // Router history is an external store; adopt only URLs this page did not write.
-    setSearchTerm(parsed.searchTerm);
-    setType(parsed.type);
-    setStatus(parsed.status);
-    setRules(parsed.filters);
-    setAppliedRules(parsed.filters);
-    setSort(parsed.sort);
-    setView(parsed.view);
-    setOffset(parsed.offset);
-    setSyncedSearch(location.search);
-  }, [location.search, syncedSearch]);
-
-  useEffect(() => {
-    if (location.search !== syncedSearch) {
-      return;
-    }
-    const next = libraryUrlSearch({
-      filters: appliedRules,
-      offset,
-      searchTerm,
-      sort,
-      status,
-      type,
-      view,
-    });
-    const current = location.search.startsWith("?")
-      ? location.search.slice(1)
-      : location.search;
-    if (next === current) {
-      return;
-    }
-    const search = next.length > 0 ? `?${next}` : "";
-    pendingWrites.current.push(search);
-    if (pendingWrites.current.length > 8) {
-      pendingWrites.current.shift();
-    }
-    navigate(
-      {
-        pathname: "/library",
-        search,
-      },
-      { replace: true },
-    );
-  }, [
-    appliedRules,
-    location.search,
-    navigate,
-    offset,
-    searchTerm,
-    sort,
-    status,
-    syncedSearch,
-    type,
-    view,
-  ]);
+    setRules(appliedRules);
+  }, [externalRevision, appliedRules]);
 
   useEffect(() => {
     const handlePageShow = (event: PageTransitionEvent) => {
@@ -235,6 +162,10 @@ export function LibraryPage() {
     if (waitingForSchema) {
       return;
     }
+    // The request effect owns loading for URL-driven changes (back/forward, search).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    setError(null);
     const controller = new AbortController();
     let corrected = false;
     const query: BookListQuery = {
@@ -245,7 +176,7 @@ export function LibraryPage() {
       sort: sort === "recent" ? "createdAt" : sort,
       order: sort === "recent" ? "desc" : "asc",
       limit: PAGE_SIZE,
-      offset,
+      offset: offset,
     };
 
     getBooks(query, controller.signal)
@@ -263,7 +194,6 @@ export function LibraryPage() {
           setTotal(page.total);
           setError(null);
           setOffset(maxOffset);
-          beginRequest();
           return;
         }
         setBooks(page.items);
@@ -291,9 +221,10 @@ export function LibraryPage() {
   }, [
     appliedFilters,
     expireSession,
-    offset,
     reloadKey,
+    offset,
     searchTerm,
+    setOffset,
     sort,
     status,
     type,
@@ -301,9 +232,9 @@ export function LibraryPage() {
   ]);
 
   const commitAppliedRules = (next: SmartFilterRules) => {
-    setAppliedRules(next);
-    setOffset(0);
-    beginRequest();
+    setLoading(true);
+    setError(null);
+    setFilters(next);
   };
 
   const changeRules = (
@@ -333,52 +264,50 @@ export function LibraryPage() {
     if (value === status) {
       return;
     }
-    beginRequest();
+    setLoading(true);
+    setError(null);
     setStatus(value);
-    setOffset(0);
   };
 
   const changeType = (value: TypeFilter) => {
     if (value === type) {
       return;
     }
-    beginRequest();
+    setLoading(true);
+    setError(null);
     setType(value);
-    setOffset(0);
   };
 
   const changeSort = (value: SortOrder) => {
     if (value === sort) {
       return;
     }
-    beginRequest();
+    setLoading(true);
+    setError(null);
     setSort(value);
-    setOffset(0);
   };
 
   const changeView = (value: ViewMode) => {
     if (value === view) {
       return;
     }
+    preferences.saveView(value);
     setView(value);
-    saveViewMode(value);
   };
 
   const changeCoverSize = (value: CoverSize) => {
-    if (value === coverSize) {
-      return;
+    if (value !== preferences.coverSize) {
+      preferences.setCoverSize(value);
     }
-    setCoverSize(value);
-    saveCoverSize(value);
   };
 
   const clearSearch = () => {
     if (searchTerm.length === 0) {
       return;
     }
-    beginRequest();
-    setSearchTerm("");
-    setOffset(0);
+    setLoading(true);
+    setError(null);
+    clearSearchUrl();
   };
 
   const clearAllFilters = () => {
@@ -392,15 +321,12 @@ export function LibraryPage() {
       status !== "all" ||
       type !== "all" ||
       offset !== 0;
-    setRules({ combinator: "ALL", conditions: [] });
-    setAppliedRules({ combinator: "ALL", conditions: [] });
-    setSearchTerm("");
-    setStatus("all");
-    setType("all");
-    setOffset(0);
+    setRules(EMPTY_FILTER_RULES);
     if (queryChanged) {
-      beginRequest();
+      setLoading(true);
+      setError(null);
     }
+    clearAll();
   };
 
   const removeCondition = (id: string) => {
@@ -416,12 +342,14 @@ export function LibraryPage() {
   };
 
   const retry = () => {
-    beginRequest();
+    setLoading(true);
+    setError(null);
     setReloadKey((current) => current + 1);
   };
 
   const refreshLibrary = () => {
-    beginRequest();
+    setLoading(true);
+    setError(null);
     setOffset(0);
     setReloadKey((current) => current + 1);
   };
@@ -440,7 +368,8 @@ export function LibraryPage() {
     if (nextOffset === offset) {
       return;
     }
-    beginRequest();
+    setLoading(true);
+    setError(null);
     setOffset(nextOffset);
     const main = mainRef.current;
     if (main !== null && typeof main.scrollTo === "function") {
@@ -450,7 +379,9 @@ export function LibraryPage() {
 
   const activeCount = summary.validCount;
   const hasExternalFilters =
-    searchTerm.length > 0 || status !== "all" || type !== "all";
+    searchTerm.length > 0 ||
+    status !== "all" ||
+    type !== "all";
   const hasFilters = hasExternalFilters || activeCount > 0;
   useDocumentTitle(t("page.libraryTitle"));
   const formattedTotal = new Intl.NumberFormat(resolvedLanguage).format(total);
@@ -560,7 +491,7 @@ export function LibraryPage() {
             <LibraryFilterToolbar
               activeCount={activeCount}
               canClear={hasFilters}
-              coverSize={coverSize}
+              coverSize={preferences.coverSize}
               filtersOpen={filtersOpen}
               onClearAll={clearAllFilters}
               onCoverSizeChange={changeCoverSize}
@@ -675,13 +606,13 @@ export function LibraryPage() {
         <div
           className="grid justify-start gap-3 sm:gap-4"
           style={{
-            gridTemplateColumns: `repeat(auto-fill, ${coverSizePx(coverSize)}px)`,
+            gridTemplateColumns: `repeat(auto-fill, ${coverSizePx(preferences.coverSize)}px)`,
           }}
         >
           {books.map((book) => (
             <BookCard
               book={book}
-              coverSize={coverSize}
+              coverSize={preferences.coverSize}
               key={book.id}
               onOpen={openBook}
             />

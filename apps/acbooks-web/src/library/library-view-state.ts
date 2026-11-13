@@ -1,7 +1,5 @@
 import {
   EMPTY_FILTER_RULES,
-  filterRulesFromTagAndFormat,
-  parseSmartFilterRules,
   type SmartFilterRules,
 } from "./filter-model";
 import { clearScrollRestoration } from "../layout/scroll-restoration";
@@ -22,7 +20,6 @@ export interface LibraryViewState {
   view: ViewMode;
 }
 
-const VIEW_KEY = "acbooks-library-view";
 const VIEW_MODE_KEY = "acbooks-library-view-mode";
 const COVER_SIZE_KEY = "acbooks-library-cover-size";
 const DESCRIPTION_PREFIX = "acbooks-description-expanded:";
@@ -36,18 +33,6 @@ export const DEFAULT_LIBRARY_VIEW: LibraryViewState = {
   type: "all",
   view: "grid",
 };
-
-const TYPES: readonly TypeFilter[] = ["all", "digital", "physical"];
-const STATUSES: readonly StatusFilter[] = ["all", "done", "reading", "unread"];
-const SORTS: readonly SortOrder[] = ["author", "recent", "title"];
-const VIEWS: readonly ViewMode[] = ["grid", "list"];
-
-function isOneOf<T extends string>(
-  values: readonly T[],
-  value: unknown,
-): value is T {
-  return typeof value === "string" && values.includes(value as T);
-}
 
 function readSession(key: string): string | null {
   try {
@@ -71,99 +56,6 @@ function removeSession(key: string): void {
   } catch {
     return;
   }
-}
-
-export function readLibraryView(): LibraryViewState | null {
-  const raw = readSession(VIEW_KEY);
-  if (raw === null) {
-    return null;
-  }
-  try {
-    const value = JSON.parse(raw) as Partial<LibraryViewState> & {
-      format?: unknown;
-      tag?: unknown;
-    };
-    return {
-      filters:
-        value.filters !== undefined
-          ? parseSmartFilterRules(value.filters)
-          : filterRulesFromTagAndFormat(
-              typeof value.tag === "string" ? value.tag : "",
-              typeof value.format === "string" ? value.format : "",
-            ),
-      offset:
-        typeof value.offset === "number" && Number.isInteger(value.offset)
-          ? Math.max(0, value.offset)
-          : DEFAULT_LIBRARY_VIEW.offset,
-      searchTerm:
-        typeof value.searchTerm === "string" ? value.searchTerm : "",
-      sort: isOneOf(SORTS, value.sort) ? value.sort : DEFAULT_LIBRARY_VIEW.sort,
-      status: isOneOf(STATUSES, value.status)
-        ? value.status
-        : DEFAULT_LIBRARY_VIEW.status,
-      type: isOneOf(TYPES, value.type)
-        ? value.type
-        : DEFAULT_LIBRARY_VIEW.type,
-      view: isOneOf(VIEWS, value.view)
-        ? value.view
-        : DEFAULT_LIBRARY_VIEW.view,
-    };
-  } catch {
-    return null;
-  }
-}
-
-export function readInitialLibraryView(): LibraryViewState {
-  const saved = readLibraryView() ?? DEFAULT_LIBRARY_VIEW;
-  const params = new URLSearchParams(window.location.search);
-  const urlQuery = params.get("q");
-  const mediaType = params.get("mediaType");
-  const urlTag = params.get("tag");
-  const urlFormat = params.get("format");
-  const urlFilters = params.get("filters");
-  const reset = params.get("reset") === "1";
-  if (
-    urlQuery === null &&
-    mediaType === null &&
-    urlTag === null &&
-    urlFormat === null &&
-    urlFilters === null &&
-    !reset
-  ) {
-    return saved;
-  }
-
-  const view: LibraryViewState = { ...saved, offset: 0 };
-  if (reset) {
-    view.filters = EMPTY_FILTER_RULES;
-    view.searchTerm = "";
-    view.status = "all";
-    view.type = "all";
-  }
-  if (mediaType === "physical" || mediaType === "digital") {
-    view.type = mediaType;
-  } else if (mediaType !== null) {
-    view.type = "all";
-  }
-  if (urlFilters !== null) {
-    view.filters = parseSmartFilterRules(urlFilters);
-  } else if (urlTag !== null || urlFormat !== null) {
-    view.filters = filterRulesFromTagAndFormat(
-      urlTag?.trim() ?? "",
-      urlFormat?.trim() ?? "",
-    );
-  }
-  if (urlQuery !== null) {
-    view.filters = EMPTY_FILTER_RULES;
-    view.searchTerm = urlQuery.trim();
-    view.status = "all";
-    view.type = "all";
-  }
-  return view;
-}
-
-export function saveLibraryView(view: LibraryViewState): void {
-  writeSession(VIEW_KEY, JSON.stringify(view));
 }
 
 function readLocal(key: string): string | null {
@@ -215,7 +107,6 @@ export function saveDescriptionExpanded(
 }
 
 export function clearLibrarySessionState(): void {
-  removeSession(VIEW_KEY);
   clearScrollRestoration();
   const keys: string[] = [];
   try {

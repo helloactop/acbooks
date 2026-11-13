@@ -1034,6 +1034,45 @@ describe("LibraryPage", () => {
     expect(latestBookRequest()?.searchParams.get("filters")).toBeNull();
   });
 
+  it("resets the filter draft when the URL changes externally", async () => {
+    const params = new URLSearchParams({
+      filters: JSON.stringify({
+        combinator: "ALL",
+        conditions: [{ field: "tag", operator: "equals", value: "文学" }],
+      }),
+    });
+    window.history.replaceState({}, "", `/library?${params.toString()}`);
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1]));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+    await screen.findByRole("article", { name: "呐喊" });
+
+    await user.click(
+      screen.getByRole("button", { name: /更多筛选，已启用 1 个条件/ }),
+    );
+    expect(
+      await screen.findByRole("combobox", { name: "标签筛选值" }),
+    ).toHaveValue("文学");
+
+    await searchFromDrawer(user, "三体");
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("combobox", { name: "标签筛选值" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("button", { name: /添加第一个筛选条件/ }),
+    ).toBeInTheDocument();
+    expect(currentLocation).toContain("q=%E4%B8%89%E4%BD%93");
+  });
+
   it("shows a no-results state and clears filters", async () => {
     installApi(
       baseHandler((url, init) => {
