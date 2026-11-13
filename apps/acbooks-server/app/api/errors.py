@@ -37,6 +37,16 @@ _BUSINESS_PROBLEMS = {
         HTTPStatus.UNPROCESSABLE_ENTITY,
         "Batch change exceeds the per-book limit.",
     ),
+    BusinessErrorCode.COPY_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Book copy not found."),
+    BusinessErrorCode.LOCATION_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Location not found."),
+    BusinessErrorCode.LOCATION_HAS_CHILDREN: (
+        HTTPStatus.CONFLICT,
+        "Location still has child locations.",
+    ),
+    BusinessErrorCode.LOCATION_CYCLE: (
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        "Location parent would create a cycle.",
+    ),
 }
 
 

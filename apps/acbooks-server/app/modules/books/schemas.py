@@ -27,6 +27,7 @@ __all__ = [
     "BookBatchDelete",
     "BookBatchUpdate",
     "BookCopy",
+    "BookCopyCreate",
     "BookCreate",
     "BookDetail",
     "BookFile",
@@ -69,6 +70,19 @@ def _unique_ids(value: list[UUID]) -> list[UUID]:
     return value
 
 
+class BookCopyCreate(LaxApiModel):
+    location_id: UUID | None = None
+    acquired_at: int | None = None
+    note: Annotated[str | None, Field(max_length=2000)] = None
+
+    @field_validator("note")
+    @classmethod
+    def validate_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return clean_text(value, "note", allow_newlines=True, max_length=2000)
+
+
 class BookCreate(ApiModel):
     title: Annotated[str, Field(min_length=1, max_length=500)]
     description: Annotated[str | None, Field(max_length=20000)] = None
@@ -78,6 +92,9 @@ class BookCreate(ApiModel):
     reading_status: ReadingStatus | None = None
     tags: Annotated[list[str], Field(max_length=20)] = Field(default_factory=list)
     shelves: Annotated[list[str], Field(max_length=20)] = Field(default_factory=list)
+    copies: Annotated[list[BookCopyCreate], Field(max_length=20)] = Field(
+        default_factory=list
+    )
 
     @field_validator("title")
     @classmethod

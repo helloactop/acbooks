@@ -119,7 +119,40 @@ def _search_condition(value: str) -> ColumnElement[bool]:
     )
 
 
-def _conditions(query: BookListQuery) -> list[ColumnElement[bool]]:
+def resolve_location_subtrees(
+    session: Session, expression: BookFilterExpression
+) -> dict[str, frozenset[str]]:
+    values: set[str] = set()
+    for condition in expression.conditions:
+        if (
+            condition.field == "location"
+            and condition.operator in {"equals", "not_equals"}
+            and isinstance(condition.value, str)
+        ):
+            values.add(condition.value)
+    if not values:
+        return {}
+    children: dict[str, list[str]] = defaultdict(list)
+    for location_id, parent_id in session.execute(
+        select(Location.id, Location.parent_id)
+    ):
+        if parent_id is not None:
+            children[parent_id].append(location_id)
+    subtrees: dict[str, frozenset[str]] = {}
+    for value in values:
+        seen = {value}
+        stack = [value]
+        while stack:
+            current = stack.pop()
+            for child in children.get(current, ()):
+                if child not in seen:
+                    seen.add(child)
+                    stack.append(child)
+        subtrees[value] = frozenset(seen)
+    return subtrees
+
+
+def _conditions(session: Session, query: BookListQuery) -> list[ColumnElement[bool]]:
     conditions: list[ColumnElement[bool]] = []
 
     if query.q is not None and query.q != "":
@@ -166,7 +199,10 @@ def _conditions(query: BookListQuery) -> list[ColumnElement[bool]]:
             )
         )
     if query.filter_expression is not None:
-        smart_filter = compile_filter_expression(query.filter_expression)
+        smart_filter = compile_filter_expression(
+            query.filter_expression,
+            resolve_location_subtrees(session, query.filter_expression),
+        )
         if smart_filter is not None:
             conditions.append(smart_filter)
 
@@ -199,6 +235,57 @@ def _order_by(query: BookListQuery) -> list[ColumnElement[Any]]:
     return [direction, Book.id.asc()]
 
 
+def _location_options(
+    session: Session, query: str, limit: int
+) -> tuple[list[BookFilterOption], bool]:
+    rows = session.execute(
+        select(Location.id, Location.parent_id, Location.name)
+    ).all()
+    counts = {
+        location_id: int(total)
+        for location_id, total in session.execute(
+            select(
+                BookCopy.location_id, func.count(func.distinct(BookCopy.book_id))
+            )
+            .where(BookCopy.location_id.is_not(None))
+            .group_by(BookCopy.location_id)
+        ).all()
+    }
+    parents = {row[0]: row[1] for row in rows}
+    names = {row[0]: row[2] for row in rows}
+
+    def path_label(location_id: str) -> str:
+        parts: list[str] = []
+        current: str | None = location_id
+        seen: set[str] = set()
+        while current is not None and current in names and current not in seen:
+            seen.add(current)
+            parts.append(names[current])
+            current = parents[current]
+        return " / ".join(reversed(parts))
+
+    needle = query.casefold()
+    options: list[BookFilterOption] = []
+    for location_id, _parent_id, name in rows:
+        label = path_label(location_id)
+        if (
+            needle
+            and needle not in label.casefold()
+            and needle not in name.casefold()
+        ):
+            continue
+        options.append(
+            BookFilterOption(
+                value=location_id,
+                label=label,
+                count=counts.get(location_id, 0),
+            )
+        )
+    options.sort(key=lambda option: (-(option.count or 0), option.label.casefold()))
+    has_more = len(options) > limit
+    return options[:limit], has_more
+
+
 def list_filter_options(
     session: Session,
     *,
@@ -206,6 +293,8 @@ def list_filter_options(
     query: str,
     limit: int,
 ) -> tuple[list[BookFilterOption], bool]:
+    if source == "locations":
+        return _location_options(session, query, limit)
     pattern = f"%{escape_like(query)}%" if query else None
 
     if source in {"authors", "translators"}:
@@ -323,7 +412,7 @@ def add_book(session: Session, book: Book) -> None:
 def find_books(
     session: Session, query: BookListQuery
 ) -> tuple[list[Book], int]:
-    conditions = _conditions(query)
+    conditions = _conditions(session, query)
     total = session.scalar(
         select(func.count()).select_from(Book).where(*conditions)
     )

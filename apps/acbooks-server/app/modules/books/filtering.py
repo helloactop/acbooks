@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
@@ -34,7 +35,7 @@ from app.modules.books.normalization import escape_like, normalize_isbn
 FilterCombinator = Literal["ALL", "ANY"]
 BookFilterFieldType = Literal["text", "select", "number", "date", "boolean"]
 BookFilterOptionSource = Literal[
-    "authors", "translators", "tags", "shelves", "formats"
+    "authors", "translators", "tags", "shelves", "formats", "locations"
 ]
 
 TEXT_OPERATORS = (
@@ -148,6 +149,9 @@ FILTER_FIELDS = (
     ),
     BookFilterFieldDefinition(
         "copyCount", "files", "number", NUMBER_OPERATORS
+    ),
+    BookFilterFieldDefinition(
+        "location", "files", "select", SELECT_OPERATORS, "locations", True
     ),
     BookFilterFieldDefinition(
         "fileCount", "files", "number", NUMBER_OPERATORS
@@ -514,7 +518,35 @@ def _file_count() -> ColumnElement[int]:
     )
 
 
-def _condition(condition: BookFilterCondition) -> ColumnElement[bool]:
+def _location_condition(
+    condition: BookFilterCondition,
+    location_subtrees: Mapping[str, frozenset[str]] | None,
+) -> ColumnElement[bool]:
+    located = exists(
+        select(1).where(
+            BookCopy.book_id == Book.id,
+            BookCopy.location_id.is_not(None),
+        )
+    )
+    if condition.operator == "is_empty":
+        return not_(located)
+    if condition.operator == "is_not_empty":
+        return located
+    value = str(condition.value or "")
+    ids = (location_subtrees or {}).get(value, frozenset({value}))
+    predicate = exists(
+        select(1).where(
+            BookCopy.book_id == Book.id,
+            BookCopy.location_id.in_(sorted(ids)),
+        )
+    )
+    return not_(predicate) if condition.operator == "not_equals" else predicate
+
+
+def _condition(
+    condition: BookFilterCondition,
+    location_subtrees: Mapping[str, frozenset[str]] | None = None,
+) -> ColumnElement[bool]:
     if condition.field == "title":
         return _text(Book.title, condition)
     if condition.field == "description":
@@ -535,6 +567,8 @@ def _condition(condition: BookFilterCondition) -> ColumnElement[bool]:
         return _select_scalar(Book.reading_status, condition)
     if condition.field == "copyCount":
         return _number(_copy_count(), condition)
+    if condition.field == "location":
+        return _location_condition(condition, location_subtrees)
     if condition.field == "fileCount":
         return _number(_file_count(), condition)
     if condition.field == "createdAt":
@@ -548,10 +582,14 @@ def _condition(condition: BookFilterCondition) -> ColumnElement[bool]:
 
 def compile_filter_expression(
     expression: BookFilterExpression,
+    location_subtrees: Mapping[str, frozenset[str]] | None = None,
 ) -> ColumnElement[bool] | None:
     if not expression.conditions:
         return None
-    predicates = [_condition(condition) for condition in expression.conditions]
+    predicates = [
+        _condition(condition, location_subtrees)
+        for condition in expression.conditions
+    ]
     return and_(*predicates) if expression.combinator == "ALL" else or_(*predicates)
 
 

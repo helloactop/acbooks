@@ -21,6 +21,8 @@ from app.modules.auth.service import SetupService, WebAuthService
 from app.modules.auth.setup_code import SETUP_CODE_PATH
 from app.modules.books.router import books_router
 from app.modules.books.service import BooksService
+from app.modules.copies.router import copies_router
+from app.modules.copies.service import CopiesService
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -68,10 +70,12 @@ def create_app(
         ),
         prefix="/api/v1",
     )
+    copies = CopiesService(engine)
     app.include_router(
-        books_router(BooksService(engine, covers), dependencies),
+        books_router(BooksService(engine, covers, copies), dependencies),
         prefix="/api/v1",
     )
+    app.include_router(copies_router(copies, dependencies), prefix="/api/v1")
     if web_dist is not None:
         app.mount("/", SPAStaticFiles(directory=web_dist, html=True), name="web")
 

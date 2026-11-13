@@ -46,6 +46,7 @@ from app.modules.books.schemas import (
     ReadingStatus,
 )
 from app.modules.books.types import BookOrder, BookSort, MediaType
+from app.modules.copies.service import CopiesService
 
 logger = logging.getLogger("uvicorn.error")
 MAX_COVER_BYTES = 5 * 1024 * 1024
@@ -108,12 +109,15 @@ def _batch_names(current: list[str], add: list[str], remove: list[str], field: s
 
 
 class BooksService:
-    def __init__(self, engine: Engine, covers_dir: Path) -> None:
+    def __init__(
+        self, engine: Engine, covers_dir: Path, copies: CopiesService
+    ) -> None:
         self.read_sessions = create_session_factory(engine)
         self.write_sessions = create_session_factory(
             engine.execution_options(sqlite_begin_immediate=True)
         )
         self.covers_dir = covers_dir
+        self.copies = copies
 
     @staticmethod
     def _isbn(record: BookRecord) -> str | None:
@@ -318,6 +322,8 @@ class BooksService:
             repository.replace_identifiers(session, book_id, payload.isbn)
             repository.replace_tags(session, book_id, payload.tags)
             repository.replace_shelves(session, book_id, payload.shelves)
+            if payload.copies:
+                self.copies.create_copies(session, book_id, payload.copies)
             session.flush()
             record = repository.load_records(session, [book])[0]
             return self._detail(record)

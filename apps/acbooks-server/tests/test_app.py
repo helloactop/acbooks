@@ -170,6 +170,10 @@ def test_business_error_contract(code: BusinessErrorCode) -> None:
         BusinessErrorCode.INVALID_BOOK_FILTER: ("INVALID_BOOK_FILTER", 422),
         BusinessErrorCode.INVALID_COVER: ("INVALID_COVER", 422),
         BusinessErrorCode.BATCH_LIMIT_EXCEEDED: ("BATCH_LIMIT_EXCEEDED", 422),
+        BusinessErrorCode.COPY_NOT_FOUND: ("COPY_NOT_FOUND", 404),
+        BusinessErrorCode.LOCATION_NOT_FOUND: ("LOCATION_NOT_FOUND", 404),
+        BusinessErrorCode.LOCATION_HAS_CHILDREN: ("LOCATION_HAS_CHILDREN", 409),
+        BusinessErrorCode.LOCATION_CYCLE: ("LOCATION_CYCLE", 422),
     }[code]
     app = create_app()
 
