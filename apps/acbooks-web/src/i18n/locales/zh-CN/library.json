@@ -231,6 +231,8 @@
     "notFound": "书籍不存在或已被删除。",
     "copyNotFound": "实体副本不存在或已被删除。",
     "locationNotFound": "存放位置不存在或已被删除。",
+    "locationHasChildren": "该位置下还有子位置，请先删除子位置。",
+    "locationCycle": "上级位置无效，不能移动到自身或其子位置下。",
     "validation": "请检查输入内容后重试。",
     "invalidCover": "封面必须是 5 MB 以内的 PNG、JPEG 或 WebP 图片。",
     "forbidden": "请求未通过安全校验，请刷新页面后重试。",

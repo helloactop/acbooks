@@ -2,12 +2,13 @@ import {
   House,
   Languages,
   LibraryBig,
+  MapPin,
   SunMoon,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
 
-import { homeHref, libraryHref } from "./routes";
+import { homeHref, libraryHref, locationsHref } from "./routes";
 
 export interface NavItem {
   href: string;
@@ -18,6 +19,7 @@ export interface NavItem {
 export const APP_NAV_ITEMS: readonly NavItem[] = [
   { href: homeHref(), icon: House, labelKey: "nav.home" },
   { href: libraryHref(), icon: LibraryBig, labelKey: "nav.library" },
+  { href: locationsHref(), icon: MapPin, labelKey: "nav.locations" },
 ];
 
 export type SettingsSection = "account" | "appearance" | "language";

@@ -5,6 +5,7 @@ import { DashboardPage } from "./dashboard/DashboardPage";
 import { AuthenticatedLayout } from "./layout/AuthenticatedLayout";
 import { BookDetailPage } from "./library/BookDetailPage";
 import { LibraryPage } from "./library/LibraryPage";
+import { LocationsPage } from "./locations/LocationsPage";
 import { NotFoundPage } from "./NotFoundPage";
 import { PreviewPage } from "./preview/PreviewPage";
 import { SettingsPage } from "./settings/SettingsPage";
@@ -27,6 +28,7 @@ export default function App() {
         <Route element={<DashboardPage />} path="home" />
         <Route element={<LibraryPage />} path="library" />
         <Route element={<BookDetailRoute />} path="library/books/:bookId" />
+        <Route element={<LocationsPage />} path="locations" />
         <Route element={<SettingsPage />} path="settings" />
       </Route>
       <Route element={<NotFoundPage />} path="*" />

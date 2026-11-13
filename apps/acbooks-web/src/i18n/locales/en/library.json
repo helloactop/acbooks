@@ -231,6 +231,8 @@
     "notFound": "This book no longer exists.",
     "copyNotFound": "This physical copy no longer exists.",
     "locationNotFound": "This location no longer exists.",
+    "locationHasChildren": "This location still has child locations; delete them first.",
+    "locationCycle": "That parent is invalid: a location cannot move under itself or its descendants.",
     "validation": "Check the form and try again.",
     "invalidCover": "Use a PNG, JPEG, or WebP image up to 5 MB.",
     "forbidden": "This request did not pass the security check. Refresh the page and try again.",

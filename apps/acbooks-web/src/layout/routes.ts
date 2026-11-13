@@ -36,6 +36,18 @@ export function libraryTagHref(tag: string): string {
   return `/library?tag=${encodeURIComponent(tag)}`;
 }
 
+export function locationsHref(): string {
+  return "/locations";
+}
+
+export function locationBooksHref(locationId: string): string {
+  const filters = JSON.stringify({
+    combinator: "ALL",
+    conditions: [{ field: "location", operator: "equals", value: locationId }],
+  });
+  return `/library?filters=${encodeURIComponent(filters)}`;
+}
+
 export function bookDetailHref(bookId: string): string {
   return `/library/books/${encodeURIComponent(bookId)}`;
 }

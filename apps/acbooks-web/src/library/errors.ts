@@ -13,6 +13,10 @@ export function libraryErrorMessage(
       return t("errors.copyNotFound");
     case "LOCATION_NOT_FOUND":
       return t("errors.locationNotFound");
+    case "LOCATION_HAS_CHILDREN":
+      return t("errors.locationHasChildren");
+    case "LOCATION_CYCLE":
+      return t("errors.locationCycle");
     case "VALIDATION_ERROR":
       return t("errors.validation");
     case "INVALID_COVER":
