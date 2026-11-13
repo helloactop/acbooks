@@ -59,8 +59,11 @@ Books Core V1 提供书目创建、列表、详情、部分更新、单本/批�
 ```
 
 - `title` 必填，1–500 字符。
-- `description`、`authors`、`translators`、`isbn`、`tags`、`shelves` 可选；
+- `description`、`authors`、`translators`、`isbn`、`tags`、`shelves`、`copies` 可选；
   `authors`/`translators`/`tags`/`shelves` 各最多 20 项，名称最多 200 字符。
+- `copies` 为实体副本数组（最多 20 个），每项含 `locationId`、`acquiredAt`
+  （UTC 毫秒）和 `note`；在创建书目的同一事务内写入，`locationId` 不存在时整体
+  返回 `404 LOCATION_NOT_FOUND`，不产生部分创建。
 - 成功返回 `BookDetail`，并设置 `Location: /api/v1/books/{bookId}`。
 
 ### 3.2 列表查询
@@ -128,7 +131,7 @@ Books Core V1 提供书目创建、列表、详情、部分更新、单本/批�
 - `combinator`：`ALL` 同时满足全部条件，`ANY` 满足任意一条。
 - 字段定义固定为：`title`、`author`、`translator`、`tag`、`shelf`、
   `isbn`、`description`、`format`、`readingStatus`、`copyCount`、
-  `fileCount`、`createdAt`、`updatedAt`、`hasCover`。
+  `location`、`fileCount`、`createdAt`、`updatedAt`、`hasCover`。
 - 文本运算符：`contains`、`not_contains`、`equals`、`not_equals`、
   `starts_with`、`ends_with`、`is_empty`、`is_not_empty`。
 - 选择运算符：`equals`、`not_equals`、`is_empty`、`is_not_empty`。
@@ -141,6 +144,8 @@ Books Core V1 提供书目创建、列表、详情、部分更新、单本/批�
 - `between` 的 `value` 为两个字符串组成的数组；无值运算符不提交 `value`。
 - 名称、标题、标签、书架、格式匹配使用 Unicode casefold；否定关系条件表示
   书目不存在匹配行。`copyCount`/`fileCount` 基于关联表真实计数。
+- `location` 为选择型字段，`value` 为位置 UUID；匹配存放在该位置**及其所有
+  子位置**下的副本（按层级子树生效，例如选“房间”即包含其书架与层）。
 - 规则非法或字段/运算符不支持时返回 `422 INVALID_BOOK_FILTER`。
 
 `GET /api/v1/books/filter-schema` 返回前端渲染条件所需的字段、类型、运算符、
@@ -148,8 +153,9 @@ Books Core V1 提供书目创建、列表、详情、部分更新、单本/批�
 
 `GET /api/v1/books/filter-options?source=authors&query=...&limit=20`
 
-`source` 取 `authors`、`translators`、`tags`、`shelves`、`formats`，
-返回带书库计数的选项；`query` 最长 100 字符，`limit` 为 1–50。
+`source` 取 `authors`、`translators`、`tags`、`shelves`、`formats`、`locations`，
+返回带书库计数的选项（`locations` 的 `value` 为位置 UUID，`label` 为层级路径）；
+`query` 最长 100 字符，`limit` 为 1–50。
 这些元数据端点仅用于读取，不表示新的数据表。
 
 ### 3.4 书目详情
@@ -234,6 +240,7 @@ Books Core V1 提供书目创建、列表、详情、部分更新、单本/批�
 | 401 | `UNAUTHORIZED` | 缺少或过期 Web 会话 |
 | 403 | `FORBIDDEN` | CSRF、来源或传输校验失败 |
 | 404 | `BOOK_NOT_FOUND` | 书目不存在 |
+| 404 | `LOCATION_NOT_FOUND` | 内联副本或位置接口引用的存放位置不存在 |
 | 404 | `COVER_NOT_FOUND` | 封面未设置或文件缺失 |
 | 422 | `VALIDATION_ERROR` | 输入、查询参数、空 PATCH/批量请求不合法 |
 | 422 | `INVALID_BOOK_FILTER` | `filters` JSON、字段或运算符不合法 |

@@ -67,6 +67,11 @@
 `storage_objects` 与 NAS 原始文件保留，封面文件在提交后清理。批量删除任一 ID
 不存在时整体回滚。
 
+**位置层级与副本归属**：`locations.parent_id` 自引用形成房间→书架→层等多级位置；
+更新父级须防止循环（不得设为自身或后代）。删除位置前若存在子位置则拒绝；删除叶子
+位置时 `book_copies.location_id` 经外键 `SET NULL` 置空，副本与书目保留。
+`locations`（实体存放位置）与虚拟分类 `shelves` 是不同模型，不得混用。
+
 **删除与扫描规则**：扫描不到文件时将 `storage_objects.file_status` 标为 `missing`，不自动删除 `Book`、笔记或阅读历史；移动文件尽量更新存储索引并保持书籍/文件 ID 稳定。ISBN、书名、文件哈希只用于候选匹配，歧义需人工确认。
 
 **状态值约束**：`storage_objects.file_status` 允许 `present`（默认）和 `missing`；
