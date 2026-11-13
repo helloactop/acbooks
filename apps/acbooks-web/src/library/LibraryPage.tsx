@@ -30,12 +30,6 @@ import {
 } from "./books-api";
 import { ActiveFilterSummary } from "./ActiveFilterSummary";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
-import {
-  EMPTY_FILTER_RULES,
-  serializeSmartFilterRules,
-  summarizeSmartFilterRules,
-  type SmartFilterRules,
-} from "./filter-model";
 import { LibraryAlert } from "./LibraryAlert";
 import { LibraryFilterToolbar } from "./LibraryFilterToolbar";
 import {
@@ -49,6 +43,7 @@ import {
 import { Pagination } from "./Pagination";
 import { SmartFilterBuilder } from "./SmartFilterBuilder";
 import { useBookFilterSchema } from "./use-book-filter-schema";
+import { useLibraryFilters } from "./use-library-filters";
 import { useLibraryUrlState } from "./use-library-url-state";
 import { useLibraryViewPreferences } from "./use-library-view-preferences";
 
@@ -83,44 +78,35 @@ export function LibraryPage() {
   const view = hasViewParam ? urlView : preferences.defaultView;
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [total, setTotal] = useState(0);
-  const [rules, setRules] = useState<SmartFilterRules>(appliedRules);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const scrollRestored = useRef(false);
-  const filterTimer = useRef<number | undefined>(undefined);
-  const lastExternalRevision = useRef(externalRevision);
   const filterSchema = useBookFilterSchema(true, expireSession);
   const fields = filterSchema.schema?.fields ?? [];
-  const summary = summarizeSmartFilterRules(rules, fields);
-  const appliedFilters = serializeSmartFilterRules(appliedRules, fields);
+  const {
+    appliedFilters,
+    changeRules,
+    removeCondition,
+    resetDraft,
+    rules,
+    summary,
+  } = useLibraryFilters({
+    appliedRules,
+    externalRevision,
+    fields,
+    onApply: (next) => {
+      setLoading(true);
+      setError(null);
+      setFilters(next);
+    },
+  });
   const waitingForSchema =
     appliedRules.conditions.length > 0 &&
     fields.length === 0 &&
     filterSchema.error === null;
-
-  useEffect(
-    () => () => {
-      if (filterTimer.current !== undefined) {
-        window.clearTimeout(filterTimer.current);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (externalRevision === lastExternalRevision.current) {
-      return;
-    }
-    lastExternalRevision.current = externalRevision;
-    if (filterTimer.current !== undefined) {
-      window.clearTimeout(filterTimer.current);
-      filterTimer.current = undefined;
-    }
-    setRules(appliedRules);
-  }, [externalRevision, appliedRules]);
 
   useEffect(() => {
     const handlePageShow = (event: PageTransitionEvent) => {
@@ -231,35 +217,6 @@ export function LibraryPage() {
     waitingForSchema,
   ]);
 
-  const commitAppliedRules = (next: SmartFilterRules) => {
-    setLoading(true);
-    setError(null);
-    setFilters(next);
-  };
-
-  const changeRules = (
-    next: SmartFilterRules,
-    immediate = false,
-  ) => {
-    setRules(next);
-    if (filterTimer.current !== undefined) {
-      window.clearTimeout(filterTimer.current);
-      filterTimer.current = undefined;
-    }
-    const serialized = serializeSmartFilterRules(next, fields);
-    if (serialized === appliedFilters) {
-      return;
-    }
-    if (immediate || serialized.length === 0) {
-      commitAppliedRules(next);
-      return;
-    }
-    filterTimer.current = window.setTimeout(() => {
-      filterTimer.current = undefined;
-      commitAppliedRules(next);
-    }, 300);
-  };
-
   const changeStatus = (value: StatusFilter) => {
     if (value === status) {
       return;
@@ -311,34 +268,18 @@ export function LibraryPage() {
   };
 
   const clearAllFilters = () => {
-    if (filterTimer.current !== undefined) {
-      window.clearTimeout(filterTimer.current);
-      filterTimer.current = undefined;
-    }
+    resetDraft();
     const queryChanged =
       appliedFilters.length > 0 ||
       searchTerm.length > 0 ||
       status !== "all" ||
       type !== "all" ||
       offset !== 0;
-    setRules(EMPTY_FILTER_RULES);
     if (queryChanged) {
       setLoading(true);
       setError(null);
     }
     clearAll();
-  };
-
-  const removeCondition = (id: string) => {
-    changeRules(
-      {
-        ...rules,
-        conditions: rules.conditions.filter(
-          (condition) => condition.id !== id,
-        ),
-      },
-      true,
-    );
   };
 
   const retry = () => {
