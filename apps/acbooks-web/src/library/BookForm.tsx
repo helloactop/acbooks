@@ -7,7 +7,7 @@ import {
   Select,
   Textarea,
 } from "@acbooks/ui";
-import { X } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -17,11 +17,14 @@ import {
   NAME_LIST_LIMIT,
   NAME_MAX_LENGTH,
   updateBook,
+  type BookCopyCreate,
   type BookCreate,
   type BookDetail,
   type BookUpdate,
   type ReadingStatus,
 } from "./books-api";
+import { CopyFormFields } from "./CopyFormFields";
+import { copyDraftToBody, emptyCopyDraft, type CopyDraft } from "./copy-draft";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
 import { LibraryAlert } from "./LibraryAlert";
 
@@ -42,6 +45,9 @@ const STATUS_OPTIONS: readonly ReadingStatus[] = [
   "reading",
   "done",
 ];
+
+// Mirrors the server-side inline copy limit.
+const MAX_COPIES = 20;
 
 function sameNames(left: readonly string[], right: readonly string[]): boolean {
   return (
@@ -112,6 +118,7 @@ export function BookForm({
   );
   const [tags, setTags] = useState<string[]>(book?.tags ?? []);
   const [shelves, setShelves] = useState<string[]>(book?.shelves ?? []);
+  const [copies, setCopies] = useState<CopyDraft[]>([]);
   const [titleError, setTitleError] = useState<string | undefined>(undefined);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -137,6 +144,7 @@ export function BookForm({
         translators.length > 0 ||
         tags.length > 0 ||
         shelves.length > 0 ||
+        copies.length > 0 ||
         readingStatus !== "unread";
 
   useEffect(() => {
@@ -149,6 +157,13 @@ export function BookForm({
 
   const clearError = () => {
     setError(null);
+  };
+
+  const updateCopyDraft = (index: number, draft: CopyDraft) => {
+    setCopies((current) =>
+      current.map((item, itemIndex) => (itemIndex === index ? draft : item)),
+    );
+    clearError();
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -188,7 +203,11 @@ export function BookForm({
         }
         saved = await updateBook(book.id, update);
       } else {
-        const body: BookCreate = values;
+        const inlineCopies: BookCopyCreate[] = copies.map(copyDraftToBody);
+        const body: BookCreate = {
+          ...values,
+          ...(inlineCopies.length > 0 ? { copies: inlineCopies } : {}),
+        };
         saved = await createBook(body);
       }
       setBusy(false);
@@ -386,6 +405,67 @@ export function BookForm({
                 value={description}
               />
             </Field>
+
+            {mode === "create" ? (
+              <section className="flex flex-col gap-3 border-t border-border pt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold">{t("form.copies")}</h3>
+                  <Button
+                    disabled={busy || copies.length >= MAX_COPIES}
+                    onClick={() => {
+                      setCopies((current) => [...current, emptyCopyDraft()]);
+                      clearError();
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {t("form.addCopy")}
+                  </Button>
+                </div>
+                {copies.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {t("form.copiesHint")}
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-3">
+                    {copies.map((copy, index) => (
+                      <li
+                        className="rounded-card border border-border p-3"
+                        key={index}
+                      >
+                        <div className="mb-3 flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {t("form.copyNumber", { number: index + 1 })}
+                          </span>
+                          <IconButton
+                            disabled={busy}
+                            label={t("form.removeCopy")}
+                            onClick={() => {
+                              setCopies((current) =>
+                                current.filter(
+                                  (_item, itemIndex) => itemIndex !== index,
+                                ),
+                              );
+                              clearError();
+                            }}
+                          >
+                            <Trash2 aria-hidden="true" />
+                          </IconButton>
+                        </div>
+                        <CopyFormFields
+                          disabled={busy}
+                          draft={copy}
+                          idPrefix={`book-copy-${index}`}
+                          onChange={(draft) => {
+                            updateCopyDraft(index, draft);
+                          }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            ) : null}
           </div>
         </div>
 

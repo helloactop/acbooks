@@ -918,4 +918,156 @@ describe("BookDetailPage", () => {
     });
     expect(findCall("PATCH", `/api/v1/books/${BOOK_ID}`)).toBeUndefined();
   });
+
+  it("adds a physical copy from the detail page", async () => {
+    const created = {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-000000000003",
+      locationId: null,
+      locationName: null,
+      acquiredAt: null,
+      note: "新副本",
+    };
+    let detail: BookDetail = BOOK;
+    installApi(
+      baseHandler((url, init) => {
+        const method = methodOf(init);
+        if (url.pathname === "/api/v1/locations" && method === "GET") {
+          return jsonResponse([]);
+        }
+        if (url.pathname === `/api/v1/books/${BOOK_ID}` && method === "GET") {
+          return jsonResponse(detail);
+        }
+        if (
+          url.pathname === `/api/v1/books/${BOOK_ID}/copies` &&
+          method === "POST"
+        ) {
+          detail = {
+            ...BOOK,
+            copyCount: BOOK.copies.length + 1,
+            copies: [...BOOK.copies, created],
+          };
+          return jsonResponse(created, 201);
+        }
+        throw new Error(`Unexpected ${method} ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetail();
+    await screen.findByRole("heading", { name: BOOK.title });
+
+    await user.click(screen.getByRole("button", { name: "添加副本" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("备注"), "新副本");
+    await user.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("新副本")).toBeInTheDocument();
+    });
+    const call = findCall("POST", `/api/v1/books/${BOOK_ID}/copies`);
+    expect(call).toBeDefined();
+    expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+      acquiredAt: null,
+      locationId: null,
+      note: "新副本",
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("edits a physical copy", async () => {
+    const original = {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-000000000009",
+      locationId: null,
+      locationName: "书房",
+      acquiredAt: null,
+      note: "旧备注",
+    };
+    let detail: BookDetail = { ...BOOK, copyCount: 1, copies: [original] };
+    installApi(
+      baseHandler((url, init) => {
+        const method = methodOf(init);
+        if (url.pathname === "/api/v1/locations" && method === "GET") {
+          return jsonResponse([]);
+        }
+        if (url.pathname === `/api/v1/books/${BOOK_ID}` && method === "GET") {
+          return jsonResponse(detail);
+        }
+        if (
+          url.pathname ===
+            `/api/v1/books/${BOOK_ID}/copies/${original.id}` &&
+          method === "PATCH"
+        ) {
+          const updated = { ...original, note: "更新备注" };
+          detail = { ...detail, copies: [updated] };
+          return jsonResponse(updated);
+        }
+        throw new Error(`Unexpected ${method} ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetail();
+    await screen.findByRole("heading", { name: BOOK.title });
+
+    await user.click(screen.getByRole("button", { name: "编辑副本" }));
+    const dialog = await screen.findByRole("dialog");
+    const note = within(dialog).getByLabelText("备注");
+    await user.clear(note);
+    await user.type(note, "更新备注");
+    await user.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("更新备注")).toBeInTheDocument();
+    });
+    const call = findCall(
+      "PATCH",
+      `/api/v1/books/${BOOK_ID}/copies/${original.id}`,
+    );
+    expect(call).toBeDefined();
+    expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+      acquiredAt: null,
+      locationId: null,
+      note: "更新备注",
+    });
+  });
+
+  it("deletes a physical copy after confirmation", async () => {
+    const original = {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-00000000000a",
+      locationId: null,
+      locationName: "书房",
+      acquiredAt: null,
+      note: "待删副本",
+    };
+    let detail: BookDetail = { ...BOOK, copyCount: 1, copies: [original] };
+    installApi(
+      baseHandler((url, init) => {
+        const method = methodOf(init);
+        if (url.pathname === `/api/v1/books/${BOOK_ID}` && method === "GET") {
+          return jsonResponse(detail);
+        }
+        if (
+          url.pathname ===
+            `/api/v1/books/${BOOK_ID}/copies/${original.id}` &&
+          method === "DELETE"
+        ) {
+          detail = { ...detail, copyCount: 0, copies: [] };
+          return jsonResponse(null, 204);
+        }
+        throw new Error(`Unexpected ${method} ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetail();
+    await screen.findByRole("heading", { name: BOOK.title });
+
+    await user.click(screen.getByRole("button", { name: "删除副本" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "删除" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("待删副本")).not.toBeInTheDocument();
+    });
+    expect(
+      findCall("DELETE", `/api/v1/books/${BOOK_ID}/copies/${original.id}`),
+    ).toBeDefined();
+  });
 });

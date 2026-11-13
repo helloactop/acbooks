@@ -20,6 +20,7 @@ export type BookSummary = components["schemas"]["BookSummary"];
 export type BookDetail = components["schemas"]["BookDetail"];
 export type BookPage = components["schemas"]["BookPage"];
 export type BookCreate = components["schemas"]["BookCreate"];
+export type BookCopyCreate = components["schemas"]["BookCopyCreate"];
 export type BookUpdate = components["schemas"]["BookUpdate"];
 export type BookBatchUpdate = components["schemas"]["BookBatchUpdate"];
 export type BatchResult = components["schemas"]["BatchResult"];

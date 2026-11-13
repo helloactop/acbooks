@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { BookInfoPanel } from "./BookInfoPanel";
 import type { BookDetail } from "./books-api";
+import type { BookCopy } from "./copies-api";
 
 type DetailTab = "info" | "reading" | "notes";
 
@@ -17,9 +18,17 @@ const TAB_KEYS: Record<DetailTab, string> = {
 
 export interface BookDetailTabsProps {
   detail: BookDetail;
+  onAddCopy?: () => void;
+  onDeleteCopy?: (copy: BookCopy) => void;
+  onEditCopy?: (copy: BookCopy) => void;
 }
 
-export function BookDetailTabs({ detail }: BookDetailTabsProps) {
+export function BookDetailTabs({
+  detail,
+  onAddCopy,
+  onDeleteCopy,
+  onEditCopy,
+}: BookDetailTabsProps) {
   const { t } = useTranslation("library");
   const [activeTab, setActiveTab] = useState<DetailTab>("info");
   const items = TAB_IDS.map((tab) => ({
@@ -45,7 +54,14 @@ export function BookDetailTabs({ detail }: BookDetailTabsProps) {
         role="tabpanel"
         tabIndex={0}
       >
-        {activeTab === "info" ? <BookInfoPanel detail={detail} /> : null}
+        {activeTab === "info" ? (
+          <BookInfoPanel
+            detail={detail}
+            onAddCopy={onAddCopy}
+            onDeleteCopy={onDeleteCopy}
+            onEditCopy={onEditCopy}
+          />
+        ) : null}
         {activeTab === "reading" ? (
           <UnavailablePanel
             description={t("tabs.readingDescription")}

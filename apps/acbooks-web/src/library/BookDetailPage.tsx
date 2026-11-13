@@ -25,9 +25,12 @@ import {
   type BookDetail,
   type ReadingStatus,
 } from "./books-api";
+import { deleteBookCopy, type BookCopy } from "./copies-api";
+import { CopyDialog } from "./CopyDialog";
 import { DeleteBooksDialog } from "./DeleteBooksDialog";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
 import { LibraryAlert } from "./LibraryAlert";
+import { Modal } from "./Modal";
 
 export interface BookDetailPageProps {
   bookId: string;
@@ -54,6 +57,12 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<ApiError | null>(null);
+  const [copyDialog, setCopyDialog] = useState<{ copy?: BookCopy } | null>(null);
+  const [copyDeleteTarget, setCopyDeleteTarget] = useState<BookCopy | null>(
+    null,
+  );
+  const [copyDeleteBusy, setCopyDeleteBusy] = useState(false);
+  const [copyDeleteError, setCopyDeleteError] = useState<ApiError | null>(null);
   useDocumentTitle(detail?.title ?? t("detail.title"));
   const backHref = detailReturnHref();
   const backLabel = isDetailReturnFromHome()
@@ -115,6 +124,43 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
   const applyDetail = (saved: BookDetail) => {
     if (saved.id === activeBookId.current) {
       setDetail(saved);
+    }
+  };
+
+  const refreshDetail = () => {
+    getBook(bookId)
+      .then((book) => {
+        applyDetail(book);
+      })
+      .catch((cause) => {
+        const apiError = toApiError(cause);
+        if (apiError.status === 401) {
+          expireSession();
+          return;
+        }
+        setActionError(apiError);
+      });
+  };
+
+  const confirmDeleteCopy = async () => {
+    if (detail === null || copyDeleteTarget === null || copyDeleteBusy) {
+      return;
+    }
+    setCopyDeleteBusy(true);
+    setCopyDeleteError(null);
+    try {
+      await deleteBookCopy(detail.id, copyDeleteTarget.id);
+      setCopyDeleteBusy(false);
+      setCopyDeleteTarget(null);
+      refreshDetail();
+    } catch (cause) {
+      const apiError = toApiError(cause);
+      setCopyDeleteBusy(false);
+      if (apiError.status === 401) {
+        expireSession();
+        return;
+      }
+      setCopyDeleteError(apiError);
     }
   };
 
@@ -317,7 +363,19 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
             </LibraryAlert>
           ) : null}
 
-          <BookDetailTabs detail={detail ?? headerDetail} />
+          <BookDetailTabs
+            detail={detail ?? headerDetail}
+            onAddCopy={() => {
+              setCopyDialog({});
+            }}
+            onDeleteCopy={(copy) => {
+              setCopyDeleteError(null);
+              setCopyDeleteTarget(copy);
+            }}
+            onEditCopy={(copy) => {
+              setCopyDialog({ copy });
+            }}
+          />
         </>
       ) : null}
 
@@ -356,6 +414,73 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
             void confirmDelete();
           }}
         />
+      ) : null}
+
+      {copyDialog !== null && detail !== null ? (
+        <CopyDialog
+          bookId={detail.id}
+          copy={copyDialog.copy}
+          onClose={() => {
+            setCopyDialog(null);
+          }}
+          onSaved={() => {
+            setCopyDialog(null);
+            refreshDetail();
+          }}
+          onSessionExpired={expireSession}
+        />
+      ) : null}
+
+      {copyDeleteTarget !== null ? (
+        <Modal
+          describedBy="delete-copy-description"
+          labelledBy="delete-copy-title"
+          onClose={
+            copyDeleteBusy
+              ? () => undefined
+              : () => {
+                  setCopyDeleteTarget(null);
+                }
+          }
+          size="confirm"
+        >
+          <div className="p-5">
+            <h2 className="text-lg font-semibold" id="delete-copy-title">
+              {t("copy.deleteTitle")}
+            </h2>
+            <p
+              className="mt-2 text-sm text-muted-foreground"
+              id="delete-copy-description"
+            >
+              {t("copy.deleteDescription")}
+            </p>
+            {copyDeleteError !== null ? (
+              <p className="mt-3 text-sm text-destructive-text" role="alert">
+                {libraryErrorMessage(t, copyDeleteError)}
+              </p>
+            ) : null}
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <Button
+                disabled={copyDeleteBusy}
+                onClick={() => {
+                  setCopyDeleteTarget(null);
+                }}
+                variant="ghost"
+              >
+                {t("form.cancel")}
+              </Button>
+              <Button
+                disabled={copyDeleteBusy}
+                onClick={() => {
+                  void confirmDeleteCopy();
+                }}
+                variant="danger-confirm"
+              >
+                {t("copy.deleteConfirm")}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       ) : null}
     </div>
   );

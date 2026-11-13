@@ -9,6 +9,10 @@ export function libraryErrorMessage(
   switch (error.code) {
     case "BOOK_NOT_FOUND":
       return t("errors.notFound");
+    case "COPY_NOT_FOUND":
+      return t("errors.copyNotFound");
+    case "LOCATION_NOT_FOUND":
+      return t("errors.locationNotFound");
     case "VALIDATION_ERROR":
       return t("errors.validation");
     case "INVALID_COVER":
