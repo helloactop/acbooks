@@ -3,8 +3,9 @@
 GitHub Actions 在分支推送、Pull Request 或手动触发时运行
 [CI 工作流](../../.github/workflows/ci.yml)。后端在 Ubuntu 和 Windows
 上以最低支持版本 Python 3.12 运行相同的检查；Web 在两个平台使用 Node.js 22.13
-与 24，配合仓库锁定的 pnpm 版本运行相同的检查。两个平台分别报告结果，
-某个平台失败时，另一个平台继续运行。
+与 24，配合仓库锁定的 pnpm 版本运行相同的检查。Playwright 端到端测试在 Ubuntu
+上以单源静态托管运行；Docker 部署在 AMD64 与 ARM64 运行器上分别验收。
+各任务分别报告结果，某个任务失败时其他任务继续运行。
 
 ## 本地运行
 
@@ -26,7 +27,14 @@ pnpm typecheck
 pnpm i18n:check
 pnpm test
 pnpm build
+pnpm --filter @acbooks/web exec playwright install chromium
+pnpm e2e
 ```
+
+端到端测试需要可导入 `fastapi` 与 `sqlalchemy` 的 Python；默认使用
+`apps/acbooks-server/.venv`，可用 `ACBOOKS_PYTHON` 指定。测试使用临时数据库与
+`http://127.0.0.1:4174`，会先构建 Web。无法下载 Playwright 浏览器时，可设置
+`ACBOOKS_E2E_CHANNEL=chrome` 或 `msedge` 使用系统浏览器。
 
 ## 当前覆盖范围
 
@@ -38,6 +46,8 @@ pnpm build
 | pytest | SQLite 临时文件库上的 Alembic 升降级、模型一致性、异常回滚重试、连接参数、外键和唯一约束、阅读状态与有效时长约束、列表查询索引命中、任务和文件状态校验、并发写入及在线备份恢复 |
 | pytest | 首次管理员初始化的码文件生成与权限、来源和 CSRF 验证、密码校验与 Argon2id 存储、限速、双应用实例并发、事务失败重试及清理失败后的重启 |
 | pytest | Web 密码登录与限速、Cookie 属性、会话摘要与过期、重启持久化、会话轮换、CSRF 来源与绑定、单会话注销、登录时清理过期与撤销凭据 |
+| pytest | 数据库备份：在线快照与清单、完整性/外键校验、篡改检测、恢复前快照、原子替换、拒绝更新版本的备份 |
+| pytest | Compose 部署冒烟（Ubuntu AMD64/ARM64）：镜像内 Web 静态托管与 SPA 回退、就绪探针、HTTPS 代理下的 Cookie/CSRF、迁移门禁、备份命令、Worker 与重启持久化 |
 | pytest | Books Core V1：创建书目、重复 ISBN 不合并、作者/译者/ISBN/标签/书架关联、Unicode casefold 名称匹配、数据库级搜索筛选排序分页、部分更新保留副本与阅读数据、会话/CSRF、OpenAPI 契约 |
 | ESLint | Web 与共享 UI 的 TypeScript/React 代码、Hooks 规则和导入问题 |
 | tsc | Web 与共享 UI 的 TypeScript strict 类型检查 |
@@ -47,6 +57,7 @@ pnpm build
 | Vitest | Web 初始化/登录状态机、CSRF 请求头与 Cookie 同源请求、错误码与 `Retry-After` 映射、加载禁用、初始化成功后返回登录、已有会话跳转 `/library`、认证页双语切换 |
 | Vitest | Web 全部书籍界面：真实 Books API 的会话守卫、服务端搜索/筛选/排序/分页、加载/空库/无结果/失败重试、添加/详情/编辑、CSRF 保存、退出登录/会话失效、标签与格式/副本区分、IME 组合处理、双语与响应式结构 |
 | Vite | Web 生产构建、共享 UI 源码解析与 Tailwind 样式生成 |
+| Playwright | 真实服务端与同源静态托管下的登录（失败/成功/刷新恢复）、添加书籍、阅读状态筛选、详情编辑弹窗、390px 移动端抽屉导航与添加书籍 |
 
 测试使用 pytest 的临时目录创建数据库，不需要真实书库、NAS 挂载或服务凭据。
 前端测试使用 jsdom，不连接真实 API。Windows 客户端和 Android 工程初始化后，

@@ -123,6 +123,18 @@ def get_json(
         return json.load(response), response.headers.get("Set-Cookie", "")
 
 
+def get_text(
+    client: OpenerDirector, request: Request | str, expected: int = 200
+) -> tuple[str, str]:
+    try:
+        response = client.open(request, timeout=10)
+    except HTTPError as error:
+        response = error
+    with response:
+        assert response.status == expected, f"HTTP {response.status}, expected {expected}"
+        return response.read().decode("utf-8"), response.headers.get("Content-Type", "")
+
+
 def proxy_client(deploy: Deployment) -> tuple[OpenerDirector, str]:
     if platform := deploy.env.get("DOCKER_DEFAULT_PLATFORM"):
         deploy.docker("pull", "--platform", platform, PROXY_IMAGE)
@@ -194,7 +206,36 @@ with closing(sqlite3.connect(DATABASE_PATH)) as db:
 """,
     )
     assert get_json(client, origin + API + "/health")[0] == {"status": "ok"}
+    assert get_json(client, origin + API + "/ready")[0] == {"status": "ok", "migration": "current"}
     assert get_json(client, origin + API + "/setup/status")[0] == {"initialized": False}
+    index, content_type = get_text(client, origin + "/")
+    assert "text/html" in content_type
+    assert 'id="root"' in index
+    deep_link, _ = get_text(client, origin + "/library")
+    assert 'id="root"' in deep_link
+    get_text(client, origin + API + "/missing", expected=404)
+    backup = deploy.compose(
+        "exec",
+        "-T",
+        "api",
+        "python",
+        "-m",
+        "app.modules.backup",
+        "backup",
+        "--output",
+        "/data/acbooks/backups/smoke.db",
+    )
+    assert '"sha256"' in backup
+    deploy.compose(
+        "exec",
+        "-T",
+        "api",
+        "python",
+        "-m",
+        "app.modules.backup",
+        "verify",
+        "/data/acbooks/backups/smoke.db",
+    )
     api_address = deploy.compose("port", "api", "8000").strip()
     direct = Request(f"http://{api_address}{API}/auth/csrf", headers={"X-Forwarded-Proto": "https"})
     get_json(build_opener(ProxyHandler({})), direct, expected=403)

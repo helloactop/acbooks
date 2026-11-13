@@ -15,6 +15,10 @@ python -m uvicorn app.main:create_app --factory --no-access-log
 [后端健康检查](../../docs/api/health.md)，Books Core V1 见
 [Books API](../../docs/api/books.md)。
 
+设置 `ACBOOKS_WEB_DIST_PATH` 指向 Web 构建目录后，服务端在同源下托管静态文件，
+并为非 `/api` 的前端路由回退到 `index.html`；未设置时仅提供 API。
+该变量由仓库的 Docker 镜像默认启用。
+
 ## SQLite 与迁移
 
 从本目录运行 `python -m alembic upgrade head` 初始化或升级数据库。
@@ -63,6 +67,18 @@ python -m app.modules.auth.provision
 Web Cookie 会话默认在签发 7 天后到期。可通过 `ACBOOKS_WEB_SESSION_TTL_SECONDS`
 配置新会话有效期，范围为 1–604800 秒。使用 Docker Compose 时可在项目的 `.env`
 中设置该变量。
+
+## 数据库备份与恢复
+
+```sh
+python -m app.modules.backup backup --output /data/acbooks/backups/acbooks.db
+python -m app.modules.backup verify /data/acbooks/backups/acbooks.db
+python -m app.modules.backup restore /data/acbooks/backups/acbooks.db
+```
+
+备份使用 SQLite Online Backup API 并生成 SHA-256 清单；恢复前停止 API 与 Worker，
+命令会先创建 `pre-restore` 快照并拒绝比当前代码更新的 schema。详见
+[数据库备份与恢复](../../docs/deployment/backup.md)。
 
 ## 检查
 

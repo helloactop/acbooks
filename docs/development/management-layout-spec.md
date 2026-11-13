@@ -1,6 +1,6 @@
 # acbooks Web 管理面板布局与 AppShell 设计规范
 
-> 状态：已实现（2026-11-13，B 方案：80px 图标轨 + 56px 顶栏 + 移动抽屉）。
+> 状态：已实现（2026-11-13，B 方案：80px 图标轨 + 56px 顶栏 + 移动抽屉）；生产构建由 FastAPI 同源托管，Playwright 覆盖桌面与 390px 抽屉流程。
 > 适用范围：Web / Windows 共用 Web UI；桌面横屏、平板、手机竖屏及手机横屏。原生 Android 不在本次实现范围。
 > 参考项目：二猫书库 ermao-library，main 提交 `21b5715e884fda4375c2621b96f0751f4d542703`。
 > acbooks 分析基线：main 提交 `4778d5703ea5b777efdf02925e29c0e311d95895`；当前实现已迁移至 React Router 持久化 AppShell，布局以本文第 4–7 节为准。
@@ -12,7 +12,7 @@
 
 **借鉴二猫的布局与交互，保留 acbooks 的蓝色主题、圆角主内容面板、语义设计令牌和现有公共组件。不要照搬二猫的暖色背景、橙色按钮、书架木纹或业务模型。**
 
-开发前阅读 `AGENTS.md`、`docs/architecture/system.md`、`docs/development/standards.md`、`docs/development/ui.md`、`docs/development/ui-components.md`、`docs/development/ui-pages.md`、`docs/api/books.md`，涉及接口时同时阅读 API、后端、安全及测试规范。仓库权威规范优先；本文新增的结构、尺寸和交互是建议实施方案。如有冲突，先报告并明确解决方式，不擅自改写全局设计系统。
+开发前阅读 `AGENTS.md`、`docs/architecture/system.md`、`docs/development/standards.md`、`docs/development/ui.md`、`docs/development/ui-components.md`、`docs/development/ui-pages.md`、`docs/api/books.md`，涉及接口时同时阅读 API、后端、安全及测试规范。仓库权威规范优先；本文第 4–7 节的结构、尺寸和交互已是当前实现基线，修改布局时须同步更新本文与验收截图。如有冲突，先报告并明确解决方式，不擅自改写全局设计系统。
 
 本次核心交付是 **共享 AppShell、可用的响应式导航、统一全局搜索、账户入口、页面级布局和现有书库功能迁移**。首页、书架、设置等新功能依据真实 API 分阶段开放；不得伪造数据或构造虚假业务流程。
 
@@ -354,6 +354,7 @@ apps/acbooks-web/src/
 - 原有图书添加、查询、详情、编辑、筛选、排序、分页及持久化不回退；列表和网格共用查询，实体/电子视图无重复 Book。
 - 未实现页面不展示假数据、假操作和虚假成功提示；已开放页面有加载、空、错误、重试及必要禁用状态。
 - 主题和语言切换不重置业务上下文；长名称、动态导航大量条目及窄窗口不破坏框架。
+- 生产构建由 FastAPI 同源托管（`ACBOOKS_WEB_DIST_PATH`）：`/library` 等深链接返回应用外壳，`/api` 不参与回退；`pnpm e2e` 覆盖登录、添加、筛选、编辑弹窗与 390px 抽屉流程。
 
 执行当前仓库规定的 `pnpm check` 等命令（以 package.json 和 AGENTS.md 为准），补充共享 AppShell、路由、抽屉、全局搜索、账户入口及现有书库回归测试。若改变真实 API，更新 OpenAPI、生成客户端类型并补后端测试。不得声称未执行的测试已通过。
 

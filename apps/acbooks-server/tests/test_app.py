@@ -34,6 +34,34 @@ def test_health_and_openapi(monkeypatch: pytest.MonkeyPatch) -> None:
         assert client.get("/api/v1/health").headers["X-Request-ID"] != request_id
 
 
+def test_web_static_serving_and_spa_fallback(tmp_path: Path) -> None:
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<html><body>app-shell</body></html>", encoding="utf-8")
+    (dist / "assets" / "app.js").write_text("console.log('app')", encoding="utf-8")
+
+    app = create_app(database_path=tmp_path / "acbooks.db", web_dist_path=dist)
+    with TestClient(app) as client:
+        index = client.get("/")
+        assert index.status_code == 200
+        assert "app-shell" in index.text
+        assert index.headers["cache-control"] == "no-cache"
+        deep_link = client.get("/library")
+        assert deep_link.status_code == 200
+        assert "app-shell" in deep_link.text
+        assert deep_link.headers["cache-control"] == "no-cache"
+        asset = client.get("/assets/app.js")
+        assert asset.status_code == 200
+        assert "console.log" in asset.text
+        assert client.get("/assets/missing.js").status_code == 404
+        api_missing = client.get("/api/v1/missing")
+        assert api_missing.status_code == 404
+        assert api_missing.headers["content-type"] == "application/problem+json"
+
+    with pytest.raises(RuntimeError, match="Web build directory"):
+        create_app(database_path=tmp_path / "acbooks.db", web_dist_path=tmp_path / "absent")
+
+
 def test_readiness_requires_database_and_current_migration(tmp_path: Path) -> None:
     database = tmp_path / "acbooks.db"
     config = migration_config(database)

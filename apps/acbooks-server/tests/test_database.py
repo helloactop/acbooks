@@ -284,6 +284,55 @@ def test_library_constraint_migration_rejects_invalid_legacy_rows(
         engine.dispose()
 
 
+def test_library_migration_preserves_existing_rows(tmp_path: Path) -> None:
+    path = tmp_path / "upgrade.db"
+    config = migration_config(path)
+    command.upgrade(config, "0003")
+    engine = create_sqlite_engine(path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO books (id, title, reading_status, created_at, updated_at)"
+                " VALUES ('book', 'Kept', 'reading', 1, 2)"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO reading_sessions"
+                " (id, book_id, started_at, ended_at, active_seconds, source)"
+                " VALUES ('read', 'book', 0, 60_000, 60, 'manual')"
+            )
+
+        command.upgrade(config, "head")
+        with engine.connect() as connection:
+            assert tuple(
+                connection.exec_driver_sql(
+                    "SELECT title, reading_status, created_at FROM books WHERE id = 'book'"
+                ).one()
+            ) == ("Kept", "reading", 1)
+            assert tuple(
+                connection.exec_driver_sql(
+                    "SELECT active_seconds FROM reading_sessions WHERE id = 'read'"
+                ).one()
+            ) == (60,)
+            assert (
+                connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
+            )
+
+        command.downgrade(config, "0003")
+        with engine.connect() as connection:
+            assert (
+                connection.exec_driver_sql("SELECT title FROM books WHERE id = 'book'").scalar_one()
+                == "Kept"
+            )
+            assert (
+                connection.exec_driver_sql(
+                    "SELECT name FROM sqlite_schema WHERE name = 'ix_books_created_at'"
+                ).all()
+                == []
+            )
+    finally:
+        engine.dispose()
+
+
 def test_library_query_plans_use_indexes(database: Engine) -> None:
     with database.begin() as connection:
         connection.exec_driver_sql("INSERT INTO locations (id, name) VALUES ('room', 'Room')")

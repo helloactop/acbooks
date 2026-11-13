@@ -55,13 +55,39 @@ pnpm typecheck
 pnpm test
 pnpm i18n:check
 pnpm build
+pnpm e2e
 ```
 
-Web 测试位于 `tests/`，按源码目录镜像组织；共享 UI 测试位于
+Web 单元与集成测试位于 `tests/`，按源码目录镜像组织；共享 UI 测试位于
 `packages/acbooks-ui/tests/`。生产源码目录不存放测试文件。
 
 开发服务器默认监听 `http://localhost:5173`，预览构建产物使用
 `pnpm preview:web`。开发服务器将 `/api` 代理到 `http://127.0.0.1:8000`。
+
+## 生产托管
+
+`pnpm build` 产物为 `dist/`。Docker 镜像在 Node 阶段构建 Web，并由 FastAPI 在
+同一来源下托管静态文件；服务端设置 `ACBOOKS_WEB_DIST_PATH` 指向构建目录后，
+未知的非 API 路径回退到 `index.html`。因此生产环境不需要独立 Web 服务器或 CORS，
+浏览器仍以同源 `Cookie` 和 `X-CSRF-Token` 访问 `/api/v1`。本地开发与预览继续使用
+Vite 代理，不改变认证方式。
+
+## 端到端测试
+
+Playwright 测试位于 `e2e/`，用真实 SQLite、真实登录和单源静态托管运行，
+覆盖登录失败与成功、添加书籍、阅读状态筛选、详情编辑弹窗以及 390px 移动端抽屉流程。
+测试串行执行，使用临时数据库 `apps/acbooks-web/.e2e-data/`，不会写入现有数据。
+
+```sh
+pnpm --filter @acbooks/web exec playwright install chromium
+pnpm e2e
+```
+
+`e2e/server.mjs` 会构建 Web、迁移临时数据库、创建测试管理员并在
+`http://127.0.0.1:4174` 启动服务；需要能导入 `fastapi` 和 `sqlalchemy` 的 Python，
+默认使用 `apps/acbooks-server/.venv`，也可用 `ACBOOKS_PYTHON` 指定解释器。
+设置 `ACBOOKS_E2E_SKIP_BUILD=1` 可复用已有 `dist/`。若无法下载 Playwright
+浏览器，可设置 `ACBOOKS_E2E_CHANNEL=chrome`（或 `msedge`）改用系统已安装的浏览器。
 
 ## 本地前后端联调
 

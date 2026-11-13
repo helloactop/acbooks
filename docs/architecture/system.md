@@ -21,7 +21,7 @@
 | Android | Kotlin、Jetpack Compose、Room、Readium |
 | iOS（后续） | Swift、SwiftUI；可评估 KMP |
 | 阅读 / 文件处理 | Readium、PDFium、Python 文件解析工具 |
-| 部署 | Docker Compose；NAS / Linux 统一部署包 |
+| 部署 | Docker Compose；NAS / Linux 统一部署包；Web 构建产物由 FastAPI 同源托管 |
 
 **架构约束**：模块化单体；API 与 Worker 复用业务逻辑；客户端不直连数据库；REST + OpenAPI 为内部与客户端接口；OPDS 负责书籍发现/下载，WebDAV 负责文件访问，进度和笔记通过专用同步 API。
 

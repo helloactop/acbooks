@@ -40,8 +40,24 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm e2e
 ```
 
-NAS 和 Linux 上的 API、Worker 与数据库迁移见 [Docker Compose 部署](docs/deployment/docker.md)。
+`pnpm e2e` 首次运行前需在 `apps/acbooks-web/` 执行
+`pnpm exec playwright install chromium`，详见 [Web 开发说明](apps/acbooks-web/README.md#端到端测试)。
+
+## 生产部署
+
+Docker 镜像在一个容器内构建 Web 客户端并由 FastAPI 同源托管静态文件，
+SPA 深链接自动回退到 `index.html`；API、Cookie 与 CSRF 校验保持同源，
+无需额外 CORS 配置。Worker 使用同一镜像单独运行。
+
+```sh
+docker compose -f deploy/compose.yaml up -d --build --wait
+curl -fsS http://127.0.0.1:8000/api/v1/ready
+```
+
+部署、反向代理与升级步骤见 [Docker Compose 部署](docs/deployment/docker.md)；
+升级或恢复前请按 [数据库备份与恢复](docs/deployment/backup.md) 创建一致性备份。
 
 项目采用 GPL-3.0-only 许可证。[许可证说明](LICENSE.md)

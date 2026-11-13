@@ -6,10 +6,12 @@ from time import perf_counter
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import Response
 
 from app.api.errors import internal_error, register_exception_handlers
 from app.api.health import health_router
+from app.api.webapp import SPAStaticFiles
 from app.core.config import Settings
 from app.db.session import DATABASE_PATH, create_sqlite_engine
 from app.modules.auth.csrf import CsrfTokens
@@ -28,8 +30,12 @@ def create_app(
     *,
     database_path: Path = DATABASE_PATH,
     setup_code_path: Path = SETUP_CODE_PATH,
+    web_dist_path: Path | None = None,
 ) -> FastAPI:
     settings = settings if settings is not None else Settings()
+    web_dist = web_dist_path if web_dist_path is not None else settings.web_dist_path
+    if web_dist is not None and not web_dist.is_dir():
+        raise RuntimeError(f"Web build directory does not exist: {web_dist}")
     engine = create_sqlite_engine(database_path)
 
     @asynccontextmanager
@@ -46,6 +52,7 @@ def create_app(
         lifespan=lifespan,
     )
     register_exception_handlers(app)
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     auth = WebAuthService(engine, settings.web_session_ttl_seconds)
     dependencies = AuthDependencies(
         auth, settings.public_origin, CsrfTokens()
@@ -63,6 +70,8 @@ def create_app(
         books_router(BooksService(engine), dependencies),
         prefix="/api/v1",
     )
+    if web_dist is not None:
+        app.mount("/", SPAStaticFiles(directory=web_dist, html=True), name="web")
 
     @app.middleware("http")
     async def handle_request(

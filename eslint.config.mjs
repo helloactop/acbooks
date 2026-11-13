@@ -43,7 +43,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ["**/*.config.{js,ts,mjs}", "eslint.config.mjs", "scripts/**/*.mjs"],
+    files: [
+      "**/*.config.{js,ts,mjs}",
+      "eslint.config.mjs",
+      "scripts/**/*.mjs",
+      "apps/acbooks-web/e2e/**/*.mjs",
+    ],
     languageOptions: {
       globals: globals.node,
     },
