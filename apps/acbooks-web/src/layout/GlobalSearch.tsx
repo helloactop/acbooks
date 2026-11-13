@@ -50,6 +50,7 @@ export function GlobalSearch({
   const timerRef = useRef<number | undefined>(undefined);
   const controllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
+  const requestedTermRef = useRef("");
   const composingRef = useRef(false);
   const listId = useId();
   const input = inputRef ?? localInputRef;
@@ -86,6 +87,7 @@ export function GlobalSearch({
     controllerRef.current = controller;
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
+    requestedTermRef.current = term;
     getBooks({ q: term, limit: 5, offset: 0 }, controller.signal)
       .then((page) => {
         if (requestId !== requestIdRef.current) {
@@ -112,6 +114,9 @@ export function GlobalSearch({
       .finally(() => {
         if (requestId === requestIdRef.current) {
           setLoading(false);
+          if (controllerRef.current === controller) {
+            controllerRef.current = null;
+          }
         }
       });
     return () => controller.abort();
@@ -142,6 +147,7 @@ export function GlobalSearch({
       controllerRef.current?.abort();
       controllerRef.current = null;
       requestIdRef.current += 1;
+      requestedTermRef.current = "";
       setTerm("");
       setResults([]);
       setTotal(0);
@@ -157,6 +163,19 @@ export function GlobalSearch({
         timerRef.current = undefined;
       }
       setOpen(true);
+      const requestActive =
+        controllerRef.current !== null &&
+        !controllerRef.current.signal.aborted &&
+        requestedTermRef.current === term;
+      // Restoring a keyword can land while a newer term's request was aborted.
+      // The old results were cleared, so the current term must be fetched again.
+      if (loading && !requestActive) {
+        setResults([]);
+        setTotal(0);
+        setError(null);
+        setActiveIndex(-1);
+        setReloadKey((current) => current + 1);
+      }
       return;
     }
 

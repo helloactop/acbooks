@@ -387,6 +387,38 @@ describe("AppShell", () => {
     ).toBeInTheDocument();
   });
 
+  it("recovers when the original keyword is restored during the debounce", async () => {
+    mockViewport("desktop");
+    const pending = installDeferredSearch();
+    const user = userEvent.setup();
+    renderShell("/library");
+    const search = screen.getByRole("combobox", { name: "全局搜索" });
+
+    await user.type(search, "三体");
+    await waitFor(() => {
+      expect(pending).toHaveLength(1);
+    });
+    expect(pending[0]?.q).toBe("三体");
+
+    fireEvent.change(search, { target: { value: "边城" } });
+    expect(pending[0]?.signal?.aborted).toBe(true);
+
+    fireEvent.change(search, { target: { value: "三体" } });
+    await waitFor(() => {
+      expect(pending).toHaveLength(2);
+    });
+    expect(pending[1]?.q).toBe("三体");
+    expect(pending[1]?.signal?.aborted).toBe(false);
+
+    await act(async () => {
+      pending[1]?.resolve(searchPage("三体"));
+    });
+    expect(
+      await screen.findByRole("option", { name: /三体/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("正在搜索")).not.toBeInTheDocument();
+  });
+
   it("hides stale results and discards late responses for old keywords", async () => {
     mockViewport("desktop");
     const pending = installDeferredSearch();

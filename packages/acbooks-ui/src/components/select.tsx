@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { cn } from "../lib/utils";
+import { resolveOverlayContainer } from "../lib/overlay-container";
 
 export interface SelectOption {
   disabled?: boolean;
@@ -74,6 +75,9 @@ export function Select({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(
+    null,
+  );
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -139,6 +143,7 @@ export function Select({
     setOpen(false);
     setActiveIndex(-1);
     setMenuPosition(null);
+    setPortalContainer(null);
   }, []);
 
   const openMenu = () => {
@@ -146,6 +151,7 @@ export function Select({
       return;
     }
     updatePosition();
+    setPortalContainer(resolveOverlayContainer(triggerRef.current));
     setOpen(true);
     setActiveIndex(
       selectedIndex >= 0
@@ -323,7 +329,7 @@ export function Select({
         />
       </button>
 
-      {open && menuPosition !== null
+      {open && menuPosition !== null && portalContainer !== null
         ? createPortal(
             <div
               className="fixed z-40 overflow-y-auto overscroll-contain rounded-menu border border-border bg-background p-1 shadow-overlay"
@@ -393,7 +399,7 @@ export function Select({
                 </div>
               ))}
             </div>,
-            document.body,
+            portalContainer,
           )
         : null}
     </div>

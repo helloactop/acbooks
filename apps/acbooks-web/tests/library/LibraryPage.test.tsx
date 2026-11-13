@@ -940,6 +940,89 @@ describe("LibraryPage", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("corrects an out-of-range offset from the server total", async () => {
+    window.history.replaceState({}, "", "/library?offset=12");
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          const offset = Number(url.searchParams.get("offset") ?? "0");
+          return jsonResponse(
+            offset === 12
+              ? makePage([], 2, 12)
+              : makePage([BOOK1, BOOK2], 2, 0),
+          );
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    renderLibrary();
+
+    expect(
+      await screen.findByRole("article", { name: "呐喊" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("article", { name: "边城" }),
+    ).toBeInTheDocument();
+    expect(latestBookRequest()?.searchParams.get("offset")).toBe("0");
+    await waitFor(() => {
+      expect(currentLocation).not.toContain("offset=12");
+    });
+    expect(bookRequests()).toHaveLength(2);
+    expect(screen.queryByText("正在更新")).not.toBeInTheDocument();
+  });
+
+  it("finishes updating after clearing filters cancels the current query", async () => {
+    const params = new URLSearchParams({
+      filters: JSON.stringify({
+        combinator: "ALL",
+        conditions: [{ field: "tag", operator: "equals", value: "文学" }],
+      }),
+    });
+    window.history.replaceState({}, "", `/library?${params.toString()}`);
+    let resolveCleared: ((response: Response) => void) | undefined;
+    let listRequests = 0;
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          listRequests += 1;
+          if (listRequests === 1) {
+            return jsonResponse(makePage([BOOK1]));
+          }
+          return new Promise<Response>((resolve) => {
+            resolveCleared = resolve;
+          });
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLibrary();
+    await screen.findByRole("article", { name: "呐喊" });
+
+    await user.click(
+      screen.getByRole("button", { name: "更多操作" }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "清除全部筛选" }),
+    );
+
+    await waitFor(() => {
+      expect(resolveCleared).toBeDefined();
+    });
+    expect(await screen.findByText("正在更新")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveCleared?.(jsonResponse(makePage([BOOK1, BOOK2], 2, 0)));
+    });
+    expect(
+      await screen.findByRole("article", { name: "边城" }),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("正在更新")).not.toBeInTheDocument();
+    });
+    expect(latestBookRequest()?.searchParams.get("filters")).toBeNull();
+  });
+
   it("shows a no-results state and clears filters", async () => {
     installApi(
       baseHandler((url, init) => {

@@ -11,6 +11,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { cn } from "../lib/utils";
+import { resolveOverlayContainer } from "../lib/overlay-container";
 import { Input } from "./input";
 import { Spinner } from "./spinner";
 
@@ -62,6 +63,9 @@ export function Combobox({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(
+    null,
+  );
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -120,6 +124,7 @@ export function Combobox({
 
   const openMenu = useCallback(() => {
     updatePosition();
+    setPortalContainer(resolveOverlayContainer(inputRef.current));
     setOpen(true);
   }, [updatePosition]);
 
@@ -127,6 +132,7 @@ export function Combobox({
     setOpen(false);
     setActiveIndex(-1);
     setMenuPosition(null);
+    setPortalContainer(null);
   }, []);
 
   useEffect(() => {
@@ -253,7 +259,7 @@ export function Combobox({
         value={value}
       />
 
-      {open && menuPosition !== null
+      {open && menuPosition !== null && portalContainer !== null
         ? createPortal(
             <div
               className="fixed z-40 overflow-y-auto overscroll-contain rounded-menu border border-border bg-background p-1 shadow-overlay"
@@ -317,7 +323,7 @@ export function Combobox({
                 </div>
               ) : null}
             </div>,
-            document.body,
+            portalContainer,
           )
         : null}
     </div>

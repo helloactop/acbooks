@@ -62,7 +62,7 @@
 | `Field` | Label → Control → Description/Error；间距 8 | label 关联控件；错误与说明通过 aria 关联；必填有文字/语义提示 |
 | `Input` / `PasswordInput` | 高 32（认证 44，移动 44）、圆角 10、横向内边距 10；始终保持 `control-border` 边框 | 密码可见切换使用 IconButton，不丢失焦点；支持 autofill；错误用危险边框与文字；禁用态使用 `disabled-border` / `disabled-surface` / `disabled-foreground`，保持边框与尺寸 |
 | `Textarea` | 圆角 10、最小高 96，内边距 10 | 可纵向扩展，不固定裁切正文 |
-| `Select` / `Combobox` | `Select` 触发器高 32（移动 44）、圆角 10；末尾箭头；选中项带勾选标记 | 单选用 `Select`，大量选项需搜索时用 `Combobox`；`Select` 使用 Portal 浮层、支持分组、方向键/Home/End/Enter/Escape 与点击外部关闭，不使用原生列表 |
+| `Select` / `Combobox` | `Select` 触发器高 32（移动 44）、圆角 10；末尾箭头；选中项带勾选标记 | 单选用 `Select`，大量选项需搜索时用 `Combobox`；浮层通过统一容器解析：位于打开的 `dialog` 内时挂载到该 dialog 顶层，否则挂载到 body；支持分组、方向键/Home/End/Enter/Escape 与点击外部关闭，不使用原生列表 |
 | `Checkbox` / `Radio` | 视觉 18×18，Checkbox 圆角 4，Radio 全圆 | 标签可点击；支持 checked/disabled；批量选择支持 indeterminate |
 | `Switch` | 视觉轨道 40×24、胶囊，滑块清晰 | 仅用于即时布尔设置；用位置与语义表达开关状态，不只依赖颜色 |
 | `SearchInput` | 高 32（移动 44）、圆角 10；搜索图标 + 输入 + 清除按钮 | 清除不改变布局；回车提交或按业务约定防抖；空查询恢复默认结果；输入法组合结束后才触发搜索 |

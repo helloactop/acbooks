@@ -236,6 +236,7 @@ export function LibraryPage() {
       return;
     }
     const controller = new AbortController();
+    let corrected = false;
     const query: BookListQuery = {
       q: searchTerm.length > 0 ? searchTerm : undefined,
       readingStatus: status === "all" ? undefined : status,
@@ -249,6 +250,22 @@ export function LibraryPage() {
 
     getBooks(query, controller.signal)
       .then((page) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        const pageSize = page.limit > 0 ? page.limit : PAGE_SIZE;
+        const maxOffset =
+          page.total > 0
+            ? Math.floor((page.total - 1) / pageSize) * pageSize
+            : 0;
+        if (offset > maxOffset) {
+          corrected = true;
+          setTotal(page.total);
+          setError(null);
+          setOffset(maxOffset);
+          beginRequest();
+          return;
+        }
         setBooks(page.items);
         setTotal(page.total);
         setError(null);
@@ -265,7 +282,7 @@ export function LibraryPage() {
         setError(apiError);
       })
       .finally(() => {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && !corrected) {
           setLoading(false);
         }
       });
@@ -369,13 +386,21 @@ export function LibraryPage() {
       window.clearTimeout(filterTimer.current);
       filterTimer.current = undefined;
     }
+    const queryChanged =
+      appliedFilters.length > 0 ||
+      searchTerm.length > 0 ||
+      status !== "all" ||
+      type !== "all" ||
+      offset !== 0;
     setRules({ combinator: "ALL", conditions: [] });
     setAppliedRules({ combinator: "ALL", conditions: [] });
     setSearchTerm("");
     setStatus("all");
     setType("all");
     setOffset(0);
-    beginRequest();
+    if (queryChanged) {
+      beginRequest();
+    }
   };
 
   const removeCondition = (id: string) => {

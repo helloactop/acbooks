@@ -56,7 +56,7 @@ export function Pagination({
     Math.floor(offset / limit) + 1,
   );
   const numberFormat = new Intl.NumberFormat(resolvedLanguage);
-  const rangeStart = offset + 1;
+  const rangeStart = Math.min(offset + 1, total);
   const rangeEnd = Math.min(offset + limit, total);
   const requestPage = (nextOffset: number) => {
     if (nextOffset !== offset) {

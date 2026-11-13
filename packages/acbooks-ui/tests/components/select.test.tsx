@@ -110,4 +110,25 @@ describe("Select", () => {
     expect(trigger).toBeDisabled();
     expect(trigger).toHaveClass("disabled:bg-disabled-surface");
   });
+
+  it("portals the listbox inside an open dialog", async () => {
+    const user = userEvent.setup();
+    render(
+      <dialog open>
+        <Select
+          ariaLabel="排序"
+          onValueChange={() => undefined}
+          options={OPTIONS}
+          value="recent"
+        />
+      </dialog>,
+    );
+    const dialog = screen.getByRole("dialog");
+
+    await user.click(screen.getByRole("combobox", { name: "排序" }));
+    const listbox = await screen.findByRole("listbox");
+
+    expect(dialog.contains(listbox)).toBe(true);
+    expect(document.body.contains(listbox)).toBe(true);
+  });
 });
