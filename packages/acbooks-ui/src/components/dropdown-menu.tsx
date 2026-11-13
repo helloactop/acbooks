@@ -1,14 +1,18 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 import { cn } from "../lib/utils";
+import { resolveOverlayContainer } from "../lib/overlay-container";
 import { IconButton } from "./icon-button";
 import type { ButtonProps } from "./button";
 
@@ -31,6 +35,20 @@ export interface DropdownMenuProps {
   triggerVariant?: ButtonProps["variant"];
 }
 
+interface MenuPosition {
+  bottom?: number;
+  left: number;
+  maxHeight: number;
+  top?: number;
+  width: number;
+}
+
+const VIEWPORT_PADDING = 12;
+const MENU_GAP = 8;
+const MENU_MAX_HEIGHT = 320;
+const MENU_MIN_WIDTH = 176;
+const MENU_MIN_SPACE = 176;
+
 export function DropdownMenu({
   actions,
   align = "end",
@@ -43,10 +61,65 @@ export function DropdownMenu({
   triggerVariant = "ghost",
 }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(
+    null,
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+
+  const updatePosition = useCallback(() => {
+    const triggerElement = triggerRef.current;
+    if (triggerElement === null) {
+      return;
+    }
+    const rect = triggerElement.getBoundingClientRect();
+    const width = Math.min(
+      Math.max(rect.width, MENU_MIN_WIDTH),
+      window.innerWidth - VIEWPORT_PADDING * 2,
+    );
+    const spaceBelow =
+      window.innerHeight - rect.bottom - MENU_GAP - VIEWPORT_PADDING;
+    const spaceAbove = rect.top - MENU_GAP - VIEWPORT_PADDING;
+    const openUp =
+      side === "top"
+        ? spaceAbove >= MENU_MIN_SPACE || spaceAbove >= spaceBelow
+        : spaceBelow < MENU_MIN_SPACE && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(
+      96,
+      Math.min(MENU_MAX_HEIGHT, openUp ? spaceAbove : spaceBelow),
+    );
+    const desiredLeft = align === "end" ? rect.right - width : rect.left;
+    const left = Math.min(
+      Math.max(desiredLeft, VIEWPORT_PADDING),
+      window.innerWidth - width - VIEWPORT_PADDING,
+    );
+    setMenuPosition({
+      left,
+      maxHeight,
+      width,
+      ...(openUp
+        ? { bottom: window.innerHeight - rect.top + MENU_GAP }
+        : { top: rect.bottom + MENU_GAP }),
+    });
+  }, [align, side]);
+
+  const closeMenu = useCallback((restoreFocus = false) => {
+    setOpen(false);
+    setMenuPosition(null);
+    setPortalContainer(null);
+    if (restoreFocus) {
+      triggerRef.current?.focus();
+    }
+  }, []);
+
+  const openMenu = () => {
+    updatePosition();
+    setPortalContainer(resolveOverlayContainer(triggerRef.current));
+    setOpen(true);
+  };
 
   useEffect(() => {
     if (!open) {
@@ -58,27 +131,52 @@ export function DropdownMenu({
         ?.focus();
     });
     const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
       if (
-        containerRef.current !== null &&
-        !containerRef.current.contains(event.target as Node)
+        containerRef.current?.contains(target) !== true &&
+        menuRef.current?.contains(target) !== true
       ) {
-        setOpen(false);
+        closeMenu();
       }
     };
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
-        triggerRef.current?.focus();
+        event.preventDefault();
+        closeMenu(true);
+        return;
       }
+      if (event.key === "Tab") {
+        event.preventDefault();
+        const trigger = triggerRef.current;
+        closeMenu();
+        if (trigger !== null) {
+          const focusables = Array.from(
+            document.querySelectorAll<HTMLElement>(
+              'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
+            ),
+          ).filter((element) => element.closest('[role="menu"]') === null);
+          const index = focusables.indexOf(trigger);
+          const target = focusables[index + (event.shiftKey ? -1 : 1)];
+          (target ?? trigger).focus();
+        }
+        return;
+      }
+    };
+    const reposition = () => {
+      updatePosition();
     };
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
     return () => {
       window.cancelAnimationFrame(frame);
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
     };
-  }, [open]);
+  }, [closeMenu, open, updatePosition]);
 
   const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (
@@ -112,6 +210,17 @@ export function DropdownMenu({
     items[next]?.focus();
   };
 
+  const menuStyle: CSSProperties | undefined =
+    menuPosition === null
+      ? undefined
+      : {
+          bottom: menuPosition.bottom,
+          left: menuPosition.left,
+          maxHeight: menuPosition.maxHeight,
+          top: menuPosition.top,
+          width: menuPosition.width,
+        };
+
   return (
     <div className={cn("relative", className)} ref={containerRef}>
       {trigger !== undefined ? (
@@ -122,7 +231,11 @@ export function DropdownMenu({
           aria-label={label}
           className={triggerClassName}
           onClick={() => {
-            setOpen((current) => !current);
+            if (open) {
+              closeMenu();
+            } else {
+              openMenu();
+            }
           }}
           ref={triggerRef}
           type="button"
@@ -137,7 +250,11 @@ export function DropdownMenu({
           className={triggerClassName}
           label={label}
           onClick={() => {
-            setOpen((current) => !current);
+            if (open) {
+              closeMenu();
+            } else {
+              openMenu();
+            }
           }}
           ref={triggerRef}
           variant={triggerVariant}
@@ -146,42 +263,41 @@ export function DropdownMenu({
         </IconButton>
       )}
 
-      {open ? (
-        <div
-          className={cn(
-            "absolute z-30 min-w-44 rounded-menu border border-border bg-background p-1 shadow-overlay",
-            side === "top" ? "bottom-full mb-2" : "top-full mt-2",
-            align === "end" ? "right-0" : "left-0",
-          )}
-          id={menuId}
-          onKeyDown={handleMenuKeyDown}
-          ref={menuRef}
-          role="menu"
-        >
-          {actions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <button
-                className="flex min-h-8 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-[13px] text-foreground hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:hover:bg-transparent max-md:min-h-11 md:min-h-8"
-                disabled={action.disabled}
-                key={action.label}
-                onClick={() => {
-                  action.onSelect();
-                  setOpen(false);
-                  triggerRef.current?.focus();
-                }}
-                role="menuitem"
-                type="button"
-              >
-                {Icon !== undefined ? (
-                  <Icon aria-hidden="true" className="size-4" />
-                ) : null}
-                {action.label}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+      {open && menuPosition !== null && portalContainer !== null
+        ? createPortal(
+            <div
+              className="fixed z-40 overflow-y-auto overscroll-contain rounded-menu border border-border bg-background p-1 shadow-overlay"
+              id={menuId}
+              onKeyDown={handleMenuKeyDown}
+              ref={menuRef}
+              role="menu"
+              style={menuStyle}
+            >
+              {actions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <button
+                    className="flex min-h-8 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-[13px] text-foreground hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:hover:bg-transparent max-md:min-h-11 md:min-h-8"
+                    disabled={action.disabled}
+                    key={action.label}
+                    onClick={() => {
+                      action.onSelect();
+                      closeMenu(true);
+                    }}
+                    role="menuitem"
+                    type="button"
+                  >
+                    {Icon !== undefined ? (
+                      <Icon aria-hidden="true" className="size-4" />
+                    ) : null}
+                    {action.label}
+                  </button>
+                );
+              })}
+            </div>,
+            portalContainer,
+          )
+        : null}
     </div>
   );
 }

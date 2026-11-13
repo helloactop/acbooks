@@ -26,6 +26,21 @@ function isFormField(target: EventTarget | null): boolean {
   );
 }
 
+function hasHorizontalScroll(target: EventTarget | null): boolean {
+  let node = target instanceof Element ? target : null;
+  while (node !== null && node !== document.body) {
+    const style = window.getComputedStyle(node);
+    if (
+      (style.overflowX === "auto" || style.overflowX === "scroll") &&
+      node.scrollWidth > node.clientWidth + 1
+    ) {
+      return true;
+    }
+    node = node.parentElement;
+  }
+  return false;
+}
+
 export interface MobileNavigationProps extends AppSidebarProps {
   onOpen: () => void;
   open: boolean;
@@ -64,6 +79,7 @@ export function MobileNavigation({
         event.touches.length !== 1 ||
         touch === undefined ||
         isFormField(event.target) ||
+        hasHorizontalScroll(event.target) ||
         touch.clientX > EDGE_ZONE
       ) {
         edgeSwipe.current = null;

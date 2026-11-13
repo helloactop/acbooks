@@ -49,7 +49,7 @@ interface MenuPosition {
 }
 
 const VIEWPORT_PADDING = 12;
-const MENU_GAP = 6;
+const MENU_GAP = 8;
 const MENU_MAX_HEIGHT = 320;
 
 const TRIGGER_CLASS =
@@ -111,7 +111,7 @@ export function Select({
     }
     const rect = trigger.getBoundingClientRect();
     const width = Math.min(
-      Math.max(rect.width, 168),
+      Math.max(rect.width, 176),
       window.innerWidth - VIEWPORT_PADDING * 2,
     );
     const availableBelow =

@@ -95,13 +95,13 @@ export function MultiValueInput({
     >
       {values.map((value) => (
         <span
-          className="inline-flex max-w-full items-center gap-1 rounded bg-surface py-0.5 pr-1 pl-1.5 text-xs leading-4 text-foreground"
+          className="inline-flex max-w-full items-center gap-1 rounded bg-surface py-0.5 pr-1 pl-1.5 text-xs leading-4 text-foreground max-md:min-h-11 max-md:py-0"
           key={value}
         >
-          <span className="truncate">{value}</span>
+          <span className="min-w-0 truncate">{value}</span>
           <button
             aria-label={t("multiValue.remove", { value })}
-            className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-150 ease-out hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none"
+            className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-150 ease-out hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none max-md:size-11 max-md:active:bg-surface-hover"
             disabled={disabled}
             onClick={(event) => {
               event.stopPropagation();
@@ -109,7 +109,7 @@ export function MultiValueInput({
             }}
             type="button"
           >
-            <X aria-hidden="true" className="size-3" />
+            <X aria-hidden="true" className="size-3 max-md:size-4" />
           </button>
         </span>
       ))}

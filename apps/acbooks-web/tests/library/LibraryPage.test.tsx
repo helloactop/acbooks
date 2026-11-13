@@ -454,6 +454,17 @@ describe("LibraryPage", () => {
     expect(screen.getAllByText("实体 ×2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("阅读中").length).toBeGreaterThan(0);
     expect(screen.getAllByText("已读").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "视图" }));
+    const listItem = await screen.findByRole("menuitem", {
+      name: "列表视图",
+    });
+    const mediumCovers = screen.getByRole("menuitem", {
+      name: "中封面",
+    });
+    expect(listItem.querySelector("svg")).not.toBeNull();
+    expect(mediumCovers.querySelector("svg")).toBeNull();
+    await user.keyboard("{Escape}");
   });
 
   it("sends search, smart filters, sorting and pagination to the server", async () => {

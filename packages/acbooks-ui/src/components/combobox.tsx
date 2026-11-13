@@ -269,13 +269,13 @@ export function Combobox({
               style={menuStyle}
             >
               {loading ? (
-                <div className="flex min-h-9 items-center gap-2 px-3 text-sm text-muted-foreground">
+                <div className="flex min-h-8 items-center gap-2 px-2.5 py-2 text-[13px] text-muted-foreground max-md:min-h-11">
                   <Spinner />
                   {status}
                 </div>
               ) : visibleOptions.length === 0 ? (
                 <div
-                  className="px-3 py-2 text-sm text-muted-foreground"
+                  className="px-2.5 py-2 text-[13px] text-muted-foreground"
                   role="status"
                 >
                   {status ?? emptyLabel}
@@ -285,9 +285,9 @@ export function Combobox({
                   <div
                     aria-selected={index === activeIndex}
                     className={cn(
-                      "flex min-h-9 cursor-pointer items-center gap-2 rounded px-3 py-2 text-sm text-foreground",
+                      "flex min-h-8 cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-[13px] text-foreground max-md:min-h-11",
                       index === activeIndex
-                        ? "bg-accent-soft text-accent-text"
+                        ? "bg-surface-hover"
                         : "hover:bg-surface-hover",
                     )}
                     id={`${listId}-option-${index}`}
@@ -316,7 +316,7 @@ export function Combobox({
               )}
               {!loading && visibleOptions.length > 0 && status ? (
                 <div
-                  className="border-t border-border px-3 py-2 text-xs text-muted-foreground"
+                  className="border-t border-border px-2.5 py-2 text-xs text-muted-foreground"
                   role="status"
                 >
                   {status}

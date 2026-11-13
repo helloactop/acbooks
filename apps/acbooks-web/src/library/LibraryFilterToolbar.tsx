@@ -76,7 +76,8 @@ export function LibraryFilterToolbar({
             },
           },
           {
-            icon: coverSize === "small" ? Check : undefined,
+            icon:
+              view === "grid" && coverSize === "small" ? Check : undefined,
             label: t("view.coverSmall"),
             onSelect: () => {
               onViewChange("grid");
@@ -84,7 +85,8 @@ export function LibraryFilterToolbar({
             },
           },
           {
-            icon: coverSize === "medium" ? Check : undefined,
+            icon:
+              view === "grid" && coverSize === "medium" ? Check : undefined,
             label: t("view.coverMedium"),
             onSelect: () => {
               onViewChange("grid");
@@ -92,7 +94,8 @@ export function LibraryFilterToolbar({
             },
           },
           {
-            icon: coverSize === "large" ? Check : undefined,
+            icon:
+              view === "grid" && coverSize === "large" ? Check : undefined,
             label: t("view.coverLarge"),
             onSelect: () => {
               onViewChange("grid");

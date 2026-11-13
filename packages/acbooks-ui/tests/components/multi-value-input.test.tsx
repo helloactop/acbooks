@@ -23,7 +23,9 @@ describe("MultiValueInput", () => {
     renderWithI18n(<Harness initial={["鲁迅", "沈从文"]} />);
 
     expect(screen.getByText("鲁迅")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "移除 鲁迅" }));
+    const remove = screen.getByRole("button", { name: "移除 鲁迅" });
+    expect(remove).toHaveClass("max-md:size-11");
+    await user.click(remove);
     expect(screen.queryByText("鲁迅")).not.toBeInTheDocument();
     expect(screen.getByText("沈从文")).toBeInTheDocument();
   });
