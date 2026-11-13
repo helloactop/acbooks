@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response
 
 from app.api.errors import internal_error, register_exception_handlers
-from app.api.health import router as health_router
+from app.api.health import health_router
 from app.core.config import Settings
 from app.db.session import DATABASE_PATH, create_sqlite_engine
 from app.modules.auth.csrf import CsrfTokens
@@ -50,7 +50,7 @@ def create_app(
     dependencies = AuthDependencies(
         auth, settings.public_origin, CsrfTokens()
     )
-    app.include_router(health_router, prefix="/api/v1")
+    app.include_router(health_router(engine), prefix="/api/v1")
     app.include_router(
         auth_router(
             SetupService(engine, setup_code_path),

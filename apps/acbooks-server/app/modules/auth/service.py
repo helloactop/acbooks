@@ -25,6 +25,7 @@ from app.modules.auth.repository import (
     add_session,
     find_account,
     find_active_session,
+    prune_inactive_credentials,
     revoke_session,
 )
 from app.modules.auth.setup_code import read_setup_code
@@ -197,6 +198,7 @@ class WebAuthService:
                     now,
                     now + self.session_ttl * 1000,
                 )
+                prune_inactive_credentials(session, now)
                 identity = WebSession(session_id, UUID(current.id), current.username)
             self.limit.reset_backoff()
             return identity, token

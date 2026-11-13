@@ -46,6 +46,23 @@ class BookContributor(Base):
     role: Mapped[str] = mapped_column(Text, primary_key=True)
 
 
+Index("ix_books_created_at", Book.created_at.desc(), Book.id.asc())
+Index("ix_books_updated_at", Book.updated_at.desc(), Book.id.asc())
+Index("ix_books_title_nocase", Book.title.collate("NOCASE"), Book.id.asc())
+Index(
+    "ix_books_reading_status_created",
+    Book.reading_status,
+    Book.created_at.desc(),
+    Book.id.asc(),
+)
+Index(
+    "ix_book_contributors_book_role",
+    BookContributor.book_id,
+    BookContributor.role,
+    BookContributor.contributor_id,
+)
+
+
 class BookIdentifier(Base):
     __tablename__ = "book_identifiers"
     __table_args__ = (Index("ix_book_identifiers_scheme_value", "scheme", "value"),)

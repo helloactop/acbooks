@@ -735,7 +735,7 @@ def test_patch_book_preserves_copies_files_and_reading_data(
                     book_file_id=None,
                     device_id=None,
                     started_at=1_000,
-                    ended_at=2_000,
+                    ended_at=1_001_000,
                     active_seconds=1_000,
                     source="manual",
                 )

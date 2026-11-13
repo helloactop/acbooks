@@ -1,9 +1,12 @@
+from pathlib import Path
 from uuid import UUID
 
 import pytest
+from alembic import command
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+from test_database import migration_config
 
 from app.core.errors import BusinessError, BusinessErrorCode
 from app.main import create_app
@@ -23,8 +26,37 @@ def test_health_and_openapi(monkeypatch: pytest.MonkeyPatch) -> None:
         assert operation["responses"]["200"]["headers"]["X-Request-ID"]["required"]
         problem = operation["responses"]["500"]["content"]["application/problem+json"]
         assert "requestId" in problem["schema"]["required"]
+        readiness = schema["paths"]["/api/v1/ready"]["get"]
+        assert readiness["operationId"] == "getReadiness"
+        assert readiness["responses"]["200"]["headers"]["X-Request-ID"]["required"]
+        assert "503" in readiness["responses"]
         assert client.get("/docs").status_code == 404
         assert client.get("/api/v1/health").headers["X-Request-ID"] != request_id
+
+
+def test_readiness_requires_database_and_current_migration(tmp_path: Path) -> None:
+    database = tmp_path / "acbooks.db"
+    config = migration_config(database)
+    command.upgrade(config, "head")
+
+    with TestClient(create_app(database_path=database)) as client:
+        response = client.get("/api/v1/ready")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok", "migration": "current"}
+        assert response.headers["cache-control"] == "no-store"
+
+    command.downgrade(config, "0003")
+    with TestClient(create_app(database_path=database)) as client:
+        response = client.get("/api/v1/ready")
+        assert response.status_code == 503
+        assert response.headers["content-type"] == "application/problem+json"
+        assert response.json()["code"] == "SERVICE_UNAVAILABLE"
+        assert client.get("/api/v1/health").status_code == 200
+
+    with TestClient(create_app(database_path=tmp_path / "missing" / "acbooks.db")) as client:
+        response = client.get("/api/v1/ready")
+        assert response.status_code == 503
+        assert response.json()["code"] == "SERVICE_UNAVAILABLE"
 
 
 def test_environment_configuration(monkeypatch: pytest.MonkeyPatch) -> None:

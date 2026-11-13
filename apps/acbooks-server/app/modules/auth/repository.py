@@ -1,7 +1,7 @@
-from sqlalchemy import select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
-from app.db.models.auth import AuthAccount, AuthSession
+from app.db.models.auth import AuthAccount, AuthSession, AuthToken
 
 
 def account_exists(session: Session) -> bool:
@@ -47,6 +47,19 @@ def revoke_session(session: Session, session_id: str, now: int) -> bool:
         return False
     current.revoked_at = now
     return True
+
+
+def prune_inactive_credentials(session: Session, now: int) -> None:
+    session.execute(
+        delete(AuthSession).where(
+            or_(AuthSession.revoked_at.is_not(None), AuthSession.expires_at <= now)
+        )
+    )
+    session.execute(
+        delete(AuthToken).where(
+            or_(AuthToken.revoked_at.is_not(None), AuthToken.expires_at <= now)
+        )
+    )
 
 
 def add_account(

@@ -27,13 +27,15 @@ python -m alembic -x db_path=./.venv/acbooks-dev.db current
 python -m alembic -x db_path=./.venv/acbooks-dev.db check
 ```
 
-迁移由 Alembic 执行。应用启动和 HTTP 存活探针不会触发迁移。
+迁移由 Alembic 执行。应用启动和 HTTP 存活探针不会触发迁移；
+`GET /api/v1/ready` 检查数据库连接与 `alembic_version`，未升级到当前 head 时返回 `503`。
 API 与 Worker 的数据库调用可复用 `app.db.session` 的引擎和会话工厂，
 由业务服务使用 `session_factory.begin()` 管理写事务。
 
 变更模型后，对已升级至当前版本的本地库运行
 `python -m alembic -x db_path=./.venv/acbooks-dev.db revision --autogenerate -m "描述变更"`。
-审查生成的脚本，并在旧数据副本验证升级与完整性。涉及 SQLite batch 重建时，
+审查生成的脚本，并在旧数据副本验证升级与完整性。新增迁移后同步更新
+`app/db/version.py` 的 `SCHEMA_HEAD_REVISION`；`/api/v1/ready` 与测试据此校验迁移状态。涉及 SQLite batch 重建时，
 特别检查入向外键和级联行为。初始迁移的 `downgrade base` 会删除业务表及其数据，
 仅在可丢弃的测试库验证。真实库升级前使用 SQLite 一致性备份。
 

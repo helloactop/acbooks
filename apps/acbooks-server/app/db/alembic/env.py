@@ -29,6 +29,14 @@ def verify_integrity_triggers(connection: Connection) -> None:
             for table in ("reading_sessions", "bookmarks", "annotations")
             for event in ("insert", "update")
         )
+    if "0004" in applied:
+        required.update(
+            (f"validate_books_reading_status_{event}", "books") for event in ("insert", "update")
+        )
+        required.update(
+            (f"validate_reading_sessions_active_duration_{event}", "reading_sessions")
+            for event in ("insert", "update")
+        )
     if required:
         actual = {
             (name, table)

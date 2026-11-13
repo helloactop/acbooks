@@ -9,6 +9,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from alembic.operations import Operations
+from alembic.script import ScriptDirectory
 from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
@@ -19,6 +20,7 @@ from app.db.models.books import Book
 from app.db.models.copies import BookCopy
 from app.db.models.storage import BookFile, StorageObject, StorageRoot
 from app.db.session import create_session_factory, create_sqlite_engine
+from app.db.version import SCHEMA_HEAD_REVISION
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
 
@@ -196,6 +198,146 @@ def test_database_constraints(database: Engine, sql: str) -> None:
             connection.exec_driver_sql(seed)
     with pytest.raises(IntegrityError), database.begin() as connection:
         connection.exec_driver_sql(sql)
+
+
+def test_reading_constraints_guard_insert_and_update(database: Engine) -> None:
+    with database.begin() as connection:
+        connection.exec_driver_sql(
+            "INSERT INTO books (id, title, reading_status, created_at, updated_at)"
+            " VALUES ('book', 'Book', 'unread', 1, 1)"
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO reading_sessions"
+            " (id, book_id, started_at, ended_at, active_seconds, source)"
+            " VALUES ('read', 'book', 0, 1000, 1, 'manual')"
+        )
+
+    for statement in (
+        "INSERT INTO books (id, title, reading_status, created_at, updated_at)"
+        " VALUES ('other', 'Other', 'paused', 1, 1)",
+        "UPDATE books SET reading_status = 'paused' WHERE id = 'book'",
+        "INSERT INTO reading_sessions (id, book_id, started_at, ended_at, active_seconds, source)"
+        " VALUES ('long', 'book', 0, 1000, 2, 'manual')",
+        "UPDATE reading_sessions SET active_seconds = 2 WHERE id = 'read'",
+        "UPDATE reading_sessions SET ended_at = 500 WHERE id = 'read'",
+    ):
+        with pytest.raises(IntegrityError), database.begin() as connection:
+            connection.exec_driver_sql(statement)
+
+    with database.begin() as connection:
+        connection.exec_driver_sql("UPDATE books SET reading_status = 'done' WHERE id = 'book'")
+        connection.exec_driver_sql(
+            "UPDATE reading_sessions SET active_seconds = 2, ended_at = 2000 WHERE id = 'read'"
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO reading_sessions (id, book_id, started_at, source)"
+            " VALUES ('open', 'book', 0, 'automatic')"
+        )
+
+
+@pytest.mark.parametrize(
+    ("seed", "message"),
+    [
+        (
+            "INSERT INTO books (id, title, reading_status, created_at, updated_at)"
+            " VALUES ('legacy', 'Legacy', 'paused', 1, 1)",
+            "Unsupported reading status in books",
+        ),
+        (
+            "INSERT INTO reading_sessions"
+            " (id, book_id, started_at, ended_at, active_seconds, source)"
+            " VALUES ('legacy', 'book', 0, 1000, 2, 'manual')",
+            "Active time exceeds the reading session duration",
+        ),
+    ],
+)
+def test_library_constraint_migration_rejects_invalid_legacy_rows(
+    tmp_path: Path, seed: str, message: str
+) -> None:
+    path = tmp_path / "legacy.db"
+    config = migration_config(path)
+    command.upgrade(config, "0003")
+    engine = create_sqlite_engine(path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO books (id, title, created_at, updated_at)"
+                " VALUES ('book', 'Book', 1, 1)"
+            )
+            connection.exec_driver_sql(seed)
+        with pytest.raises(RuntimeError, match=message):
+            command.upgrade(config, "head")
+        with engine.connect() as connection:
+            assert (
+                connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one()
+                == "0003"
+            )
+            assert (
+                connection.exec_driver_sql(
+                    "SELECT name FROM sqlite_schema WHERE name IN"
+                    " ('ix_books_created_at', 'ix_book_copies_book',"
+                    " 'validate_books_reading_status_insert')"
+                ).all()
+                == []
+            )
+    finally:
+        engine.dispose()
+
+
+def test_library_query_plans_use_indexes(database: Engine) -> None:
+    with database.begin() as connection:
+        connection.exec_driver_sql("INSERT INTO locations (id, name) VALUES ('room', 'Room')")
+        connection.exec_driver_sql(
+            "INSERT INTO contributors (id, name) VALUES ('author', 'Author')"
+        )
+        for position in range(100):
+            connection.exec_driver_sql(
+                "INSERT INTO books (id, title, reading_status, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (f"book-{position}", f"Title {position}", "reading", position, position),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO book_contributors (book_id, contributor_id, role)"
+                " VALUES (?, 'author', 'author')",
+                (f"book-{position}",),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO book_copies (id, book_id, location_id) VALUES (?, ?, 'room')",
+                (f"copy-{position}", f"book-{position}"),
+            )
+
+    def plan(statement: str) -> str:
+        with database.connect() as connection:
+            rows = connection.exec_driver_sql(f"EXPLAIN QUERY PLAN {statement}")
+            return " ".join(str(row[-1]) for row in rows)
+
+    queries = {
+        "ix_books_created_at": "SELECT id FROM books ORDER BY created_at DESC, id ASC LIMIT 12",
+        "ix_books_updated_at": "SELECT id FROM books ORDER BY updated_at DESC, id ASC LIMIT 12",
+        "ix_books_title_nocase": (
+            "SELECT id FROM books ORDER BY title COLLATE NOCASE ASC, id ASC LIMIT 12"
+        ),
+        "ix_books_reading_status_created": (
+            "SELECT id FROM books WHERE reading_status = 'reading'"
+            " ORDER BY created_at DESC, id ASC LIMIT 12"
+        ),
+        "ix_book_copies_book": "SELECT id FROM book_copies WHERE book_id = 'book-1'",
+        "ix_book_copies_location": "SELECT id FROM book_copies WHERE location_id = 'room'",
+        "ix_book_contributors_book_role": (
+            "SELECT (SELECT name FROM contributors JOIN book_contributors"
+            " ON book_contributors.contributor_id = contributors.id"
+            " WHERE book_contributors.book_id = books.id"
+            " AND book_contributors.role = 'author'"
+            " ORDER BY contributors.name COLLATE NOCASE, contributors.id LIMIT 1) FROM books"
+        ),
+    }
+    for index_name, statement in queries.items():
+        assert index_name in plan(statement), f"{index_name} is not used by: {statement}"
+
+
+def test_schema_head_constant_matches_migrations() -> None:
+    script = ScriptDirectory.from_config(Config(str(SERVER_ROOT / "alembic.ini")))
+    assert script.get_current_head() == SCHEMA_HEAD_REVISION
 
 
 def test_only_one_admin_can_be_created_concurrently(database: Engine) -> None:
@@ -425,14 +567,14 @@ def test_batch_migration_must_preserve_status_triggers(tmp_path: Path, table: st
     )
     config.set_main_option("script_location", str(scripts))
     command.upgrade(config, "0003")
-    migration = scripts / "versions/0004_test_batch.py"
+    migration = scripts / "versions/0005_test_batch.py"
     migration.write_text(
         f"""
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0004"
-down_revision = "0003"
+revision = "0005"
+down_revision = "0004"
 branch_labels = None
 depends_on = None
 
@@ -497,7 +639,7 @@ def upgrade():
         with engine.begin() as connection:
             assert (
                 connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one()
-                == "0004"
+                == "0005"
             )
             with pytest.raises(IntegrityError, match=f"Invalid {table}"):
                 connection.exec_driver_sql(insert, invalid)
@@ -523,7 +665,7 @@ def downgrade():
         with engine.connect() as connection:
             assert (
                 connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one()
-                == "0004"
+                == "0005"
             )
             assert connection.exec_driver_sql(select_state).scalar_one() == valid
 

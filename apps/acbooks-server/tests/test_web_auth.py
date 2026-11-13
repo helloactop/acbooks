@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 from hashlib import sha256
 from pathlib import Path
+from time import time_ns
 from typing import Literal
 
 import pytest
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 from test_database import migration_config
 from test_setup import ORIGIN, PASSWORD, SETUP, assert_problem, challenge, make_client, payload
 
-from app.db.models.auth import AuthAccount, AuthSession
+from app.db.models.auth import AuthAccount, AuthSession, AuthToken
 from app.db.session import create_sqlite_engine
 from app.modules.auth import csrf, service
 from app.modules.auth.provision import main as provision_installation
@@ -103,6 +104,63 @@ def test_session_is_hashed_survives_restart_and_logout_revokes_only_current(
     assert "operation=logout result=revoked" in caplog.text
     for secret in (raw, PASSWORD, preauth["X-CSRF-Token"]):
         assert secret not in response.text + caplog.text
+
+
+def test_login_prunes_expired_and_revoked_credentials(
+    auth_paths: tuple[Path, Path],
+) -> None:
+    now = time_ns() // 1_000_000
+    engine = create_sqlite_engine(auth_paths[0])
+    try:
+        with Session(engine) as session, session.begin():
+            account = session.scalars(select(AuthAccount)).one()
+            session.add_all(
+                [
+                    AuthSession(
+                        id="expired",
+                        account_id=account.id,
+                        session_token_hash=sha256(b"expired").hexdigest(),
+                        created_at=now - 2_000,
+                        expires_at=now - 1_000,
+                    ),
+                    AuthSession(
+                        id="revoked",
+                        account_id=account.id,
+                        session_token_hash=sha256(b"revoked").hexdigest(),
+                        created_at=now - 2_000,
+                        expires_at=now + 60_000,
+                        revoked_at=now - 1_000,
+                    ),
+                    AuthSession(
+                        id="active",
+                        account_id=account.id,
+                        session_token_hash=sha256(b"active").hexdigest(),
+                        created_at=now - 2_000,
+                        expires_at=now + 60_000,
+                    ),
+                    AuthToken(
+                        id="stale-token",
+                        account_id=account.id,
+                        token_hash=sha256(b"token").hexdigest(),
+                        kind="device",
+                        scope="full",
+                        label="Reader",
+                        created_at=now - 2_000,
+                        expires_at=now - 1_000,
+                    ),
+                ]
+            )
+
+        with make_client(auth_paths) as browser:
+            login(browser)
+
+        with Session(engine) as session:
+            session_ids = set(session.scalars(select(AuthSession.id)).all())
+            assert len(session_ids) == 2
+            assert "active" in session_ids
+            assert session.get(AuthToken, "stale-token") is None
+    finally:
+        engine.dispose()
 
 
 def test_login_failure_is_uniform_and_throttled(

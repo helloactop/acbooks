@@ -34,10 +34,10 @@ pnpm build
 | --- | --- |
 | Ruff | 后端 Python 代码的错误、未使用导入和导入排序 |
 | mypy | 后端应用及测试代码的严格类型检查 |
-| pytest | FastAPI 配置、健康检查、OpenAPI、业务错误码、500 脱敏诊断和请求 ID |
-| pytest | SQLite 临时文件库上的 Alembic 升降级、模型一致性、异常回滚重试、连接参数、外键和唯一约束、任务和文件状态校验、并发写入及在线备份恢复 |
+| pytest | FastAPI 配置、存活与就绪探针（数据库连接和迁移版本）、OpenAPI、业务错误码、500 脱敏诊断和请求 ID |
+| pytest | SQLite 临时文件库上的 Alembic 升降级、模型一致性、异常回滚重试、连接参数、外键和唯一约束、阅读状态与有效时长约束、列表查询索引命中、任务和文件状态校验、并发写入及在线备份恢复 |
 | pytest | 首次管理员初始化的码文件生成与权限、来源和 CSRF 验证、密码校验与 Argon2id 存储、限速、双应用实例并发、事务失败重试及清理失败后的重启 |
-| pytest | Web 密码登录与限速、Cookie 属性、会话摘要与过期、重启持久化、会话轮换、CSRF 来源与绑定、单会话注销 |
+| pytest | Web 密码登录与限速、Cookie 属性、会话摘要与过期、重启持久化、会话轮换、CSRF 来源与绑定、单会话注销、登录时清理过期与撤销凭据 |
 | pytest | Books Core V1：创建书目、重复 ISBN 不合并、作者/译者/ISBN/标签/书架关联、Unicode casefold 名称匹配、数据库级搜索筛选排序分页、部分更新保留副本与阅读数据、会话/CSRF、OpenAPI 契约 |
 | ESLint | Web 与共享 UI 的 TypeScript/React 代码、Hooks 规则和导入问题 |
 | tsc | Web 与共享 UI 的 TypeScript strict 类型检查 |

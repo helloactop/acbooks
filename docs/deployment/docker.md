@@ -8,7 +8,12 @@ API、Worker 和迁移服务使用同一 Linux 镜像，容器进程以 UID/GID 
 docker compose -f deploy/compose.yaml up -d --build --wait
 docker compose -f deploy/compose.yaml ps -a
 curl -fsS http://127.0.0.1:8000/api/v1/health
+curl -fsS http://127.0.0.1:8000/api/v1/ready
 ```
+
+`/api/v1/health` 只表示进程可处理请求；`/api/v1/ready` 还要求数据库可连接且迁移
+已升级到当前版本，数据库或迁移异常时返回 `503`。外部探针应使用 `/ready`
+判断是否接入流量。
 
 `migrate` 先执行 `alembic upgrade head`，并为尚未初始化的数据库准备一次性初始化码。
 它成功退出后，Compose 才会启动 API 和 Worker。预期状态为 `migrate` 退出码 0、

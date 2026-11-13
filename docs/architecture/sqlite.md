@@ -51,7 +51,7 @@
 - 登录创建会话或令牌；请求验证时同时检查关联账号、`expires_at` 与 `revoked_at`；登出撤销当前会话或令牌；修改/本地重置密码须在事务中**撤销该账号全部现存会话和令牌**。
 - **初始化状态只由 `auth_accounts` 是否存在唯一记录判定**，不用 `app_settings` 再存一份 `initialized` 标志；安装码是 `/data/acbooks/secrets/` 内的权限 `0600` 文件，不进入 SQLite。`POST /setup` 在一个 `BEGIN IMMEDIATE` 或等效显式 SQLite 写事务中校验初始化前提并插入管理员；唯一约束保证并发请求只成功一个。初始化事务提交后废止安装码；即使废止文件失败，已有账号也永久阻止公开重试。
 - 单用户**不等于**使用全局超级令牌：应用凭据只读、与登录凭据隔离，支持过期、手动撤销；`devices` 仍只表达阅读同步的设备身份，不替代 `auth_tokens`。
-- `auth_sessions` 与 `auth_tokens` 可定期清理已过期、已撤销的历史行，但不得删当前有效凭据；密码变更和撤销要在下一次请求时立即生效。索引以唯一 token hash 为主，不引入不必要的会话缓存。
+- `auth_sessions` 与 `auth_tokens` 应定期清理已过期、已撤销的历史行，但不得删当前有效凭据；当前实现在每次成功登录的写事务中同时清理两类凭据，密码变更和撤销要在下一次请求时立即生效。索引以唯一 token hash 为主，不引入不必要的会话缓存。
 - 首次建库通过**初始 Alembic revision** 纳入这三表；如果项目已存在已发布 schema，必须**新增** revision，绝不改写已发布 migration。测试需覆盖“旧库升级、空库初始化、并发抢注、账号唯一性、撤销及恢复”。
 
 **删除与扫描规则**：扫描不到文件时将 `storage_objects.file_status` 标为 `missing`，不自动删除 `Book`、笔记或阅读历史；移动文件尽量更新存储索引并保持书籍/文件 ID 稳定。ISBN、书名、文件哈希只用于候选匹配，歧义需人工确认。
@@ -60,6 +60,18 @@
 `background_jobs.status` 允许 `queued`、`running`、`succeeded`、`failed`，状态流转按 [后台任务规范](jobs.md) 执行。
 迁移 `0002` 用 SQLite 触发器检查新增与更新，保留原表及其外键。旧库存在非法值时，
 升级会回滚。应先备份，按真实业务状态修正旧记录，再重试迁移。
+
+**阅读状态与有效时长**：`books.reading_status` 仅允许 `unread`、`reading`、`done`；
+`reading_sessions` 在 `ended_at` 非空时要求 `active_seconds × 1000 ≤ ended_at − started_at`。
+迁移 `0004` 先校验旧数据，再用 SQLite 触发器约束新增与更新；旧库存在非法值时升级回滚，
+应先备份、按真实业务状态修正记录，再重试迁移。
+
+**列表查询索引**：迁移 `0004` 增加 `books(created_at DESC, id)`、
+`books(updated_at DESC, id)`、`books(title COLLATE NOCASE, id)`、
+`books(reading_status, created_at DESC, id)`、`book_copies(book_id)`、
+`book_copies(location_id)` 与 `book_contributors(book_id, role, contributor_id)`，
+覆盖默认/标题/更新时间排序、阅读状态筛选、实体副本查询与作者排序的稳定分页。
+新增查询应通过 `EXPLAIN QUERY PLAN` 验证是否命中索引，避免无界全表扫描与临时排序。
 
 **阅读记录归属**：`reading_sessions`、`bookmarks` 和 `annotations` 的
 `book_file_id` 有值时，必须与关联文件的 `book_id` 一致。迁移 `0003` 校验旧库数据，
@@ -143,7 +155,7 @@ class ReadingSession(Base):
 - **数据库位置**：`/data/acbooks/database/acbooks.db`；只能放后端所在设备的可靠本地文件系统，不能放远程 SMB/NFS 网络共享。
 - **连接初始化**：每个连接设置 `PRAGMA foreign_keys=ON`、`PRAGMA busy_timeout=5000`；初始化数据库时启用 `journal_mode=WAL`，`synchronous=FULL` 默认优先数据可靠性。
 - **事务**：API 和 Worker 共用业务服务；数据库写入使用 SQLAlchemy `Session` 的显式事务。扫描、网络、解压、哈希、文件搬运在事务**外**完成，再短事务保存结果。
-- **迁移**：模型变更 → 生成 Alembic revision → 审查 SQL/SQLite batch 重建 → 在旧数据副本测试升级 → 提交迁移。禁止改写已发布 migration。
+- **迁移**：模型变更 → 生成 Alembic revision → 审查 SQL/SQLite batch 重建 → 在旧数据副本测试升级 → 提交迁移。禁止改写已发布 migration。新增迁移后同步更新 `app/db/version.py` 的 `SCHEMA_HEAD_REVISION`，就绪探针据此比较 `alembic_version`。
 - **触发器**：SQLite batch 重建会删除原表触发器。涉及状态或阅读归属校验的表时，
   升级和降级均须在同一事务中恢复目标版本仍需的触发器，并测试合法及非法的写入。Alembic 在提交前按
   已应用版本核对必需触发器的名称与所属表，缺失时回滚迁移。
