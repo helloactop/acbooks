@@ -17,6 +17,16 @@ export function libraryErrorMessage(
       return t("errors.locationHasChildren");
     case "LOCATION_CYCLE":
       return t("errors.locationCycle");
+    case "FILE_NOT_FOUND":
+      return t("errors.fileNotFound");
+    case "FILE_FORMAT_UNSUPPORTED":
+      return t("errors.fileFormat");
+    case "FILE_TOO_LARGE":
+      return t("errors.fileTooLarge");
+    case "FILE_DUPLICATE":
+      return t("errors.fileDuplicate");
+    case "FILE_EXTERNAL_PROTECTED":
+      return t("errors.fileExternal");
     case "VALIDATION_ERROR":
       return t("errors.validation");
     case "INVALID_COVER":

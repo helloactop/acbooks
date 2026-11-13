@@ -375,6 +375,8 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
             onEditCopy={(copy) => {
               setCopyDialog({ copy });
             }}
+            onFilesChanged={refreshDetail}
+            onSessionExpired={expireSession}
           />
         </>
       ) : null}

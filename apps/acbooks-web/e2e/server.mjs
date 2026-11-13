@@ -98,6 +98,7 @@ const child = spawn(
       ACBOOKS_E2E_ORIGIN: origin,
       ACBOOKS_E2E_WEB: distDir,
       ACBOOKS_E2E_COVERS: path.join(dataDir, "covers"),
+      ACBOOKS_E2E_LIBRARY: path.join(dataDir, "library"),
     },
     stdio: "inherit",
   },

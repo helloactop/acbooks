@@ -46,7 +46,7 @@ test("uploads, replaces, and removes a cover", async ({ page }) => {
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
     "base64",
   );
-  await page.locator('input[type="file"]').setInputFiles({
+  await page.locator('input[type="file"][accept*="image"]').setInputFiles({
     buffer: png,
     mimeType: "image/png",
     name: "cover.png",

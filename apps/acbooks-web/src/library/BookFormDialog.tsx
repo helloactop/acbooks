@@ -13,6 +13,7 @@ export interface BookFormDialogProps {
   mode: BookFormMode;
   onClose: () => void;
   onSaved: (book: BookDetail, mode: BookFormMode) => void;
+  onFilesFailed?: (names: string[]) => void;
   onSessionExpired: () => void;
 }
 
@@ -20,6 +21,7 @@ export function BookFormDialog({
   book,
   mode,
   onClose,
+  onFilesFailed,
   onSaved,
   onSessionExpired,
 }: BookFormDialogProps) {
@@ -48,6 +50,7 @@ export function BookFormDialog({
           onBusyChange={setBusy}
           onCloseRequest={requestClose}
           onDirtyChange={setDirty}
+          onFilesFailed={onFilesFailed}
           onSaved={onSaved}
           onSessionExpired={onSessionExpired}
         />

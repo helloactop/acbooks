@@ -6,9 +6,10 @@ import {
   MultiValueInput,
   Select,
   Textarea,
+  useLanguage,
 } from "@acbooks/ui";
 import { Trash2, X } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { toApiError, type ApiError } from "../api/client";
@@ -26,7 +27,9 @@ import {
 import { CopyFormFields } from "./CopyFormFields";
 import { copyDraftToBody, emptyCopyDraft, type CopyDraft } from "./copy-draft";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
+import { uploadBookFile } from "./files-api";
 import { LibraryAlert } from "./LibraryAlert";
+import { formatBytes } from "./presentation";
 
 export type BookFormMode = "create" | "edit";
 
@@ -37,6 +40,7 @@ export interface BookFormProps {
   onCloseRequest: () => void;
   onDirtyChange: (dirty: boolean) => void;
   onSaved: (book: BookDetail, mode: BookFormMode) => void;
+  onFilesFailed?: (names: string[]) => void;
   onSessionExpired: () => void;
 }
 
@@ -102,10 +106,13 @@ export function BookForm({
   onBusyChange,
   onCloseRequest,
   onDirtyChange,
+  onFilesFailed,
   onSaved,
   onSessionExpired,
 }: BookFormProps) {
   const { t } = useTranslation("library");
+  const { resolvedLanguage } = useLanguage();
+  const filesInput = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(book?.title ?? "");
   const [description, setDescription] = useState(book?.description ?? "");
   const [authors, setAuthors] = useState<string[]>(book?.authors ?? []);
@@ -119,6 +126,7 @@ export function BookForm({
   const [tags, setTags] = useState<string[]>(book?.tags ?? []);
   const [shelves, setShelves] = useState<string[]>(book?.shelves ?? []);
   const [copies, setCopies] = useState<CopyDraft[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
   const [titleError, setTitleError] = useState<string | undefined>(undefined);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -145,6 +153,7 @@ export function BookForm({
         tags.length > 0 ||
         shelves.length > 0 ||
         copies.length > 0 ||
+        files.length > 0 ||
         readingStatus !== "unread";
 
   useEffect(() => {
@@ -209,6 +218,22 @@ export function BookForm({
           ...(inlineCopies.length > 0 ? { copies: inlineCopies } : {}),
         };
         saved = await createBook(body);
+        const failed: string[] = [];
+        for (const file of files) {
+          try {
+            await uploadBookFile(saved.id, file);
+          } catch (cause) {
+            const apiError = toApiError(cause);
+            if (apiError.status === 401) {
+              onSessionExpired();
+              return;
+            }
+            failed.push(file.name);
+          }
+        }
+        if (failed.length > 0) {
+          onFilesFailed?.(failed);
+        }
       }
       setBusy(false);
       onSaved(saved, mode);
@@ -460,6 +485,73 @@ export function BookForm({
                             updateCopyDraft(index, draft);
                           }}
                         />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            ) : null}
+
+            {mode === "create" ? (
+              <section className="flex flex-col gap-3 border-t border-border pt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold">{t("form.files")}</h3>
+                  <Button
+                    disabled={busy}
+                    onClick={() => {
+                      filesInput.current?.click();
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {t("form.chooseFiles")}
+                  </Button>
+                </div>
+                <input
+                  accept=".epub,.pdf,application/epub+zip,application/pdf"
+                  className="hidden"
+                  multiple
+                  onChange={(event) => {
+                    const selected = Array.from(event.target.files ?? []);
+                    if (selected.length > 0) {
+                      setFiles((current) => [...current, ...selected]);
+                      clearError();
+                    }
+                    event.target.value = "";
+                  }}
+                  ref={filesInput}
+                  type="file"
+                />
+                {files.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {t("form.filesHint")}
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {files.map((file, index) => (
+                      <li
+                        className="flex items-center gap-2 rounded-card border border-border px-3 py-2 text-sm"
+                        key={`${file.name}-${index}`}
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {file.name}
+                        </span>
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                          {formatBytes(file.size, resolvedLanguage)}
+                        </span>
+                        <IconButton
+                          disabled={busy}
+                          label={t("form.removeFile")}
+                          onClick={() => {
+                            setFiles((current) =>
+                              current.filter(
+                                (_item, itemIndex) => itemIndex !== index,
+                              ),
+                            );
+                          }}
+                        >
+                          <Trash2 aria-hidden="true" />
+                        </IconButton>
                       </li>
                     ))}
                   </ul>

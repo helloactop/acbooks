@@ -21,6 +21,8 @@ export interface BookDetailTabsProps {
   onAddCopy?: () => void;
   onDeleteCopy?: (copy: BookCopy) => void;
   onEditCopy?: (copy: BookCopy) => void;
+  onFilesChanged?: () => void;
+  onSessionExpired?: () => void;
 }
 
 export function BookDetailTabs({
@@ -28,6 +30,8 @@ export function BookDetailTabs({
   onAddCopy,
   onDeleteCopy,
   onEditCopy,
+  onFilesChanged,
+  onSessionExpired,
 }: BookDetailTabsProps) {
   const { t } = useTranslation("library");
   const [activeTab, setActiveTab] = useState<DetailTab>("info");
@@ -60,6 +64,8 @@ export function BookDetailTabs({
             onAddCopy={onAddCopy}
             onDeleteCopy={onDeleteCopy}
             onEditCopy={onEditCopy}
+            onFilesChanged={onFilesChanged}
+            onSessionExpired={onSessionExpired}
           />
         ) : null}
         {activeTab === "reading" ? (

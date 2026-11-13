@@ -72,6 +72,7 @@ export function LibraryPage() {
   const view = hasViewParam ? urlView : preferences.defaultView;
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [uploadIssues, setUploadIssues] = useState<string[]>([]);
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
     new Set(),
@@ -361,6 +362,27 @@ export function LibraryPage() {
         title={t("page.libraryTitle")}
       />
 
+      {uploadIssues.length > 0 ? (
+        <div
+          className="flex items-start gap-2 rounded-card border border-border bg-surface px-3 py-2 text-sm"
+          role="status"
+        >
+          <span className="min-w-0 flex-1 text-muted-foreground">
+            {t("form.filesPartial", { names: uploadIssues.join("、") })}
+          </span>
+          <button
+            aria-label={t("form.close")}
+            className="shrink-0 rounded-control p-1 text-muted-foreground transition-colors duration-150 ease-out hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            onClick={() => {
+              setUploadIssues([]);
+            }}
+            type="button"
+          >
+            <X aria-hidden="true" className="size-4" />
+          </button>
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
         <SegmentedControl
           ariaLabel={t("filters.type")}
@@ -585,6 +607,7 @@ export function LibraryPage() {
           onClose={() => {
             setCreateOpen(false);
           }}
+          onFilesFailed={setUploadIssues}
           onSaved={handleCreated}
           onSessionExpired={expireSession}
         />

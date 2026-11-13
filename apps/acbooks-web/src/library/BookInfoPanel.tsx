@@ -2,16 +2,20 @@ import { Button, IconButton, useLanguage } from "@acbooks/ui";
 import { Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { FormatBadges } from "./BookMeta";
 import type { BookDetail } from "./books-api";
+import { BookFilesPanel } from "./BookFilesPanel";
 import type { BookCopy } from "./copies-api";
-import { formatBytes, formatDate, formatDateTime } from "./presentation";
+import { formatDate, formatDateTime } from "./presentation";
+
+const noop = () => undefined;
 
 export interface BookInfoPanelProps {
   detail: BookDetail;
   onAddCopy?: () => void;
   onDeleteCopy?: (copy: BookCopy) => void;
   onEditCopy?: (copy: BookCopy) => void;
+  onFilesChanged?: () => void;
+  onSessionExpired?: () => void;
 }
 
 export function BookInfoPanel({
@@ -19,6 +23,8 @@ export function BookInfoPanel({
   onAddCopy,
   onDeleteCopy,
   onEditCopy,
+  onFilesChanged,
+  onSessionExpired,
 }: BookInfoPanelProps) {
   const { t } = useTranslation("library");
   const { resolvedLanguage } = useLanguage();
@@ -92,45 +98,12 @@ export function BookInfoPanel({
           )}
         </section>
 
-        <section>
-          <h2 className="text-base font-semibold">{t("detail.files")}</h2>
-          {detail.files.length === 0 ? (
-            <p className="mt-3 text-sm text-muted-foreground">
-              {t("detail.noFiles")}
-            </p>
-          ) : (
-            <ul
-              aria-label={t("detail.files")}
-              className="mt-3 divide-y divide-border border-y border-border"
-            >
-              {detail.files.map((file, index) => (
-                <li
-                  className="flex flex-wrap items-center gap-x-2 gap-y-1 py-3 text-sm"
-                  key={file.id}
-                >
-                  <span className="text-xs text-muted-foreground">
-                    {t("detail.fileNumber", { number: index + 1 })}
-                  </span>
-                  <FormatBadges formats={[file.format]} />
-                  <span
-                    className={
-                      file.fileStatus === "present"
-                        ? "text-[13px] text-muted-foreground"
-                        : "text-[13px] text-destructive-text"
-                    }
-                  >
-                    {file.fileStatus === "present"
-                      ? t("detail.filePresent")
-                      : t("detail.fileMissing")}
-                  </span>
-                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                    {formatBytes(file.sizeBytes, resolvedLanguage)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <BookFilesPanel
+          bookId={detail.id}
+          files={detail.files}
+          onChanged={onFilesChanged ?? noop}
+          onSessionExpired={onSessionExpired ?? noop}
+        />
       </div>
 
       <section className="border-t border-border pt-6">
