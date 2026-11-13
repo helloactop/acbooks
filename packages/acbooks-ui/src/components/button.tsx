@@ -11,7 +11,7 @@ import { cn } from "../lib/utils";
  * `outline` is a bordered secondary action such as filtering or navigation.
  */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control border text-sm transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:pointer-events-none max-md:min-h-11 data-[disabled=true]:border-disabled-border data-[disabled=true]:bg-disabled-surface data-[disabled=true]:text-disabled-foreground [&_svg:not([class*='size-'])]:size-[18px] [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-control border text-[13px] transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:pointer-events-none max-md:min-h-11 data-[disabled=true]:border-disabled-border data-[disabled=true]:bg-disabled-surface data-[disabled=true]:text-disabled-foreground [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -28,10 +28,10 @@ const buttonVariants = cva(
           "border-destructive bg-destructive font-medium text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80",
       },
       size: {
-        sm: "h-8 px-3",
-        md: "h-9 px-4",
-        lg: "h-11 px-6",
-        icon: "size-9 p-0 max-md:size-11",
+        sm: "h-7 px-2.5",
+        md: "h-8 px-3",
+        lg: "h-10 px-4",
+        icon: "size-8 p-0 max-md:size-11",
       },
     },
     defaultVariants: {
@@ -97,12 +97,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         {loading ? (
           <LoaderCircle
             aria-hidden="true"
-            className="absolute size-[18px] animate-spin motion-reduce:animate-none"
+            className="absolute size-4 animate-spin motion-reduce:animate-none"
           />
         ) : null}
         <span
           className={cn(
-            "inline-flex items-center gap-2",
+            "inline-flex items-center gap-1.5",
             loading && "opacity-0",
           )}
         >

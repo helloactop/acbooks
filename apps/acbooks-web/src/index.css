@@ -3,6 +3,17 @@
 
 @source "../../../packages/acbooks-ui/src";
 
+@layer base {
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @keyframes acbooks-drawer-in {
   from {
     opacity: 0.7;

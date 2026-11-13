@@ -5,8 +5,10 @@
     "sidebar": "应用侧边栏",
     "openMenu": "打开导航菜单",
     "closeMenu": "关闭导航菜单",
+    "collapse": "折叠侧栏",
+    "expand": "展开侧栏",
     "home": "首页",
-    "library": "书库",
+    "library": "图书库",
     "allBooks": "全部书籍",
     "physical": "实体书",
     "digital": "电子书",
@@ -32,6 +34,7 @@
   "account": {
     "settings": "账户与设置",
     "settingsFor": "账户与设置：{{username}}",
+    "menu": "账户菜单：{{username}}",
     "logout": "退出登录",
     "loggingOut": "正在退出…",
     "logoutError": "退出失败，请重试。"

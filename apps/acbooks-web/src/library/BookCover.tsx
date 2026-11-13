@@ -8,6 +8,7 @@ export interface BookCoverProps {
   authorLabel?: string;
   book: Pick<BookSummary, "authors" | "id" | "title">;
   className?: string;
+  flat?: boolean;
   titleClassName?: string;
 }
 
@@ -16,6 +17,7 @@ export function BookCover({
   authorLabel,
   book,
   className,
+  flat = false,
   titleClassName,
 }: BookCoverProps) {
   const cover = coverFor(book);
@@ -24,7 +26,8 @@ export function BookCover({
     <div
       aria-hidden="true"
       className={cn(
-        "relative aspect-[2/3] overflow-hidden rounded-cover shadow-cover",
+        "relative aspect-[2/3] overflow-hidden rounded-cover",
+        !flat && "shadow-cover",
         className,
       )}
       style={{ backgroundColor: cover.background, color: cover.foreground }}

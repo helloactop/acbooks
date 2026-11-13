@@ -1,4 +1,4 @@
-import { I18nProvider } from "@acbooks/ui";
+import { I18nProvider, ThemeProvider } from "@acbooks/ui";
 import {
   act,
   fireEvent,
@@ -22,6 +22,7 @@ import { AuthenticatedLayout } from "../../src/layout/AuthenticatedLayout";
 import { rememberReturnScroll } from "../../src/layout/scroll-restoration";
 import type { BookDetail, BookPage, BookSummary } from "../../src/library/books-api";
 import { LibraryPage } from "../../src/library/LibraryPage";
+import { SettingsPage } from "../../src/settings/SettingsPage";
 
 const ACCOUNT = {
   id: "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f",
@@ -292,7 +293,9 @@ function bookRequests(): URL[] {
   return fetchMock.mock.calls.flatMap(([input, init]) => {
     const url = new URL(String(input), "http://localhost");
     const method = methodOf((init ?? {}) as RequestInit);
-    return method === "GET" && url.pathname === "/api/v1/books"
+    return method === "GET" &&
+      url.pathname === "/api/v1/books" &&
+      url.searchParams.get("limit") === "12"
       ? [url]
       : [];
   });
@@ -360,26 +363,51 @@ function renderLibrary(language: "zh-CN" | "en" = "zh-CN") {
   const onUnauthenticated = vi.fn();
   const entry = `${window.location.pathname}${window.location.search}`;
   render(
-    <I18nProvider defaultLanguage={language} resources={appResources}>
-      <MemoryRouter initialEntries={[entry]}>
-        <LocationProbe />
-        <Routes>
-          <Route
-            element={
-              <AuthenticatedLayout
-                onLoggedOut={onLoggedOut}
-                onSessionExpired={onSessionExpired}
-                onUnauthenticated={onUnauthenticated}
-              />
-            }
-          >
-            <Route element={<LibraryPage />} path="/library" />
-          </Route>
-        </Routes>
-      </MemoryRouter>
-    </I18nProvider>,
+    <ThemeProvider>
+      <I18nProvider defaultLanguage={language} resources={appResources}>
+        <MemoryRouter initialEntries={[entry]}>
+          <LocationProbe />
+          <Routes>
+            <Route
+              element={
+                <AuthenticatedLayout
+                  onLoggedOut={onLoggedOut}
+                  onSessionExpired={onSessionExpired}
+                  onUnauthenticated={onUnauthenticated}
+                />
+              }
+            >
+              <Route element={<LibraryPage />} path="/library" />
+              <Route element={<SettingsPage />} path="/settings" />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </I18nProvider>
+    </ThemeProvider>,
   );
   return { onLoggedOut, onSessionExpired, onUnauthenticated };
+}
+
+async function searchFromDrawer(
+  user: ReturnType<typeof userEvent.setup>,
+  term: string,
+) {
+  await user.click(screen.getByRole("button", { name: "打开导航菜单" }));
+  const drawer = document.getElementById(
+    "app-navigation-drawer",
+  ) as HTMLDialogElement;
+  const search = within(drawer).getByRole("combobox", { name: "全局搜索" });
+  await user.type(search, term);
+  await user.keyboard("{Enter}");
+}
+
+async function chooseOption(
+  user: ReturnType<typeof userEvent.setup>,
+  trigger: string,
+  option: string,
+) {
+  await user.click(screen.getByRole("combobox", { name: trigger }));
+  await user.click(await screen.findByRole("option", { name: option }));
 }
 
 describe("LibraryPage", () => {
@@ -396,7 +424,7 @@ describe("LibraryPage", () => {
     renderLibrary();
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "全部书籍" }),
+      await screen.findByRole("heading", { level: 1, name: "书库" }),
     ).toBeInTheDocument();
     expect(
       await screen.findByRole("article", { name: "呐喊" }),
@@ -405,30 +433,21 @@ describe("LibraryPage", () => {
     expect(
       screen.getByText("共 2 本，实体书与电子书统一管理"),
     ).toBeInTheDocument();
-    expect(screen.getAllByText("文学")).toHaveLength(2);
-    expect(screen.getByText("经典")).toBeInTheDocument();
-    expect(screen.getByText("+1")).toBeInTheDocument();
-    expect(screen.queryByText("长篇")).not.toBeInTheDocument();
+    expect(screen.queryByText("文学")).not.toBeInTheDocument();
     expect(screen.queryByText("PDF")).not.toBeInTheDocument();
     expect(screen.queryByText("实体 ×2")).not.toBeInTheDocument();
-    expect(
-      within(screen.getByRole("article", { name: "呐喊" })).queryByText(
-        "阅读中",
-      ),
-    ).not.toBeInTheDocument();
     expect(screen.queryAllByRole("progressbar")).toHaveLength(0);
-    expect(
-      screen.getByRole("complementary", { name: "应用侧边栏" }),
-    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "添加书籍" }),
     ).toBeEnabled();
     expect(
-      screen.getByRole("link", { name: "账户与设置：admin" }),
+      screen.getByRole("button", { name: "打开导航菜单" }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("radio", { name: "列表视图" }));
+    await user.click(screen.getByRole("button", { name: "视图" }));
+    await user.click(await screen.findByRole("menuitem", { name: "列表视图" }));
     await screen.findByRole("table", { name: "书籍列表" });
+    expect(screen.getAllByText("文学").length).toBeGreaterThan(0);
     expect(screen.getAllByText("长篇").length).toBeGreaterThan(0);
     expect(screen.getAllByText("PDF").length).toBeGreaterThan(0);
     expect(screen.getAllByText("EPUB").length).toBeGreaterThan(0);
@@ -468,14 +487,13 @@ describe("LibraryPage", () => {
     await user.click(screen.getByRole("button", { name: "第 2 页" }));
     expect(bookRequests()).toHaveLength(beforeCurrentPage);
 
-    const search = screen.getByRole("searchbox", { name: "搜索书库" });
-    await user.type(search, "三体");
+    await searchFromDrawer(user, "三体");
     await waitFor(() => {
       expect(latestBookRequest()?.searchParams.get("q")).toBe("三体");
     });
     expect(latestBookRequest()?.searchParams.get("offset")).toBe("0");
-
-    await user.click(screen.getByRole("radio", { name: "已读" }));
+    const statusSelect = screen.getByRole("combobox", { name: "状态" });
+    await chooseOption(user, "状态", "已读");
     await waitFor(() => {
       expect(
         latestBookRequest()?.searchParams.get("readingStatus"),
@@ -483,11 +501,15 @@ describe("LibraryPage", () => {
     });
 
     const beforeDuplicate = bookRequests().length;
-    await user.click(screen.getByRole("radio", { name: "已读" }));
-    await user.click(screen.getByRole("radio", { name: "网格视图" }));
+    expect(statusSelect).toHaveTextContent("已读");
+    await chooseOption(user, "状态", "已读");
+    await user.click(screen.getByRole("button", { name: "视图" }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: "网格视图" }),
+    );
     expect(bookRequests()).toHaveLength(beforeDuplicate);
 
-    await user.click(screen.getByRole("button", { name: "更多筛选" }));
+    await user.click(screen.getByRole("button", { name: "筛选" }));
     await user.click(
       await screen.findByRole("button", { name: /添加第一个筛选条件/ }),
     );
@@ -495,13 +517,10 @@ describe("LibraryPage", () => {
       screen.getByText("待完善：请填写完整的筛选值"),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "更多筛选" }),
+      screen.getByRole("button", { name: "筛选" }),
     ).toBeInTheDocument();
 
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "第 1 条筛选字段" }),
-      "tag",
-    );
+    await chooseOption(user, "第 1 条筛选字段", "标签");
     const tagValue = screen.getByRole("combobox", {
       name: "标签筛选值",
     });
@@ -522,10 +541,7 @@ describe("LibraryPage", () => {
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "添加条件" }));
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "第 2 条筛选字段" }),
-      "format",
-    );
+    await chooseOption(user, "第 2 条筛选字段", "文件格式");
     await user.type(
       screen.getByRole("combobox", { name: "文件格式筛选值" }),
       "epub",
@@ -538,18 +554,12 @@ describe("LibraryPage", () => {
       screen.getByRole("button", { name: /更多筛选，已启用 2 个条件/ }),
     ).toHaveTextContent("2");
 
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "条件组合方式" }),
-      "ANY",
-    );
+    await chooseOption(user, "条件组合方式", "任一条件");
     await waitFor(() => {
       expect(latestFilters()?.combinator).toBe("ANY");
     });
 
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "排序" }),
-      "title",
-    );
+    await chooseOption(user, "排序", "书名");
     await waitFor(() => {
       const request = latestBookRequest();
       expect(request?.searchParams.get("sort")).toBe("title");
@@ -614,7 +624,7 @@ describe("LibraryPage", () => {
     ).toHaveValue("文学");
     expect(
       screen.getByRole("combobox", { name: "条件组合方式" }),
-    ).toHaveValue("ANY");
+    ).toHaveTextContent("任一条件");
 
     await user.click(
       screen.getByRole("button", { name: "清空组合条件" }),
@@ -780,11 +790,6 @@ describe("LibraryPage", () => {
       ).toBe("done");
     });
 
-    const search = screen.getByRole("searchbox", { name: "搜索书库" });
-    await user.type(search, "边城");
-    await waitFor(() => {
-      expect(latestBookRequest()?.searchParams.get("q")).toBe("边城");
-    });
     await user.click(
       screen.getByRole("button", { name: "清除全部筛选" }),
     );
@@ -867,12 +872,18 @@ describe("LibraryPage", () => {
     expect(request?.searchParams.get("tag")).toBeNull();
     expect(request?.searchParams.get("format")).toBeNull();
     expect(
-      screen.getByRole("heading", { level: 1, name: "实体书" }),
+      screen.getByRole("heading", { level: 1, name: "书库" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("searchbox", { name: "搜索书库" }),
-    ).toHaveValue("");
-    expect(screen.getByRole("radio", { name: "全部" })).toBeChecked();
+      within(screen.getByRole("radiogroup", { name: "类型" })).getByRole(
+        "radio",
+        { name: "实体书" },
+      ),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByLabelText("状态")).toHaveTextContent("全部");
+    expect(
+      screen.queryByRole("button", { name: "清除搜索" }),
+    ).not.toBeInTheDocument();
     await waitFor(() => {
       expect(currentLocation).toContain("mediaType=physical");
       expect(currentLocation).not.toContain("reset=1");
@@ -894,7 +905,7 @@ describe("LibraryPage", () => {
     );
     renderLibrary();
 
-    await screen.findByRole("heading", { level: 1, name: "全部书籍" });
+    await screen.findByRole("heading", { level: 1, name: "书库" });
     expect(
       screen.getAllByText("正在载入书库").length,
     ).toBeGreaterThan(0);
@@ -946,8 +957,7 @@ describe("LibraryPage", () => {
     renderLibrary();
     await screen.findByRole("article", { name: "呐喊" });
 
-    const search = screen.getByRole("searchbox", { name: "搜索书库" });
-    await user.type(search, "不存在");
+    await searchFromDrawer(user, "不存在");
     expect(
       await screen.findByText("没有找到匹配的书籍"),
     ).toBeInTheDocument();
@@ -958,7 +968,9 @@ describe("LibraryPage", () => {
     expect(
       await screen.findByRole("article", { name: "呐喊" }),
     ).toBeInTheDocument();
-    expect(search).toHaveValue("");
+    expect(
+      screen.queryByRole("button", { name: "清除搜索" }),
+    ).not.toBeInTheDocument();
   });
 
   it("retries after a list request fails", async () => {
@@ -1113,9 +1125,11 @@ describe("LibraryPage", () => {
       within(dialog).getByLabelText("ISBN"),
       "978-0-306-40615-7",
     );
-    await user.selectOptions(
-      within(dialog).getByLabelText("阅读状态"),
-      "reading",
+    await user.click(
+      within(dialog).getByRole("combobox", { name: "阅读状态" }),
+    );
+    await user.click(
+      await screen.findByRole("option", { name: "阅读中" }),
     );
     await user.click(within(dialog).getByRole("button", { name: "保存" }));
 
@@ -1161,13 +1175,13 @@ describe("LibraryPage", () => {
       screen.getByRole("link", { name: "查看《呐喊》详情" }),
     ).toHaveAttribute("href", `/library/books/${BOOK1.id}`);
 
-    await user.click(screen.getByRole("radio", { name: "阅读中" }));
+    await chooseOption(user, "状态", "阅读中");
     await waitFor(() => {
       expect(currentLocation).toContain("readingStatus=reading");
     });
   });
 
-  it("logs out with CSRF", async () => {
+  it("opens settings from the account entry and signs out with CSRF", async () => {
     installApi(
       baseHandler((url, init) => {
         const method = methodOf(init);
@@ -1184,7 +1198,23 @@ describe("LibraryPage", () => {
     const { onLoggedOut } = renderLibrary();
     await screen.findByRole("article", { name: "呐喊" });
 
-    await user.click(screen.getByRole("button", { name: "退出登录" }));
+    await user.click(screen.getByRole("button", { name: "打开导航菜单" }));
+    const drawer = document.getElementById(
+      "app-navigation-drawer",
+    ) as HTMLDialogElement;
+    await user.click(
+      within(drawer).getByRole("link", { name: "账户与设置：admin" }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "设置" }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("link", { name: "打开账户设置" }),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "退出登录" }),
+    );
 
     await waitFor(() => {
       expect(onLoggedOut).toHaveBeenCalledOnce();
@@ -1197,7 +1227,8 @@ describe("LibraryPage", () => {
     ).toBe("csrf-token");
   });
 
-  it("does not search during IME composition", async () => {
+  it("adopts a query from the global search URL and clears it", async () => {
+    window.history.replaceState({}, "", "/library?q=%E4%B8%89%E4%BD%93");
     installApi(
       baseHandler((url, init) => {
         if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
@@ -1206,23 +1237,22 @@ describe("LibraryPage", () => {
         throw new Error(`Unexpected request ${url.pathname}`);
       }),
     );
+    const user = userEvent.setup();
     renderLibrary();
     await screen.findByRole("article", { name: "呐喊" });
-    const search = screen.getByRole("searchbox", { name: "搜索书库" });
 
-    fireEvent.compositionStart(search);
-    fireEvent.change(search, { target: { value: "三体" } });
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    expect(
-      bookRequests().some((url) => url.searchParams.get("q") === "三体"),
-    ).toBe(false);
+    expect(latestBookRequest()?.searchParams.get("q")).toBe("三体");
+    const clear = screen.getByRole("button", { name: "清除搜索" });
+    expect(clear).toHaveTextContent("三体");
 
-    fireEvent.compositionEnd(search, { target: { value: "三体" } });
+    await user.click(clear);
     await waitFor(() => {
-      expect(
-        bookRequests().some((url) => url.searchParams.get("q") === "三体"),
-      ).toBe(true);
+      expect(latestBookRequest()?.searchParams.get("q")).toBeNull();
+      expect(currentLocation).not.toContain("q=");
     });
+    expect(
+      screen.queryByRole("button", { name: "清除搜索" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders the API-backed library in English", async () => {
@@ -1237,7 +1267,7 @@ describe("LibraryPage", () => {
     renderLibrary("en");
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "All books" }),
+      await screen.findByRole("heading", { level: 1, name: "Library" }),
     ).toBeInTheDocument();
     await screen.findByRole("article", { name: "呐喊" });
     expect(
@@ -1246,17 +1276,12 @@ describe("LibraryPage", () => {
       ),
     ).toHaveTextContent("1 book ·");
     const user = userEvent.setup();
-    await user.click(screen.getByRole("radio", { name: "List view" }));
+    await user.click(screen.getByRole("button", { name: "View" }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: "List view" }),
+    );
     await screen.findByRole("table", { name: "Book list" });
     expect(screen.getAllByText("Physical ×2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Reading").length).toBeGreaterThan(0);
-    expect(
-      screen.getByRole("complementary", { name: "Application sidebar" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", {
-        name: "Account and settings for admin",
-      }),
-    ).toBeInTheDocument();
   });
 });

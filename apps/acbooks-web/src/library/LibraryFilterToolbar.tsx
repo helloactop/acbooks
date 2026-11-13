@@ -1,310 +1,145 @@
+import { Button, DropdownMenu } from "@acbooks/ui";
 import {
-  Button,
-  DropdownMenu,
-  IconButton,
-  Input,
-  SegmentedControl,
-  Select,
-  cn,
-  type SegmentedControlOption,
-} from "@acbooks/ui";
-import {
-  ArrowUpDown,
   Check,
+  ChevronDown,
+  Ellipsis,
   LayoutGrid,
   List,
-  Search,
-  SlidersHorizontal,
-  X,
+  RefreshCw,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useMediaQuery } from "../layout/use-media-query";
-import type { SortOrder, StatusFilter, ViewMode } from "./library-view-state";
+import type { CoverSize, ViewMode } from "./library-view-state";
 
 export interface LibraryFilterToolbarProps {
   activeCount: number;
+  canClear: boolean;
+  coverSize: CoverSize;
   filtersOpen: boolean;
-  hasSearch: boolean;
-  onClearSearch: () => void;
-  onSearchChange: (value: string) => void;
-  onSortChange: (value: SortOrder) => void;
-  onStatusChange: (value: StatusFilter) => void;
+  onClearAll: () => void;
+  onCoverSizeChange: (size: CoverSize) => void;
+  onRefresh: () => void;
   onToggleFilters: () => void;
-  onViewChange: (value: ViewMode) => void;
-  searchValue: string;
-  sort: SortOrder;
-  status: StatusFilter;
+  onViewChange: (view: ViewMode) => void;
   view: ViewMode;
 }
 
-const FILTER_CONTROL =
-  "h-10 max-lg:min-h-11 aria-pressed:border-accent-border aria-pressed:bg-accent-soft aria-pressed:text-accent-text aria-pressed:hover:bg-accent-hover";
-const VIEW_SEGMENTED =
-  "h-10 [&>button]:h-8 max-lg:h-11 max-lg:p-0 max-lg:[&>button]:h-11";
-
 export function LibraryFilterToolbar({
   activeCount,
+  canClear,
+  coverSize,
   filtersOpen,
-  hasSearch,
-  onClearSearch,
-  onSearchChange,
-  onSortChange,
-  onStatusChange,
+  onClearAll,
+  onCoverSizeChange,
+  onRefresh,
   onToggleFilters,
   onViewChange,
-  searchValue,
-  sort,
-  status,
   view,
 }: LibraryFilterToolbarProps) {
   const { t } = useTranslation("library");
-  const compact = useMediaQuery("(max-width: 1023px)");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const timer = useRef<number | undefined>(undefined);
-  const composing = useRef(false);
-  const lastCommitted = useRef(searchValue);
-
-  useEffect(() => {
-    if (
-      inputRef.current !== null &&
-      inputRef.current.value !== searchValue
-    ) {
-      inputRef.current.value = searchValue;
-    }
-    if (searchValue.length === 0) {
-      if (timer.current !== undefined) {
-        window.clearTimeout(timer.current);
-        timer.current = undefined;
-      }
-      composing.current = false;
-      lastCommitted.current = "";
-    }
-  }, [searchValue]);
-
-  useEffect(
-    () => () => {
-      if (timer.current !== undefined) {
-        window.clearTimeout(timer.current);
-      }
-    },
-    [],
-  );
-
-  const commitSearch = (value: string) => {
-    if (timer.current !== undefined) {
-      window.clearTimeout(timer.current);
-      timer.current = undefined;
-    }
-    const next = value.trim();
-    if (next === lastCommitted.current) {
-      return;
-    }
-    lastCommitted.current = next;
-    onSearchChange(next);
-  };
-
-  const scheduleSearch = (value: string, immediate = false) => {
-    if (composing.current) {
-      return;
-    }
-    if (timer.current !== undefined) {
-      window.clearTimeout(timer.current);
-      timer.current = undefined;
-    }
-    if (immediate) {
-      commitSearch(value);
-      return;
-    }
-    timer.current = window.setTimeout(() => {
-      timer.current = undefined;
-      commitSearch(value);
-    }, 300);
-  };
-
-  const statusOptions: readonly SegmentedControlOption<StatusFilter>[] = [
-    { label: t("filters.all"), value: "all" },
-    { label: t("filters.unread"), value: "unread" },
-    { label: t("filters.reading"), value: "reading" },
-    { label: t("filters.done"), value: "done" },
-  ];
-  const viewOptions: readonly SegmentedControlOption<ViewMode>[] = [
-    {
-      label: (
-        <>
-          <LayoutGrid aria-hidden="true" />
-          <span className="sr-only">{t("view.grid")}</span>
-        </>
-      ),
-      value: "grid",
-    },
-    {
-      label: (
-        <>
-          <List aria-hidden="true" />
-          <span className="sr-only">{t("view.list")}</span>
-        </>
-      ),
-      value: "list",
-    },
-  ];
-  const moreLabel =
+  const filterLabel =
     activeCount > 0
       ? t("filters.moreActive", { count: activeCount })
-      : t("filters.more");
-  const sortOptions: readonly { label: string; value: SortOrder }[] = [
-    { label: t("filters.recent"), value: "recent" },
-    { label: t("filters.title"), value: "title" },
-    { label: t("filters.author"), value: "author" },
-  ];
-  const sortLabel =
-    sortOptions.find((option) => option.value === sort)?.label ?? sort;
+      : t("filters.open");
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="relative min-w-[160px] flex-1 basis-[190px] max-sm:basis-full">
-        <Search
-          aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-muted-foreground"
-          strokeWidth={2}
-        />
-        <Input
-          aria-label={t("header.searchLabel")}
-          className={cn(
-            "pl-9 max-lg:h-11 [&::-webkit-search-cancel-button]:appearance-none",
-            hasSearch && "pr-11",
-          )}
-          defaultValue={searchValue}
-          onChange={(event) => {
-            scheduleSearch(event.target.value);
-          }}
-          onCompositionEnd={(event) => {
-            composing.current = false;
-            scheduleSearch(event.currentTarget.value, true);
-          }}
-          onCompositionStart={() => {
-            composing.current = true;
-          }}
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              !event.nativeEvent.isComposing
-            ) {
-              event.preventDefault();
-              scheduleSearch(event.currentTarget.value, true);
-            }
-          }}
-          placeholder={t("header.searchPlaceholder")}
-          ref={inputRef}
-          type="search"
-        />
-        {hasSearch ? (
-          <IconButton
-            className="absolute top-1/2 right-1 size-8 -translate-y-1/2 max-md:size-10"
-            label={t("filters.clearSearch")}
-            onClick={onClearSearch}
-            variant="ghost"
-          >
-            <X aria-hidden="true" />
-          </IconButton>
+    <div className="flex shrink-0 items-center gap-2 max-md:w-full">
+      <Button
+        aria-label={filterLabel}
+        aria-pressed={filtersOpen}
+        className="shrink-0 aria-pressed:bg-surface max-md:flex-1"
+        onClick={onToggleFilters}
+        variant="outline"
+      >
+        {t("filters.open")}
+        {activeCount > 0 ? (
+          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-soft px-1 text-[10px] font-semibold text-accent-text tabular-nums">
+            {activeCount}
+          </span>
         ) : null}
-      </div>
+      </Button>
 
-      <div className="flex w-full flex-wrap items-center gap-2 sm:contents">
-        {compact ? (
-          <Select
-            aria-label={t("filters.status")}
-            className="w-[104px] max-lg:h-11"
-            containerClassName="shrink-0"
-            onChange={(event) => {
-              onStatusChange(event.target.value as StatusFilter);
-            }}
-            value={status}
-          >
-            <option value="all">{t("filters.all")}</option>
-            <option value="unread">{t("filters.unread")}</option>
-            <option value="reading">{t("filters.reading")}</option>
-            <option value="done">{t("filters.done")}</option>
-          </Select>
-        ) : (
-          <SegmentedControl
-            ariaLabel={t("filters.status")}
-            className="shrink-0 whitespace-nowrap"
-            onValueChange={onStatusChange}
-            options={statusOptions}
-            value={status}
-            variant="boxed"
-          />
-        )}
-
-        <Button
-          aria-controls="library-smart-filter-panel"
-          aria-expanded={filtersOpen}
-          aria-label={moreLabel}
-          aria-pressed={filtersOpen || activeCount > 0}
-          className={cn(FILTER_CONTROL, "shrink-0 px-3")}
-          onClick={onToggleFilters}
-          variant="outline"
-        >
-          <SlidersHorizontal aria-hidden="true" className="lg:hidden" />
-          <span className="max-lg:sr-only">{t("filters.more")}</span>
-          {activeCount > 0 ? (
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-text px-1 text-[11px] font-semibold text-background tabular-nums">
-              {activeCount}
-            </span>
-          ) : null}
-        </Button>
-
-        {compact ? (
-          <DropdownMenu
-            actions={sortOptions.map((option) => ({
-              icon: sort === option.value ? Check : undefined,
-              label: option.label,
-              onSelect: () => {
-                onSortChange(option.value);
-              },
-            }))}
-            className="shrink-0"
-            label={t("filters.sortCurrent", { value: sortLabel })}
-            side="bottom"
-            triggerClassName="size-10 max-lg:size-11"
-            triggerVariant="outline"
-          >
-            <ArrowUpDown aria-hidden="true" />
-          </DropdownMenu>
-        ) : (
-          <label className="inline-flex shrink-0 items-center gap-1.5">
-            <ArrowUpDown
+      <DropdownMenu
+        actions={[
+          {
+            icon: view === "grid" ? Check : undefined,
+            label: t("view.grid"),
+            onSelect: () => {
+              onViewChange("grid");
+            },
+          },
+          {
+            icon: view === "list" ? Check : undefined,
+            label: t("view.list"),
+            onSelect: () => {
+              onViewChange("list");
+            },
+          },
+          {
+            icon: coverSize === "small" ? Check : undefined,
+            label: t("view.coverSmall"),
+            onSelect: () => {
+              onViewChange("grid");
+              onCoverSizeChange("small");
+            },
+          },
+          {
+            icon: coverSize === "medium" ? Check : undefined,
+            label: t("view.coverMedium"),
+            onSelect: () => {
+              onViewChange("grid");
+              onCoverSizeChange("medium");
+            },
+          },
+          {
+            icon: coverSize === "large" ? Check : undefined,
+            label: t("view.coverLarge"),
+            onSelect: () => {
+              onViewChange("grid");
+              onCoverSizeChange("large");
+            },
+          },
+        ]}
+        align="end"
+        label={t("view.label")}
+        side="bottom"
+        trigger={
+          <>
+            {view === "grid" ? (
+              <LayoutGrid aria-hidden="true" className="size-4 md:hidden" />
+            ) : (
+              <List aria-hidden="true" className="size-4 md:hidden" />
+            )}
+            <span className="hidden md:inline">{t("view.label")}</span>
+            <ChevronDown
               aria-hidden="true"
-              className="size-4 shrink-0 text-muted-foreground"
-              strokeWidth={2}
+              className="hidden size-3.5 md:inline"
             />
-            <Select
-              aria-label={t("filters.sort")}
-              className="h-10 w-[168px]"
-              onChange={(event) => {
-                onSortChange(event.target.value as SortOrder);
-              }}
-              value={sort}
-            >
-              {sortOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </label>
-        )}
+          </>
+        }
+        triggerClassName="inline-flex h-11 shrink-0 items-center justify-center gap-1 rounded-control border border-control-border px-2.5 text-[13px] font-medium text-foreground transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:h-8"
+      />
 
-        <SegmentedControl
-          ariaLabel={t("view.label")}
-          className={cn(VIEW_SEGMENTED, "shrink-0 max-sm:ml-auto")}
-          onValueChange={onViewChange}
-          options={viewOptions}
-          value={view}
-        />
-      </div>
+      <DropdownMenu
+        actions={[
+          {
+            icon: RefreshCw,
+            label: t("actions.refresh"),
+            onSelect: onRefresh,
+          },
+          {
+            disabled: !canClear,
+            label: t("filters.clearAll"),
+            onSelect: onClearAll,
+          },
+        ]}
+        className="shrink-0"
+        label={t("actions.more")}
+        side="bottom"
+        triggerVariant="outline"
+      >
+        <Ellipsis aria-hidden="true" />
+      </DropdownMenu>
     </div>
   );
 }

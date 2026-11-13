@@ -137,9 +137,9 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
     (error.code === "BOOK_NOT_FOUND" || error.status === 404);
 
   return (
-    <div className="@container flex min-h-0 flex-col gap-6">
+    <div className="@container mx-auto flex min-h-0 w-full max-w-[1200px] flex-col gap-4">
       <div className="flex items-center gap-2">
-        <MobileNavigationTrigger className="-ml-1 lg:hidden" />
+        <MobileNavigationTrigger className="-ml-1 md:hidden" />
         <nav aria-label={t("detail.breadcrumb")}>
           <Link
             className="inline-flex items-center gap-1.5 rounded-control text-[13px] font-medium text-muted-foreground transition-colors duration-150 ease-out hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"

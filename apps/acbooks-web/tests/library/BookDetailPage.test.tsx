@@ -163,6 +163,14 @@ function renderDetail(
   return { onLoggedOut, onSessionExpired, onUnauthenticated };
 }
 
+async function chooseReadingStatus(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+) {
+  await user.click(screen.getByRole("combobox", { name: "阅读状态" }));
+  await user.click(await screen.findByRole("option", { name: label }));
+}
+
 const ORIGINAL_SCROLL_HEIGHT = Object.getOwnPropertyDescriptor(
   Element.prototype,
   "scrollHeight",
@@ -413,11 +421,11 @@ describe("BookDetailPage", () => {
     await screen.findByRole("heading", { level: 1, name: BOOK.title });
 
     const select = screen.getByRole("combobox", { name: "阅读状态" });
-    expect(select).toHaveValue("reading");
-    await user.selectOptions(select, "done");
+    expect(select).toHaveTextContent("阅读中");
+    await chooseReadingStatus(user, "已读");
 
     await waitFor(() => {
-      expect(select).toHaveValue("done");
+      expect(select).toHaveTextContent("已读");
     });
     const patch = findCall("PATCH", `/api/v1/books/${BOOK_ID}`);
     expect(patch).toBeDefined();
@@ -452,12 +460,12 @@ describe("BookDetailPage", () => {
     await screen.findByRole("heading", { level: 1, name: BOOK.title });
 
     const select = screen.getByRole("combobox", { name: "阅读状态" });
-    await user.selectOptions(select, "done");
+    await chooseReadingStatus(user, "已读");
 
     expect(
       await screen.findByText("服务器暂时无法完成请求，请稍后重试。"),
     ).toBeInTheDocument();
-    expect(select).toHaveValue("reading");
+    expect(select).toHaveTextContent("阅读中");
   });
 
   it("edits authors through token chips instead of comma text", async () => {

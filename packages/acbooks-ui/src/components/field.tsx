@@ -58,10 +58,10 @@ export function Field({
   });
 
   return (
-    <div className={cn("grid gap-2", className)}>
+    <div className={cn("grid gap-1.5", className)}>
       <label
         className={cn(
-          "text-sm font-medium text-foreground",
+          "text-[13px] font-medium text-foreground",
           required &&
             "after:ml-1 after:text-destructive-text after:content-['*']",
         )}

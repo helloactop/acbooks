@@ -6,11 +6,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 
-import { SidebarContent } from "./AppSidebar";
+import { AppRail } from "./AppRail";
 import { AppShellContext } from "./app-shell-context";
+import { AppTopBar } from "./AppTopBar";
 import { MobileNavigation } from "./MobileNavigation";
 import {
   readScrollPosition,
@@ -27,6 +27,8 @@ export interface AppShellProps {
   onLogout: () => void;
 }
 
+const SCROLL_SAVE_INTERVAL = 150;
+
 function isDrawerEntry(state: unknown): boolean {
   return (
     typeof state === "object" &&
@@ -42,8 +44,6 @@ function withDrawerEntry(state: unknown): Record<string, unknown> {
   };
 }
 
-const SCROLL_SAVE_INTERVAL = 150;
-
 export function AppShell({
   accountName,
   children,
@@ -52,25 +52,20 @@ export function AppShell({
   logoutError,
   onLogout,
 }: AppShellProps) {
-  const { t } = useTranslation("app");
   const location = useLocation();
   const navigate = useNavigate();
   const navigationType = useNavigationType();
   const [focusSearchOnOpen, setFocusSearchOnOpen] = useState(false);
+  const pendingSearchFocus = useRef(false);
   const mainRef = useRef<HTMLElement>(null);
   const desktopSearchRef = useRef<HTMLInputElement>(null);
   const lastScrollSave = useRef(0);
   const previousPathname = useRef(location.pathname);
-  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const isTabletUp = useMediaQuery("(min-width: 768px)");
   const pathname = location.pathname;
   const search = location.search;
-  const settingsMode = pathname === "/settings";
   const drawerOpen = isDrawerEntry(location.state);
-  const navigationOpen = !isDesktop && drawerOpen;
-
-  const dismissNavigation = useCallback(() => {
-    setFocusSearchOnOpen(false);
-  }, []);
+  const navigationOpen = !isTabletUp && drawerOpen;
 
   const closeNavigation = useCallback(() => {
     setFocusSearchOnOpen(false);
@@ -80,33 +75,55 @@ export function AppShell({
   }, [drawerOpen, navigate]);
 
   const openNavigation = useCallback(() => {
-    if (isDesktop || drawerOpen) {
+    if (isTabletUp || drawerOpen) {
       return;
     }
     navigate(`${location.pathname}${location.search}${location.hash}`, {
       state: withDrawerEntry(location.state),
     });
-  }, [drawerOpen, isDesktop, location, navigate]);
+  }, [drawerOpen, isTabletUp, location, navigate]);
 
   const handleFocusSearchHandled = useCallback(() => {
     setFocusSearchOnOpen(false);
   }, []);
 
   useEffect(() => {
-    if (typeof window.matchMedia !== "function") {
-      return;
+    if (isTabletUp && drawerOpen) {
+      navigate(-1);
     }
-    const media = window.matchMedia("(min-width: 1024px)");
-    const handleChange = (event: MediaQueryListEvent) => {
-      if (event.matches) {
-        closeNavigation();
+  }, [drawerOpen, isTabletUp, navigate]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        !(event.ctrlKey || event.metaKey) ||
+        event.key.toLowerCase() !== "k"
+      ) {
+        return;
+      }
+      event.preventDefault();
+      if (isTabletUp) {
+        desktopSearchRef.current?.focus();
+      } else {
+        // Opening the drawer commits on a later router update; requesting focus
+        // in the same commit lets showModal() move focus back to the brand link.
+        pendingSearchFocus.current = true;
+        openNavigation();
       }
     };
-    media.addEventListener("change", handleChange);
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      media.removeEventListener("change", handleChange);
+      window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [closeNavigation]);
+  }, [isTabletUp, openNavigation]);
+
+  useEffect(() => {
+    if (!navigationOpen || !pendingSearchFocus.current) {
+      return;
+    }
+    pendingSearchFocus.current = false;
+    setFocusSearchOnOpen(true);
+  }, [navigationOpen]);
 
   useEffect(() => {
     const main = mainRef.current;
@@ -148,29 +165,6 @@ export function AppShell({
     };
   }, [location, navigationType]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        settingsMode ||
-        !(event.ctrlKey || event.metaKey) ||
-        event.key.toLowerCase() !== "k"
-      ) {
-        return;
-      }
-      event.preventDefault();
-      if (isDesktop) {
-        desktopSearchRef.current?.focus();
-      } else {
-        setFocusSearchOnOpen(true);
-        openNavigation();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isDesktop, openNavigation, settingsMode]);
-
   const contextValue = useMemo(
     () => ({
       accountName,
@@ -202,45 +196,38 @@ export function AppShell({
   return (
     <AppShellContext.Provider value={contextValue}>
       <div className="flex h-dvh overflow-hidden bg-frame text-foreground">
-        <aside
-          aria-label={t("nav.sidebar")}
-          className="hidden w-[clamp(236px,16vw,264px)] shrink-0 flex-col lg:flex"
-        >
-          <SidebarContent
+        {isTabletUp ? <AppRail pathname={pathname} /> : null}
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {isTabletUp ? (
+            <AppTopBar
+              accountName={accountName}
+              searchInputRef={desktopSearchRef}
+            />
+          ) : null}
+
+          <main
+            className="m-2 min-h-0 flex-1 overflow-y-auto rounded-panel bg-background p-2 md:px-5 md:py-4"
+            ref={mainRef}
+          >
+            <div className="flex min-h-full w-full flex-col gap-4">
+              {children}
+            </div>
+          </main>
+        </div>
+
+        {!isTabletUp ? (
+          <MobileNavigation
             accountName={accountName}
-            loggingOut={loggingOut}
-            logoutError={logoutError}
-            onLogout={onLogout}
+            focusSearchOnOpen={focusSearchOnOpen}
+            onClose={closeNavigation}
+            onFocusSearchHandled={handleFocusSearchHandled}
+            onOpen={openNavigation}
+            open={navigationOpen}
             pathname={pathname}
-            search={search}
-            searchInputRef={desktopSearchRef}
-            variant="desktop"
+            replaceNavigation={navigationOpen}
           />
-        </aside>
-
-        <MobileNavigation
-          accountName={accountName}
-          focusSearchOnOpen={focusSearchOnOpen}
-          loggingOut={loggingOut}
-          logoutError={logoutError}
-          onClose={closeNavigation}
-          onFocusSearchHandled={handleFocusSearchHandled}
-          onLogout={onLogout}
-          onNavigate={dismissNavigation}
-          open={navigationOpen}
-          pathname={pathname}
-          replaceNavigation={navigationOpen}
-          search={search}
-        />
-
-        <main
-          className="min-h-0 flex-1 overflow-y-auto bg-background p-4 [scrollbar-gutter:stable] md:p-5 lg:m-2 lg:rounded-panel lg:p-6 2xl:p-8"
-          ref={mainRef}
-        >
-          <div className="mx-auto flex min-h-full w-full max-w-[1280px] flex-col gap-6">
-            {children}
-          </div>
-        </main>
+        ) : null}
       </div>
     </AppShellContext.Provider>
   );

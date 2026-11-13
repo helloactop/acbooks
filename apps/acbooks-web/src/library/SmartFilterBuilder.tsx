@@ -239,23 +239,23 @@ export function SmartFilterBuilder({
     if (field.type === "select") {
       return (
         <Select
-          aria-invalid={invalid || undefined}
-          aria-label={t("filters.valueLabel", {
+          ariaLabel={t("filters.valueLabel", {
             field: fieldLabel(field),
           })}
           className="max-lg:h-11"
-          onChange={(event) => {
-            updateCondition(condition.id, { value: event.target.value });
+          invalid={invalid}
+          onValueChange={(nextValue) => {
+            updateCondition(condition.id, { value: nextValue });
           }}
-          value={value}
-        >
-          <option value="">{t("filters.selectValue")}</option>
-          {(field.options ?? []).map((option) => (
-            <option key={option.value} value={option.value}>
-              {optionLabel(field, option)}
-            </option>
-          ))}
-        </Select>
+          options={[
+            { label: t("filters.selectValue"), value: "" },
+            ...(field.options ?? []).map((option) => ({
+              label: optionLabel(field, option),
+              value: option.value,
+            })),
+          ]}
+          value={typeof value === "string" ? value : ""}
+        />
       );
     }
 
@@ -300,13 +300,13 @@ export function SmartFilterBuilder({
       className="@container rounded-card border border-border bg-surface"
       id="library-smart-filter-panel"
     >
-      <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-accent-soft text-accent-text">
+      <div className="flex flex-col gap-2 border-b border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-accent-text">
             <WandSparkles aria-hidden="true" className="size-[18px]" />
           </span>
           <div className="min-w-0">
-            <h2 className="font-semibold text-foreground">
+            <h2 className="text-[15px] font-semibold text-foreground">
               {t("filters.smartTitle")}
             </h2>
           </div>
@@ -317,21 +317,21 @@ export function SmartFilterBuilder({
             {t("filters.match")}
           </span>
           <Select
-            aria-label={t("filters.combinator")}
-            className="h-10 w-[160px] max-lg:h-11"
-            onChange={(event) => {
+            ariaLabel={t("filters.combinator")}
+            containerClassName="w-[140px]"
+            onValueChange={(nextValue) => {
               onChange({
                 ...rules,
-                combinator: event.target.value === "ANY" ? "ANY" : "ALL",
+                combinator: nextValue === "ANY" ? "ANY" : "ALL",
               });
             }}
+            options={[
+              { label: t("filters.allConditions"), value: "ALL" },
+              { label: t("filters.anyCondition"), value: "ANY" },
+            ]}
             value={rules.combinator}
-          >
-            <option value="ALL">{t("filters.allConditions")}</option>
-            <option value="ANY">{t("filters.anyCondition")}</option>
-          </Select>
+          />
           <Button
-            className="h-10 max-lg:min-h-11"
             disabled={loading || !hasFields || atLimit}
             onClick={addCondition}
             variant="soft"
@@ -341,16 +341,16 @@ export function SmartFilterBuilder({
         </div>
       </div>
 
-      <div className="space-y-2.5 p-4">
+      <div className="space-y-2 p-3">
         {loading ? (
-          <div className="flex min-h-28 items-center justify-center gap-2 text-sm text-muted-foreground">
+          <div className="flex min-h-20 items-center justify-center gap-2 text-[13px] text-muted-foreground">
             <Spinner label={t("filters.loadingSchema")} />
             <span>{t("filters.loadingSchema")}</span>
           </div>
         ) : null}
 
         {!loading && error !== undefined ? (
-          <div className="flex min-h-28 flex-col items-center justify-center gap-3 rounded-card border border-border bg-background px-6 text-center">
+          <div className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-card border border-border bg-background px-4 text-center">
             <p className="text-sm text-destructive-text">{error}</p>
             <Button onClick={onRetry} size="sm" variant="outline">
               {t("errors.retry")}
@@ -412,44 +412,36 @@ export function SmartFilterBuilder({
                     {index + 1}
                   </span>
                   <Select
-                    aria-label={t("filters.conditionField", {
+                    ariaLabel={t("filters.conditionField", {
                       index: index + 1,
                     })}
-                    className="w-full min-w-0 max-lg:h-11"
-                    onChange={(event) => {
-                      changeField(condition, event.target.value);
+                    className="max-lg:h-11"
+                    groups={groups.map(([group, groupFields]) => ({
+                      label: groupLabel(group),
+                      options: groupFields.map((groupField) => ({
+                        label: fieldLabel(groupField),
+                        value: groupField.key,
+                      })),
+                    }))}
+                    onValueChange={(nextValue) => {
+                      changeField(condition, nextValue);
                     }}
                     value={condition.field}
-                  >
-                    {groups.map(([group, groupFields]) => (
-                      <optgroup key={group} label={groupLabel(group)}>
-                        {groupFields.map((groupField) => (
-                          <option
-                            key={groupField.key}
-                            value={groupField.key}
-                          >
-                            {fieldLabel(groupField)}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </Select>
+                  />
                   <Select
-                    aria-label={t("filters.conditionOperator", {
+                    ariaLabel={t("filters.conditionOperator", {
                       index: index + 1,
                     })}
-                    className="w-full min-w-0 max-lg:h-11"
-                    onChange={(event) => {
-                      changeOperator(condition, event.target.value);
+                    className="max-lg:h-11"
+                    onValueChange={(nextValue) => {
+                      changeOperator(condition, nextValue);
                     }}
+                    options={field.operators.map((operator) => ({
+                      label: operatorLabel(operator),
+                      value: operator,
+                    }))}
                     value={condition.operator}
-                  >
-                    {field.operators.map((operator) => (
-                      <option key={operator} value={operator}>
-                        {operatorLabel(operator)}
-                      </option>
-                    ))}
-                  </Select>
+                  />
                   <div className="min-w-0">
                     {valueEditor(condition, field, validation)}
                   </div>
@@ -487,7 +479,7 @@ export function SmartFilterBuilder({
           : null}
       </div>
 
-      <div className="flex flex-col gap-2 rounded-b-card border-t border-border bg-background px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 rounded-b-card border-t border-border bg-background px-3 py-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>
           {summary.total === 0
             ? t("filters.noRules")
@@ -519,7 +511,7 @@ export function SmartFilterBuilder({
         <div className="flex flex-wrap items-center gap-1">
           {hasExternalFilters ? (
             <Button
-              className="self-start max-lg:min-h-11 sm:self-auto"
+              className="self-start max-md:min-h-11 sm:self-auto"
               onClick={onClearAll}
               size="sm"
               variant="ghost"
@@ -528,7 +520,7 @@ export function SmartFilterBuilder({
             </Button>
           ) : null}
           <Button
-            className="self-start max-lg:min-h-11 sm:self-auto"
+            className="self-start max-md:min-h-11 sm:self-auto"
             disabled={summary.total === 0}
             onClick={() => {
               onChange({ combinator: "ALL", conditions: [] });

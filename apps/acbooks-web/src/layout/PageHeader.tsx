@@ -46,9 +46,9 @@ export function PageHeader({
   return (
     <div>
       <div className="flex items-start gap-2">
-        <MobileNavigationTrigger className="-ml-1 shrink-0 lg:hidden" />
+        <MobileNavigationTrigger className="-ml-1 shrink-0 md:hidden" />
         <h1
-          className="min-w-0 flex-1 text-[28px] leading-[1.25] font-semibold break-words"
+          className="min-w-0 flex-1 text-[22px] leading-[1.3] font-semibold break-words"
           id={titleId}
         >
           {title}
@@ -62,7 +62,7 @@ export function PageHeader({
         ) : null}
       </div>
       {description !== undefined ? (
-        <div className="mt-1 pl-12 text-sm text-muted-foreground lg:pl-0">
+        <div className="mt-1 pl-12 text-[13px] text-muted-foreground md:pl-0">
           {description}
         </div>
       ) : null}

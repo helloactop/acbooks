@@ -1,19 +1,36 @@
-import { useLanguage } from "@acbooks/ui";
+import { useLanguage, cn } from "@acbooks/ui";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { BookCover } from "./BookCover";
-import { TagBadges } from "./BookMeta";
 import type { BookSummary } from "./books-api";
+import type { CoverSize } from "./library-view-state";
 import { bookDetailHref } from "../layout/routes";
 import { joinNames } from "./presentation";
 
 export interface BookCardProps {
   book: BookSummary;
+  coverSize?: CoverSize;
   onOpen: (bookId: string) => void;
 }
 
-export function BookCard({ book, onOpen }: BookCardProps) {
+const COVER_TITLE: Record<CoverSize, string> = {
+  large: "text-[19px] leading-[1.25]",
+  medium: "text-[16px] leading-[1.3]",
+  small: "text-[13px] leading-tight",
+};
+
+const COVER_AUTHOR: Record<CoverSize, string> = {
+  large: "text-[11px]",
+  medium: "text-[10px]",
+  small: "text-[8px]",
+};
+
+export function BookCard({
+  book,
+  coverSize = "medium",
+  onOpen,
+}: BookCardProps) {
   const { t } = useTranslation("library");
   const { resolvedLanguage } = useLanguage();
   const titleId = `book-${book.id}-title`;
@@ -31,24 +48,21 @@ export function BookCard({ book, onOpen }: BookCardProps) {
         to={bookDetailHref(book.id)}
       >
         <BookCover
-          authorClassName="text-[11px]"
+          authorClassName={COVER_AUTHOR[coverSize]}
           authorLabel={authors}
           book={book}
-          titleClassName="text-[17px] leading-[1.3]"
+          flat
+          titleClassName={cn("font-semibold", COVER_TITLE[coverSize])}
         />
 
         <h3
-          className="mt-2 line-clamp-2 min-h-[2.8em] text-sm leading-[1.4] font-medium group-hover:text-accent-text"
+          className="mt-1.5 line-clamp-2 min-h-[2.6em] text-[13px] leading-[1.3] font-medium group-hover:text-accent-text"
           id={titleId}
         >
           {book.title}
         </h3>
-        <p className="truncate text-[13px] text-muted-foreground">{authors}</p>
+        <p className="truncate text-xs text-muted-foreground">{authors}</p>
       </Link>
-
-      <div className="mt-1.5 flex h-5 flex-nowrap items-center gap-1 overflow-hidden">
-        <TagBadges limit={2} tags={book.tags} />
-      </div>
     </article>
   );
 }

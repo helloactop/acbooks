@@ -10,6 +10,7 @@ export type TypeFilter = "all" | "digital" | "physical";
 export type StatusFilter = "all" | "done" | "reading" | "unread";
 export type SortOrder = "author" | "recent" | "title";
 export type ViewMode = "grid" | "list";
+export type CoverSize = "large" | "medium" | "small";
 
 export interface LibraryViewState {
   filters: SmartFilterRules;
@@ -22,6 +23,8 @@ export interface LibraryViewState {
 }
 
 const VIEW_KEY = "acbooks-library-view";
+const VIEW_MODE_KEY = "acbooks-library-view-mode";
+const COVER_SIZE_KEY = "acbooks-library-cover-size";
 const DESCRIPTION_PREFIX = "acbooks-description-expanded:";
 
 export const DEFAULT_LIBRARY_VIEW: LibraryViewState = {
@@ -161,6 +164,43 @@ export function readInitialLibraryView(): LibraryViewState {
 
 export function saveLibraryView(view: LibraryViewState): void {
   writeSession(VIEW_KEY, JSON.stringify(view));
+}
+
+function readLocal(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeLocal(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    return;
+  }
+}
+
+export function readViewMode(): ViewMode {
+  return readLocal(VIEW_MODE_KEY) === "list" ? "list" : "grid";
+}
+
+export function saveViewMode(view: ViewMode): void {
+  writeLocal(VIEW_MODE_KEY, view);
+}
+
+export function readCoverSize(): CoverSize {
+  const value = readLocal(COVER_SIZE_KEY);
+  return value === "small" || value === "large" ? value : "medium";
+}
+
+export function saveCoverSize(size: CoverSize): void {
+  writeLocal(COVER_SIZE_KEY, size);
+}
+
+export function coverSizePx(size: CoverSize): number {
+  return size === "small" ? 110 : size === "large" ? 180 : 140;
 }
 
 export function readDescriptionExpanded(bookId: string): boolean {

@@ -24,6 +24,7 @@
   },
   "page": {
     "title": "全部书籍",
+    "libraryTitle": "书库",
     "physicalTitle": "实体书",
     "digitalTitle": "电子书",
     "count_one": "共 {{formattedCount}} 本，实体书与电子书统一管理",
@@ -31,10 +32,12 @@
   },
   "actions": {
     "addBook": "添加书籍",
-    "more": "更多操作"
+    "more": "更多操作",
+    "refresh": "刷新"
   },
   "filters": {
     "type": "类型",
+    "allTypes": "全部类型",
     "status": "状态",
     "shelf": "书架",
     "sort": "排序",
@@ -151,12 +154,16 @@
     "unread": "未读",
     "recent": "最近添加",
     "title": "书名",
-    "author": "作者"
+    "author": "作者",
+    "open": "筛选"
   },
   "view": {
     "label": "视图",
     "grid": "网格视图",
-    "list": "列表视图"
+    "list": "列表视图",
+    "coverSmall": "小封面",
+    "coverMedium": "中封面",
+    "coverLarge": "大封面"
   },
   "status": {
     "done": "已读",

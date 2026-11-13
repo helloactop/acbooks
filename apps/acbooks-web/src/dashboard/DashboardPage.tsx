@@ -78,7 +78,7 @@ export function DashboardPage() {
   const requestId = error === null ? undefined : libraryRequestId(error);
 
   return (
-    <>
+    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4">
       <PageHeader
         actions={
           <Button
@@ -130,7 +130,7 @@ export function DashboardPage() {
             className="size-8 text-muted-foreground"
             strokeWidth={2}
           />
-          <h2 className="text-xl font-semibold">{t("emptyTitle")}</h2>
+          <h2 className="text-base font-semibold">{t("emptyTitle")}</h2>
           <p className="text-sm text-muted-foreground">
             {t("emptyDescription")}
           </p>
@@ -147,7 +147,7 @@ export function DashboardPage() {
       ) : (
         <section className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-xl font-semibold">{t("recentTitle")}</h2>
+            <h2 className="text-base font-semibold">{t("recentTitle")}</h2>
             <Link
               className="text-sm font-medium text-accent-text hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               to={libraryMediaHref("all")}
@@ -155,9 +155,9 @@ export function DashboardPage() {
               {t("viewAll")}
             </Link>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-2 [scrollbar-width:thin]">
+          <div className="flex gap-4 overflow-x-auto pb-2">
             {books.map((book) => (
-              <div className="w-[152px] shrink-0" key={book.id}>
+              <div className="w-[140px] shrink-0" key={book.id}>
                 <BookCard
                   book={book}
                   onOpen={() => {
@@ -183,6 +183,6 @@ export function DashboardPage() {
           onSessionExpired={expireSession}
         />
       ) : null}
-    </>
+    </div>
   );
 }

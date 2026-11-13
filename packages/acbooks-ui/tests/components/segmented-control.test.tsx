@@ -50,12 +50,16 @@ describe("SegmentedControl", () => {
     );
   });
 
-  it("renders the rectangular boxed variant with a soft selected state", () => {
+  it("renders the rectangular boxed variant with a neutral selected state", () => {
     render(<Harness variant="boxed" />);
     const group = screen.getByRole("radiogroup", { name: "外观模式" });
     const selected = screen.getByRole("radio", { name: "跟随系统" });
     expect(group).toHaveClass("rounded-menu");
-    expect(selected).toHaveClass("rounded-lg", "bg-accent-soft");
+    expect(selected).toHaveClass(
+      "rounded-control",
+      "bg-background",
+      "border-segment-selected-border",
+    );
   });
 
   it("supports roving focus and arrow-key selection", async () => {

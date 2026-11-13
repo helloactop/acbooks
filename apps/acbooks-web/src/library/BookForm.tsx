@@ -210,7 +210,7 @@ export function BookForm({
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3 border-b border-border p-4 sm:p-6">
+      <div className="flex items-center justify-between gap-3 border-b border-border p-4 sm:p-5">
         <h2 className="text-lg font-semibold" id="book-form-title">
           {titleText}
         </h2>
@@ -230,7 +230,7 @@ export function BookForm({
         noValidate
         onSubmit={handleSubmit}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
           <div className="flex flex-col gap-4">
             {errorMessage !== undefined ? (
               <LibraryAlert requestId={errorRequestId}>
@@ -313,20 +313,19 @@ export function BookForm({
 
               <Field htmlFor="book-status" label={t("form.readingStatus")}>
                 <Select
+                  ariaLabel={t("form.readingStatus")}
                   disabled={busy}
                   id="book-status"
-                  onChange={(event) => {
-                    setReadingStatus(event.target.value as ReadingStatus);
+                  onValueChange={(value) => {
+                    setReadingStatus(value as ReadingStatus);
                     clearError();
                   }}
+                  options={STATUS_OPTIONS.map((status) => ({
+                    label: t(`status.${status}`),
+                    value: status,
+                  }))}
                   value={readingStatus}
-                >
-                  {STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status}>
-                      {t(`status.${status}`)}
-                    </option>
-                  ))}
-                </Select>
+                />
               </Field>
 
               <Field
@@ -380,7 +379,7 @@ export function BookForm({
           </div>
         </div>
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-border p-4 sm:p-6">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-border p-4 sm:p-5">
           <Button disabled={busy} onClick={onCloseRequest} variant="ghost">
             {t("form.cancel")}
           </Button>

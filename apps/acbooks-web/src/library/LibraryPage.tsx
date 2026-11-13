@@ -1,5 +1,11 @@
-import { Button, Spinner, useLanguage } from "@acbooks/ui";
-import { BookOpen, Search } from "lucide-react";
+import {
+  Button,
+  SegmentedControl,
+  Select,
+  Spinner,
+  useLanguage,
+} from "@acbooks/ui";
+import { BookOpen, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -40,8 +46,15 @@ import {
   readLibraryUrlState,
 } from "./library-url-state";
 import {
+  coverSizePx,
+  readCoverSize,
+  readViewMode,
+  saveCoverSize,
+  saveViewMode,
+  type CoverSize,
   type SortOrder,
   type StatusFilter,
+  type TypeFilter,
   type ViewMode,
 } from "./library-view-state";
 import { Pagination } from "./Pagination";
@@ -57,9 +70,12 @@ export function LibraryPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const navigationType = useNavigationType();
-  const [initialView] = useState(() =>
-    readLibraryUrlState(location.search),
-  );
+  const [initialView] = useState(() => {
+    const parsed = readLibraryUrlState(location.search);
+    return new URLSearchParams(location.search).has("view")
+      ? parsed
+      : { ...parsed, view: readViewMode() };
+  });
   const [syncedSearch, setSyncedSearch] = useState(location.search);
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -73,6 +89,7 @@ export function LibraryPage() {
   );
   const [sort, setSort] = useState<SortOrder>(initialView.sort);
   const [view, setView] = useState<ViewMode>(initialView.view);
+  const [coverSize, setCoverSize] = useState<CoverSize>(readCoverSize);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
@@ -295,21 +312,21 @@ export function LibraryPage() {
     }, 300);
   };
 
-  const changeSearch = (value: string) => {
-    if (value === searchTerm) {
-      return;
-    }
-    beginRequest();
-    setSearchTerm(value);
-    setOffset(0);
-  };
-
   const changeStatus = (value: StatusFilter) => {
     if (value === status) {
       return;
     }
     beginRequest();
     setStatus(value);
+    setOffset(0);
+  };
+
+  const changeType = (value: TypeFilter) => {
+    if (value === type) {
+      return;
+    }
+    beginRequest();
+    setType(value);
     setOffset(0);
   };
 
@@ -327,6 +344,15 @@ export function LibraryPage() {
       return;
     }
     setView(value);
+    saveViewMode(value);
+  };
+
+  const changeCoverSize = (value: CoverSize) => {
+    if (value === coverSize) {
+      return;
+    }
+    setCoverSize(value);
+    saveCoverSize(value);
   };
 
   const clearSearch = () => {
@@ -347,6 +373,7 @@ export function LibraryPage() {
     setAppliedRules({ combinator: "ALL", conditions: [] });
     setSearchTerm("");
     setStatus("all");
+    setType("all");
     setOffset(0);
     beginRequest();
   };
@@ -398,15 +425,9 @@ export function LibraryPage() {
 
   const activeCount = summary.validCount;
   const hasExternalFilters =
-    searchTerm.length > 0 || status !== "all";
+    searchTerm.length > 0 || status !== "all" || type !== "all";
   const hasFilters = hasExternalFilters || activeCount > 0;
-  const pageTitle =
-    type === "physical"
-      ? t("page.physicalTitle")
-      : type === "digital"
-        ? t("page.digitalTitle")
-        : t("page.title");
-  useDocumentTitle(pageTitle);
+  useDocumentTitle(t("page.libraryTitle"));
   const formattedTotal = new Intl.NumberFormat(resolvedLanguage).format(total);
   const countMessage =
     loading && books.length === 0
@@ -438,35 +459,98 @@ export function LibraryPage() {
           </Button>
         }
         description={
-          <span className="flex items-center gap-2">
+          <span className="flex flex-wrap items-center gap-2">
             <span>{countMessage}</span>
             {loading && books.length > 0 ? (
               <Spinner label={t("loading.updating")} />
             ) : null}
+            {searchTerm.length > 0 ? (
+              <button
+                aria-label={t("filters.clearSearch")}
+                className="inline-flex min-h-7 max-w-56 min-w-0 items-center gap-1 rounded-control border border-border bg-surface px-1.5 text-[12px] text-foreground transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-md:min-h-11"
+                onClick={clearSearch}
+                type="button"
+              >
+                <Search
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                />
+                <span className="min-w-0 truncate">{searchTerm}</span>
+                <X
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                />
+              </button>
+            ) : null}
           </span>
         }
-        title={pageTitle}
+        title={t("page.libraryTitle")}
       />
 
-      <div className="flex flex-col gap-3">
-        <LibraryFilterToolbar
-          activeCount={activeCount}
-          filtersOpen={filtersOpen}
-          hasSearch={searchTerm.length > 0}
-          onClearSearch={clearSearch}
-          onSearchChange={changeSearch}
-          onSortChange={changeSort}
-          onStatusChange={changeStatus}
-          onToggleFilters={() => {
-            setFiltersOpen((current) => !current);
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+        <SegmentedControl
+          ariaLabel={t("filters.type")}
+          className="w-full [&>button]:flex-1 md:w-auto md:self-start md:[&>button]:flex-none"
+          onValueChange={(value) => {
+            changeType(value as TypeFilter);
           }}
-          onViewChange={changeView}
-          searchValue={searchTerm}
-          sort={sort}
-          status={status}
-          view={view}
+          options={[
+            { label: t("page.title"), value: "all" },
+            { label: t("page.physicalTitle"), value: "physical" },
+            { label: t("page.digitalTitle"), value: "digital" },
+          ]}
+          value={type}
+          variant="boxed"
         />
 
+        <div className="flex flex-wrap items-center gap-2 lg:ml-auto lg:flex-nowrap">
+          <Select
+            ariaLabel={t("filters.status")}
+            containerClassName="min-w-0 flex-1 max-md:min-w-[120px] md:w-[100px] md:flex-none"
+            onValueChange={(value) => {
+              changeStatus(value as StatusFilter);
+            }}
+            options={[
+              { label: t("filters.all"), value: "all" },
+              { label: t("status.unread"), value: "unread" },
+              { label: t("status.reading"), value: "reading" },
+              { label: t("status.done"), value: "done" },
+            ]}
+            value={status}
+          />
+          <Select
+            ariaLabel={t("filters.sort")}
+            containerClassName="min-w-0 flex-1 max-md:min-w-[120px] md:w-[152px] md:flex-none"
+            onValueChange={(value) => {
+              changeSort(value as SortOrder);
+            }}
+            options={[
+              { label: t("filters.recent"), value: "recent" },
+              { label: t("filters.title"), value: "title" },
+              { label: t("filters.author"), value: "author" },
+            ]}
+            value={sort}
+          />
+          <div className="ml-auto shrink-0 max-md:ml-0 max-md:w-full">
+            <LibraryFilterToolbar
+              activeCount={activeCount}
+              canClear={hasFilters}
+              coverSize={coverSize}
+              filtersOpen={filtersOpen}
+              onClearAll={clearAllFilters}
+              onCoverSizeChange={changeCoverSize}
+              onRefresh={refreshLibrary}
+              onToggleFilters={() => {
+                setFiltersOpen((current) => !current);
+              }}
+              onViewChange={changeView}
+              view={view}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
         {filtersOpen ? (
           <SmartFilterBuilder
             error={schemaError}
@@ -563,9 +647,19 @@ export function LibraryPage() {
           )}
         </div>
       ) : view === "grid" ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(152px,1fr))] gap-6 max-md:grid-cols-2 max-md:gap-x-4 max-md:gap-y-6">
+        <div
+          className="grid justify-start gap-3 sm:gap-4"
+          style={{
+            gridTemplateColumns: `repeat(auto-fill, ${coverSizePx(coverSize)}px)`,
+          }}
+        >
           {books.map((book) => (
-            <BookCard key={book.id} book={book} onOpen={openBook} />
+            <BookCard
+              book={book}
+              coverSize={coverSize}
+              key={book.id}
+              onOpen={openBook}
+            />
           ))}
         </div>
       ) : (

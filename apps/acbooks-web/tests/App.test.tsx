@@ -86,6 +86,15 @@ function renderApp() {
   );
 }
 
+async function chooseOption(
+  user: ReturnType<typeof userEvent.setup>,
+  trigger: string,
+  option: string,
+) {
+  await user.click(screen.getByRole("combobox", { name: trigger }));
+  await user.click(await screen.findByRole("option", { name: option }));
+}
+
 describe("App routes", () => {
   it("renders the auth page at the root", async () => {
     window.history.replaceState({}, "", "/");
@@ -134,7 +143,7 @@ describe("App routes", () => {
     renderApp();
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "全部书籍" }),
+      await screen.findByRole("heading", { level: 1, name: "书库" }),
     ).toBeInTheDocument();
     expect(
       await screen.findByText("书库还没有书籍"),
@@ -260,12 +269,12 @@ describe("App routes", () => {
     renderApp();
     await screen.findByRole("heading", { level: 1, name: "设置" });
 
-    await user.selectOptions(screen.getByLabelText("主题"), "dark");
+    await chooseOption(user, "主题", "深色");
     await waitFor(() => {
       expect(document.documentElement.dataset.theme).toBe("dark");
     });
 
-    await user.selectOptions(screen.getByLabelText("界面语言"), "en");
+    await chooseOption(user, "界面语言", "English");
     await waitFor(() => {
       expect(document.documentElement.lang).toBe("en");
     });
@@ -295,25 +304,31 @@ describe("App routes", () => {
     renderApp();
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "全部书籍" }),
+      await screen.findByRole("heading", { level: 1, name: "书库" }),
     ).toBeInTheDocument();
     await waitFor(() => {
-      expect(document.title).toBe("全部书籍 · acbooks");
+      expect(document.title).toBe("书库 · acbooks");
     });
 
-    await user.click(
-      screen.getAllByRole("link", { name: "实体书" })[0]!,
-    );
+    await user.click(screen.getByRole("radio", { name: "实体书" }));
     await waitFor(() => {
-      expect(document.title).toBe("实体书 · acbooks");
+      expect(currentLocation).toContain("mediaType=physical");
     });
+    expect(document.title).toBe("书库 · acbooks");
 
-    await user.click(screen.getAllByRole("link", { name: "首页" })[0]!);
+    await user.click(screen.getByRole("button", { name: "打开导航菜单" }));
+    const drawer = document.getElementById(
+      "app-navigation-drawer",
+    ) as HTMLDialogElement;
+    await user.click(within(drawer).getByRole("link", { name: "首页" }));
     await waitFor(() => {
       expect(document.title).toBe("首页 · acbooks");
     });
 
-    await user.click(screen.getByRole("link", { name: "账户与设置：admin" }));
+    await user.click(screen.getByRole("button", { name: "打开导航菜单" }));
+    await user.click(
+      within(drawer).getByRole("link", { name: "账户与设置：admin" }),
+    );
     await waitFor(() => {
       expect(document.title).toBe("设置 · acbooks");
     });

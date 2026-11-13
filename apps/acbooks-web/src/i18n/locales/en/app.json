@@ -5,6 +5,8 @@
     "sidebar": "Application sidebar",
     "openMenu": "Open navigation menu",
     "closeMenu": "Close navigation menu",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
     "home": "Home",
     "library": "Library",
     "allBooks": "All books",
@@ -32,6 +34,7 @@
   "account": {
     "settings": "Settings",
     "settingsFor": "Account and settings for {{username}}",
+    "menu": "Account menu for {{username}}",
     "logout": "Sign out",
     "loggingOut": "Signing out…",
     "logoutError": "Could not sign out. Try again."

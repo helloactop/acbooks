@@ -99,7 +99,7 @@ describe("Button", () => {
     );
 
     expect(screen.getByRole("button", { name: "设置" })).toHaveClass(
-      "[&_svg:not([class*='size-'])]:size-[18px]",
+      "[&_svg:not([class*='size-'])]:size-4",
     );
   });
 });

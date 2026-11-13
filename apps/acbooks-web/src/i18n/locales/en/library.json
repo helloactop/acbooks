@@ -24,17 +24,20 @@
   },
   "page": {
     "title": "All books",
-    "physicalTitle": "Physical books",
-    "digitalTitle": "Digital books",
+    "libraryTitle": "Library",
+    "physicalTitle": "Physical",
+    "digitalTitle": "Digital",
     "count_one": "{{formattedCount}} book · physical and digital editions managed together",
     "count_other": "{{formattedCount}} books · physical and digital editions managed together"
   },
   "actions": {
     "addBook": "Add book",
-    "more": "More actions"
+    "more": "More actions",
+    "refresh": "Refresh"
   },
   "filters": {
     "type": "Type",
+    "allTypes": "All types",
     "status": "Status",
     "shelf": "Shelf",
     "sort": "Sort",
@@ -151,12 +154,16 @@
     "unread": "Unread",
     "recent": "Recently added",
     "title": "Title",
-    "author": "Author"
+    "author": "Author",
+    "open": "Filters"
   },
   "view": {
     "label": "View",
     "grid": "Grid view",
-    "list": "List view"
+    "list": "List view",
+    "coverSmall": "Small covers",
+    "coverMedium": "Medium covers",
+    "coverLarge": "Large covers"
   },
   "status": {
     "done": "Read",

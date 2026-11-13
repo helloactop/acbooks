@@ -26,21 +26,22 @@ export function BookListItem({ book, onOpen }: BookListItemProps) {
 
   return (
     <div
-      className={`${ROW_GRID} relative min-h-[72px] border-b border-border px-3 py-1.5 transition-colors duration-150 ease-out hover:bg-surface-hover focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background`}
+      className={`${ROW_GRID} relative min-h-14 border-b border-border px-2 py-1 transition-colors duration-150 ease-out hover:bg-surface-hover focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background`}
       role="row"
     >
       <div aria-hidden="true" className="flex justify-center" role="cell">
         <BookCover
           book={book}
-          className="w-10"
-          titleClassName="text-[8px] leading-tight"
+          className="w-8"
+          flat
+          titleClassName="text-[7px] leading-tight"
         />
       </div>
 
       <div className="min-w-0" role="cell">
         <Link
           aria-label={t("detail.open", { title: book.title })}
-          className="block max-w-full truncate text-left text-sm font-medium after:absolute after:inset-0 after:content-[''] hover:text-accent-text focus-visible:outline-none"
+          className="block max-w-full truncate text-left text-[13px] font-medium after:absolute after:inset-0 after:content-[''] hover:text-accent-text focus-visible:outline-none"
           onClick={() => {
             onOpen(book.id);
           }}
@@ -48,13 +49,13 @@ export function BookListItem({ book, onOpen }: BookListItemProps) {
         >
           {book.title}
         </Link>
-        <span className="block truncate text-[13px] text-muted-foreground">
+        <span className="block truncate text-xs text-muted-foreground">
           {authors}
         </span>
-        <div className="mt-1 flex flex-wrap gap-1">
+        <div className="mt-0.5 flex flex-wrap gap-1">
           <TagBadges tags={book.tags} />
         </div>
-        <div className="mt-1 flex flex-wrap gap-1 md:hidden">
+        <div className="mt-0.5 flex flex-wrap gap-1 md:hidden">
           <FormatBadges formats={book.formats} />
           <PhysicalCopiesBadge count={book.copyCount} />
           <ReadingStatusBadge status={book.readingStatus} />

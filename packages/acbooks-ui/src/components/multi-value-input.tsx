@@ -86,7 +86,7 @@ export function MultiValueInput({
   return (
     <div
       className={cn(
-        "flex min-h-10 w-full flex-wrap items-center gap-1.5 rounded-control border border-control-border bg-background px-2 py-1 transition-colors duration-150 ease-out focus-within:border-accent-text focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background max-md:min-h-11",
+        "flex min-h-8 w-full flex-wrap items-center gap-1 rounded-control border border-control-border bg-background px-1.5 py-0.5 transition-colors duration-150 ease-out focus-within:border-accent-text focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background max-md:min-h-11",
         disabled && "border-disabled-border bg-disabled-surface",
         ariaInvalid && "border-destructive-text",
         className,
@@ -95,7 +95,7 @@ export function MultiValueInput({
     >
       {values.map((value) => (
         <span
-          className="inline-flex max-w-full items-center gap-1 rounded bg-surface py-1 pr-1 pl-2 text-xs leading-4 text-foreground"
+          className="inline-flex max-w-full items-center gap-1 rounded bg-surface py-0.5 pr-1 pl-1.5 text-xs leading-4 text-foreground"
           key={value}
         >
           <span className="truncate">{value}</span>
@@ -118,7 +118,7 @@ export function MultiValueInput({
         aria-errormessage={ariaErrorMessage}
         aria-invalid={ariaInvalid}
         aria-required={ariaRequired}
-        className="h-6 min-w-[8rem] flex-1 border-0 bg-transparent p-0 text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+        className="h-6 min-w-[8rem] flex-1 border-0 bg-transparent p-0 text-[13px] text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed max-md:text-base"
         disabled={disabled}
         id={id}
         onBlur={commitDraft}

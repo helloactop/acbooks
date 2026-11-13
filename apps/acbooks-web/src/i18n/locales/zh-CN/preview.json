@@ -47,7 +47,15 @@
     "initializationCodeError": "初始化码无效",
     "disabledDescription": "禁用状态保留尺寸、边框和可读文字",
     "disabledLabel": "禁用输入",
-    "disabledValue": "不可编辑"
+    "disabledValue": "不可编辑",
+    "multiValueLabel": "多值输入",
+    "multiValuePlaceholder": "输入后按回车添加",
+    "textareaLabel": "多行文本",
+    "textareaPlaceholder": "可选",
+    "tabsLabel": "内容分页",
+    "tabInfo": "信息",
+    "tabNotes": "笔记",
+    "tabPanel": "选择上方分页查看对应内容。"
   },
   "icons": {
     "samples": {

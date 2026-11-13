@@ -67,9 +67,9 @@ export function Pagination({
   return (
     <nav
       aria-label={t("pagination.label")}
-      className="mt-auto flex items-center justify-between gap-3 pt-2"
+      className="mt-auto flex items-center justify-between gap-2 pt-1"
     >
-      <span className="text-[13px] text-muted-foreground max-md:hidden">
+      <span className="text-xs text-muted-foreground max-md:hidden">
         {t("pagination.range", {
           start: numberFormat.format(rangeStart),
           end: numberFormat.format(rangeEnd),
@@ -88,7 +88,7 @@ export function Pagination({
           <ChevronLeft aria-hidden="true" />
         </IconButton>
 
-        <span className="min-w-24 text-center text-sm whitespace-nowrap tabular-nums text-muted-foreground md:hidden">
+        <span className="min-w-24 text-center text-[13px] whitespace-nowrap tabular-nums text-muted-foreground md:hidden">
           {t("pagination.pageOf", {
             page: currentPage,
             total: pageCount,

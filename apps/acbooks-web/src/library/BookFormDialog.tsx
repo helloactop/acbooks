@@ -62,7 +62,7 @@ export function BookFormDialog({
           }}
           size="confirm"
         >
-          <div className="p-6">
+          <div className="p-5">
             <h2 className="text-lg font-semibold" id="book-form-discard-title">
               {t("form.discardTitle")}
             </h2>

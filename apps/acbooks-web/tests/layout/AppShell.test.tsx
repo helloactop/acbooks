@@ -50,6 +50,41 @@ function jsonResponse(body: unknown, status = 200): Response {
   } as unknown as Response;
 }
 
+function mockViewport(kind: "desktop" | "mobile") {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    addEventListener: () => undefined,
+    addListener: () => undefined,
+    dispatchEvent: () => false,
+    matches: kind === "desktop" && query.includes("min-width: 768px"),
+    media: query,
+    onchange: null,
+    removeEventListener: () => undefined,
+    removeListener: () => undefined,
+  }));
+}
+
+function renderShell(currentPath: string) {
+  const onLogout = vi.fn();
+  const expireSession = vi.fn();
+  render(
+    <I18nProvider defaultLanguage="zh-CN" resources={appResources}>
+      <MemoryRouter initialEntries={[currentPath]}>
+        <LocationProbe />
+        <HistoryControls />
+        <AppShell
+          accountName="admin"
+          expireSession={expireSession}
+          loggingOut={false}
+          onLogout={onLogout}
+        >
+          <PageHeader title="书库" />
+        </AppShell>
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+  return { expireSession, onLogout };
+}
+
 function bookSearchCalls(): number {
   return fetchMock.mock.calls.filter(([input]) =>
     String(input).startsWith("/api/v1/books"),
@@ -105,28 +140,6 @@ function searchPage(title: string, total = 1) {
   };
 }
 
-function renderShell(currentPath: string, title = "全部书籍") {
-  const onLogout = vi.fn();
-  const expireSession = vi.fn();
-  render(
-    <I18nProvider defaultLanguage="zh-CN" resources={appResources}>
-      <MemoryRouter initialEntries={[currentPath]}>
-        <LocationProbe />
-        <HistoryControls />
-        <AppShell
-          accountName="admin"
-          expireSession={expireSession}
-          loggingOut={false}
-          onLogout={onLogout}
-        >
-          <PageHeader title={title} />
-        </AppShell>
-      </MemoryRouter>
-    </I18nProvider>,
-  );
-  return { expireSession, onLogout };
-}
-
 beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -143,83 +156,47 @@ afterEach(() => {
 });
 
 describe("AppShell", () => {
-  it("renders shared navigation, search and the account entry", () => {
+  it("renders the icon rail, top search and account entry", () => {
+    mockViewport("desktop");
     renderShell("/library");
-    const sidebar = screen.getByRole("complementary", {
+    const rail = screen.getByRole("complementary", {
       name: "应用侧边栏",
     });
 
-    expect(within(sidebar).getByRole("link", { name: "首页" })).toHaveAttribute(
+    expect(within(rail).getByRole("link", { name: "首页" })).toHaveAttribute(
       "href",
       "/home",
     );
     expect(
-      within(sidebar).getByRole("link", { name: "全部书籍" }),
-    ).toHaveAttribute("href", "/library?mediaType=all&reset=1");
+      within(rail).getByRole("link", { name: "图书库" }),
+    ).toHaveAttribute("href", "/library");
     expect(
-      within(sidebar).getByRole("link", { name: "全部书籍" }),
+      within(rail).getByRole("link", { name: "图书库" }),
     ).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("combobox", { name: "全局搜索" })).toBeInTheDocument();
     expect(
-      within(sidebar).getByRole("link", { name: "实体书" }),
-    ).toHaveAttribute("href", "/library?mediaType=physical&reset=1");
-    expect(
-      within(sidebar).getByRole("button", { name: "书架" }),
-    ).toBeDisabled();
-    expect(
-      within(sidebar).getByRole("combobox", { name: "全局搜索" }),
-    ).toBeInTheDocument();
-    expect(
-      within(sidebar).getByRole("link", { name: "账户与设置：admin" }),
+      screen.getByRole("link", { name: "账户与设置：admin" }),
     ).toHaveAttribute("href", "/settings");
     expect(
-      within(sidebar).getByRole("button", { name: "退出登录" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: "退出登录" }),
+    ).not.toBeInTheDocument();
+    expect(rail.className).toContain("w-20");
   });
 
-  it("marks the physical-books route as the current view", () => {
-    renderShell("/library?mediaType=physical&reset=1", "实体书");
-    const sidebar = screen.getByRole("complementary", {
+  it("keeps the library group active on detail routes", () => {
+    mockViewport("desktop");
+    renderShell("/library/books/11111111-1111-4111-8111-111111111111");
+    const rail = screen.getByRole("complementary", {
       name: "应用侧边栏",
     });
 
     expect(
-      within(sidebar).getByRole("link", { name: "实体书" }),
+      within(rail).getByRole("link", { name: "图书库" }),
     ).toHaveAttribute("aria-current", "page");
-    expect(
-      within(sidebar).getByRole("link", { name: "全部书籍" }),
-    ).not.toHaveAttribute("aria-current");
   });
 
   it("opens and closes the mobile navigation drawer", async () => {
-    const user = userEvent.setup();
-    renderShell("/library");
-    const trigger = screen.getByRole("button", { name: "打开导航菜单" });
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
-
-    await user.click(trigger);
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
-    const dialog = document.getElementById(
-      "app-navigation-drawer",
-    ) as HTMLDialogElement | null;
-    expect(dialog).not.toBeNull();
-    expect(dialog?.open).toBe(true);
-    expect(
-      within(dialog as HTMLElement).getByRole("button", {
-        name: "关闭导航菜单",
-      }),
-    ).toBeInTheDocument();
-
-    await user.click(
-      within(dialog as HTMLElement).getByRole("button", {
-        name: "关闭导航菜单",
-      }),
-    );
-    await waitFor(() => {
-      expect(trigger).toHaveAttribute("aria-expanded", "false");
-    });
-  });
-
-  it("closes the drawer after navigating and keeps it closed on back", async () => {
+    mockViewport("mobile");
     const user = userEvent.setup();
     renderShell("/library");
     const trigger = screen.getByRole("button", { name: "打开导航菜单" });
@@ -227,132 +204,124 @@ describe("AppShell", () => {
     const dialog = document.getElementById(
       "app-navigation-drawer",
     ) as HTMLDialogElement;
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    expect(dialog.open).toBe(true);
+    expect(
+      within(dialog).getByRole("link", { name: "图书库" }),
+    ).toHaveAttribute("href", "/library");
+    expect(
+      within(dialog).getByRole("combobox", { name: "全局搜索" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("link", { name: "账户与设置：admin" }),
+    ).toHaveAttribute("href", "/settings");
+
+    await user.click(
+      within(dialog).getByRole("button", { name: "关闭导航菜单" }),
+    );
+    await waitFor(() => {
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+    });
+  });
+
+  it("opens and closes the drawer with horizontal swipes", async () => {
+    mockViewport("mobile");
+    renderShell("/library");
+    const dialog = document.getElementById(
+      "app-navigation-drawer",
+    ) as HTMLDialogElement;
+
+    fireEvent.touchStart(document, {
+      touches: [{ clientX: 8, clientY: 400 }],
+    });
+    fireEvent.touchMove(document, {
+      touches: [{ clientX: 26, clientY: 300 }],
+    });
+    expect(dialog.open).toBe(false);
+
+    fireEvent.touchStart(document, {
+      touches: [{ clientX: 8, clientY: 400 }],
+    });
+    fireEvent.touchMove(document, {
+      touches: [{ clientX: 90, clientY: 404 }],
+    });
+    await waitFor(() => {
+      expect(dialog.open).toBe(true);
+    });
+
+    fireEvent.touchStart(dialog, {
+      touches: [{ clientX: 260, clientY: 400 }],
+    });
+    fireEvent.touchMove(dialog, {
+      touches: [{ clientX: 150, clientY: 404 }],
+    });
+    await waitFor(() => {
+      expect(dialog.open).toBe(false);
+    });
+  });
+
+  it("focuses the top bar search with Ctrl+K on desktop", () => {
+    mockViewport("desktop");
+    renderShell("/library");
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+
+    expect(screen.getByRole("combobox", { name: "全局搜索" })).toHaveFocus();
+  });
+
+  it("opens the drawer and focuses its search with Ctrl+K on mobile", async () => {
+    mockViewport("mobile");
+    renderShell("/library");
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+    const dialog = document.getElementById(
+      "app-navigation-drawer",
+    ) as HTMLDialogElement;
+
+    await waitFor(() => {
+      expect(dialog.open).toBe(true);
+      expect(
+        within(dialog).getByRole("combobox", { name: "全局搜索" }),
+      ).toHaveFocus();
+    });
+  });
+
+  it("closes the drawer after navigating and keeps it closed on back", async () => {
+    mockViewport("mobile");
+    const user = userEvent.setup();
+    renderShell("/library");
+    const trigger = screen.getByRole("button", { name: "打开导航菜单" });
+    await user.click(trigger);
+    const dialog = document.getElementById(
+      "app-navigation-drawer",
+    ) as HTMLDialogElement;
 
     await user.click(within(dialog).getByRole("link", { name: "首页" }));
     await waitFor(() => {
       expect(currentLocation).toBe("/home");
       expect(trigger).toHaveAttribute("aria-expanded", "false");
     });
-    expect(dialog.open).toBe(false);
 
     await user.click(screen.getByRole("button", { name: "history-back" }));
     await waitFor(() => {
       expect(currentLocation).toBe("/library");
     });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
-    expect(dialog.open).toBe(false);
-  });
-
-  it("keeps an in-flight search when the same keyword is confirmed", async () => {
-    const pending = installDeferredSearch();
-    const user = userEvent.setup();
-    renderShell("/library");
-    const sidebar = screen.getByRole("complementary", {
-      name: "应用侧边栏",
-    });
-    const search = within(sidebar).getByRole("combobox", {
-      name: "全局搜索",
-    });
-
-    await user.type(search, "三体");
-    await waitFor(() => {
-      expect(pending).toHaveLength(1);
-    });
-    expect(pending[0]?.q).toBe("三体");
-
-    fireEvent.compositionEnd(search, { target: { value: "三体" } });
-    expect(pending[0]?.signal?.aborted).toBe(false);
-
-    await act(async () => {
-      pending[0]?.resolve(searchPage("三体"));
-    });
-    expect(
-      await within(sidebar).findByRole("option", { name: /三体/ }),
-    ).toBeInTheDocument();
-  });
-
-  it("hides stale results and discards late responses for old keywords", async () => {
-    const pending = installDeferredSearch();
-    const user = userEvent.setup();
-    renderShell("/library");
-    const sidebar = screen.getByRole("complementary", {
-      name: "应用侧边栏",
-    });
-    const search = within(sidebar).getByRole("combobox", {
-      name: "全局搜索",
-    });
-
-    await user.type(search, "三体");
-    await waitFor(() => {
-      expect(pending).toHaveLength(1);
-    });
-
-    fireEvent.change(search, { target: { value: "边城" } });
-    expect(within(sidebar).queryByRole("option")).not.toBeInTheDocument();
-    expect(pending[0]?.signal?.aborted).toBe(true);
-
-    await waitFor(() => {
-      expect(pending).toHaveLength(2);
-    });
-    expect(pending[1]?.q).toBe("边城");
-
-    await act(async () => {
-      pending[0]?.resolve(searchPage("三体"));
-    });
-    expect(
-      within(sidebar).queryByRole("option", { name: /三体/ }),
-    ).not.toBeInTheDocument();
-
-    await act(async () => {
-      pending[1]?.resolve(searchPage("边城"));
-    });
-    expect(
-      await within(sidebar).findByRole("option", { name: /边城/ }),
-    ).toBeInTheDocument();
   });
 
   it("searches the whole library and offers the full result list", async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse({
-        items: [
-          {
-            id: "11111111-1111-4111-8111-111111111111",
-            title: "三体",
-            authors: ["刘慈欣"],
-            translators: [],
-            isbn: null,
-            readingStatus: "reading",
-            tags: [],
-            shelves: [],
-            copyCount: 1,
-            fileCount: 1,
-            formats: ["epub"],
-            createdAt: 1_700_000_000_000,
-            updatedAt: 1_700_000_000_000,
-          },
-        ],
-        total: 7,
-        limit: 5,
-        offset: 0,
-      }),
-    );
+    mockViewport("desktop");
+    fetchMock.mockResolvedValue(jsonResponse(searchPage("三体", 7)));
     const user = userEvent.setup();
     renderShell("/library");
-    const sidebar = screen.getByRole("complementary", {
-      name: "应用侧边栏",
-    });
-    const search = within(sidebar).getByRole("combobox", {
-      name: "全局搜索",
-    });
+    const search = screen.getByRole("combobox", { name: "全局搜索" });
 
     await user.type(search, "三体");
-    const option = await within(sidebar).findByRole("option", {
-      name: /三体/,
-    });
-    expect(option).toBeInTheDocument();
     expect(
-      within(sidebar).getByRole("link", { name: "查看全部 7 个结果" }),
+      await screen.findByRole("option", { name: /三体/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "查看全部 7 个结果" }),
     ).toHaveAttribute("href", `/library?q=${encodeURIComponent("三体")}`);
 
     const request = new URL(
@@ -364,46 +333,19 @@ describe("AppShell", () => {
 
     await user.keyboard("{Escape}");
     expect(
-      within(sidebar).queryByRole("option", { name: /三体/ }),
+      screen.queryByRole("option", { name: /三体/ }),
     ).not.toBeInTheDocument();
   });
 
   it("deduplicates repeated search, ignores IME Enter and navigates on Enter", async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse({
-        items: [
-          {
-            id: "11111111-1111-4111-8111-111111111111",
-            title: "三体",
-            authors: ["刘慈欣"],
-            translators: [],
-            isbn: null,
-            readingStatus: "reading",
-            tags: [],
-            shelves: [],
-            copyCount: 1,
-            fileCount: 1,
-            formats: ["epub"],
-            createdAt: 1_700_000_000_000,
-            updatedAt: 1_700_000_000_000,
-          },
-        ],
-        total: 1,
-        limit: 5,
-        offset: 0,
-      }),
-    );
+    mockViewport("desktop");
+    fetchMock.mockResolvedValue(jsonResponse(searchPage("三体")));
     const user = userEvent.setup();
     renderShell("/library");
-    const sidebar = screen.getByRole("complementary", {
-      name: "应用侧边栏",
-    });
-    const search = within(sidebar).getByRole("combobox", {
-      name: "全局搜索",
-    });
+    const search = screen.getByRole("combobox", { name: "全局搜索" });
 
     await user.type(search, "三体");
-    await within(sidebar).findByRole("option", { name: /三体/ });
+    await screen.findByRole("option", { name: /三体/ });
     const requestsBefore = bookSearchCalls();
 
     fireEvent.compositionStart(search);
@@ -421,26 +363,63 @@ describe("AppShell", () => {
     });
   });
 
-  it("switches the sidebar to settings categories", () => {
-    renderShell("/settings", "设置");
-    const sidebar = screen.getByRole("complementary", {
-      name: "应用侧边栏",
+  it("keeps an in-flight search when the same keyword is confirmed", async () => {
+    mockViewport("desktop");
+    const pending = installDeferredSearch();
+    const user = userEvent.setup();
+    renderShell("/library");
+    const search = screen.getByRole("combobox", { name: "全局搜索" });
+
+    await user.type(search, "三体");
+    await waitFor(() => {
+      expect(pending).toHaveLength(1);
+    });
+    expect(pending[0]?.q).toBe("三体");
+
+    fireEvent.compositionEnd(search, { target: { value: "三体" } });
+    expect(pending[0]?.signal?.aborted).toBe(false);
+
+    await act(async () => {
+      pending[0]?.resolve(searchPage("三体"));
+    });
+    expect(
+      await screen.findByRole("option", { name: /三体/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides stale results and discards late responses for old keywords", async () => {
+    mockViewport("desktop");
+    const pending = installDeferredSearch();
+    const user = userEvent.setup();
+    renderShell("/library");
+    const search = screen.getByRole("combobox", { name: "全局搜索" });
+
+    await user.type(search, "三体");
+    await waitFor(() => {
+      expect(pending).toHaveLength(1);
     });
 
+    fireEvent.change(search, { target: { value: "边城" } });
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+    expect(pending[0]?.signal?.aborted).toBe(true);
+
+    await waitFor(() => {
+      expect(pending).toHaveLength(2);
+    });
+    expect(pending[1]?.q).toBe("边城");
+
+    await act(async () => {
+      pending[0]?.resolve(searchPage("三体"));
+    });
     expect(
-      within(sidebar).queryByRole("combobox"),
+      screen.queryByRole("option", { name: /三体/ }),
     ).not.toBeInTheDocument();
+
+    await act(async () => {
+      pending[1]?.resolve(searchPage("边城"));
+    });
     expect(
-      within(sidebar).getByRole("link", { name: "返回" }),
-    ).toHaveAttribute("href", "/home");
-    expect(
-      within(sidebar).getByRole("link", { name: "账户" }),
-    ).toHaveAttribute("href", "/settings?section=account");
-    expect(
-      within(sidebar).getByRole("link", { name: "外观" }),
-    ).toHaveAttribute("href", "/settings?section=appearance");
-    expect(
-      within(sidebar).getByRole("link", { name: "语言" }),
-    ).toHaveAttribute("href", "/settings?section=language");
+      await screen.findByRole("option", { name: /边城/ }),
+    ).toBeInTheDocument();
   });
 });

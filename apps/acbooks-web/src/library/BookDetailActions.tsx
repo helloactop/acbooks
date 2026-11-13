@@ -94,22 +94,21 @@ export function BookDetailActions({
           {t("detail.readingStatus")}
         </label>
         <Select
-          aria-busy={statusSaving || undefined}
-          className="h-11 @min-[640px]:h-10"
+          ariaBusy={statusSaving || undefined}
+          ariaLabel={t("detail.readingStatus")}
+          className="h-11 @min-[640px]:h-8"
           containerClassName="min-w-0 flex-1"
           disabled={statusSaving}
           id="book-reading-status"
-          onChange={(event) => {
-            onStatusChange(event.target.value as ReadingStatus);
+          onValueChange={(value) => {
+            onStatusChange(value as ReadingStatus);
           }}
+          options={STATUSES.map((status) => ({
+            label: t(`status.${status}`),
+            value: status,
+          }))}
           value={detail.readingStatus}
-        >
-          {STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {t(`status.${status}`)}
-            </option>
-          ))}
-        </Select>
+        />
 
         {statusSaving ? <Spinner label={t("detail.savingStatus")} /> : null}
 

@@ -47,7 +47,15 @@
     "initializationCodeError": "Invalid setup code",
     "disabledDescription": "Disabled states keep their size, border and readable text",
     "disabledLabel": "Disabled input",
-    "disabledValue": "Read only"
+    "disabledValue": "Read only",
+    "multiValueLabel": "Multi-value input",
+    "multiValuePlaceholder": "Type and press Enter to add",
+    "textareaLabel": "Long text",
+    "textareaPlaceholder": "Optional",
+    "tabsLabel": "Content tabs",
+    "tabInfo": "Information",
+    "tabNotes": "Notes",
+    "tabPanel": "Choose a tab above to view its content."
   },
   "icons": {
     "samples": {

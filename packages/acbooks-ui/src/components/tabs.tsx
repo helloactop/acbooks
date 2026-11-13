@@ -68,7 +68,7 @@ export function Tabs<T extends string>({
     <div
       aria-label={ariaLabel}
       className={cn(
-        "flex gap-6 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "flex gap-4 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className,
       )}
       role="tablist"
@@ -80,7 +80,7 @@ export function Tabs<T extends string>({
             aria-controls={panelId}
             aria-selected={selected}
             className={cn(
-              "-mb-px inline-flex h-11 shrink-0 items-center border-b-2 px-1 text-sm font-medium transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
+              "-mb-px inline-flex h-8 shrink-0 items-center border-b-2 px-1.5 text-[13px] font-medium transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none max-md:h-11",
               selected
                 ? "border-accent-text text-accent-text"
                 : "border-transparent text-muted-foreground hover:text-foreground",

@@ -22,10 +22,11 @@ export interface DropdownMenuAction {
 export interface DropdownMenuProps {
   actions: readonly DropdownMenuAction[];
   align?: "start" | "end";
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
   label: string;
   side?: "bottom" | "top";
+  trigger?: ReactNode;
   triggerClassName?: string;
   triggerVariant?: ButtonProps["variant"];
 }
@@ -37,6 +38,7 @@ export function DropdownMenu({
   className,
   label,
   side = "bottom",
+  trigger,
   triggerClassName,
   triggerVariant = "ghost",
 }: DropdownMenuProps) {
@@ -112,20 +114,37 @@ export function DropdownMenu({
 
   return (
     <div className={cn("relative", className)} ref={containerRef}>
-      <IconButton
-        aria-controls={open ? menuId : undefined}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className={triggerClassName}
-        label={label}
-        onClick={() => {
-          setOpen((current) => !current);
-        }}
-        ref={triggerRef}
-        variant={triggerVariant}
-      >
-        {children}
-      </IconButton>
+      {trigger !== undefined ? (
+        <button
+          aria-controls={open ? menuId : undefined}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          aria-label={label}
+          className={triggerClassName}
+          onClick={() => {
+            setOpen((current) => !current);
+          }}
+          ref={triggerRef}
+          type="button"
+        >
+          {trigger}
+        </button>
+      ) : (
+        <IconButton
+          aria-controls={open ? menuId : undefined}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          className={triggerClassName}
+          label={label}
+          onClick={() => {
+            setOpen((current) => !current);
+          }}
+          ref={triggerRef}
+          variant={triggerVariant}
+        >
+          {children}
+        </IconButton>
+      )}
 
       {open ? (
         <div
@@ -143,7 +162,7 @@ export function DropdownMenu({
             const Icon = action.icon;
             return (
               <button
-                className="flex min-h-9 w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:hover:bg-transparent max-md:min-h-11"
+                className="flex min-h-8 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-[13px] text-foreground hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:hover:bg-transparent max-md:min-h-11 md:min-h-8"
                 disabled={action.disabled}
                 key={action.label}
                 onClick={() => {
@@ -155,7 +174,7 @@ export function DropdownMenu({
                 type="button"
               >
                 {Icon !== undefined ? (
-                  <Icon aria-hidden="true" className="size-[18px]" />
+                  <Icon aria-hidden="true" className="size-4" />
                 ) : null}
                 {action.label}
               </button>

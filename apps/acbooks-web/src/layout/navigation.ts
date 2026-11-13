@@ -1,9 +1,4 @@
 import {
-  BookMarked,
-  BookOpen,
-  ChartBar,
-  FileText,
-  History,
   House,
   Languages,
   LibraryBig,
@@ -12,61 +7,17 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { homeHref, libraryMediaHref } from "./routes";
+import { homeHref, libraryHref } from "./routes";
 
 export interface NavItem {
-  disabled?: boolean;
-  href?: string;
+  href: string;
   icon: LucideIcon;
   labelKey: string;
 }
 
-export interface NavGroup {
-  items: readonly NavItem[];
-  labelKey?: string;
-}
-
-export const APP_NAV_GROUPS: readonly NavGroup[] = [
-  {
-    items: [{ href: homeHref(), icon: House, labelKey: "nav.home" }],
-  },
-  {
-    labelKey: "nav.library",
-    items: [
-      {
-        href: libraryMediaHref("all"),
-        icon: LibraryBig,
-        labelKey: "nav.allBooks",
-      },
-      {
-        href: libraryMediaHref("physical"),
-        icon: BookOpen,
-        labelKey: "nav.physical",
-      },
-      {
-        href: libraryMediaHref("digital"),
-        icon: FileText,
-        labelKey: "nav.digital",
-      },
-    ],
-  },
-  {
-    labelKey: "nav.shelves",
-    items: [
-      {
-        disabled: true,
-        icon: BookMarked,
-        labelKey: "nav.bookShelf",
-      },
-    ],
-  },
-  {
-    labelKey: "nav.reading",
-    items: [
-      { disabled: true, icon: History, labelKey: "nav.history" },
-      { disabled: true, icon: ChartBar, labelKey: "nav.statistics" },
-    ],
-  },
+export const APP_NAV_ITEMS: readonly NavItem[] = [
+  { href: homeHref(), icon: House, labelKey: "nav.home" },
+  { href: libraryHref(), icon: LibraryBig, labelKey: "nav.library" },
 ];
 
 export type SettingsSection = "account" | "appearance" | "language";
@@ -120,33 +71,11 @@ export function settingsSectionFromSearch(
     : null;
 }
 
-function currentMediaType(search: string): "all" | "physical" | "digital" {
-  const value = new URLSearchParams(search).get("mediaType");
-  return value === "physical" || value === "digital" ? value : "all";
-}
-
-export function isNavItemActive(
-  item: NavItem,
-  pathname: string,
-  search: string,
-): boolean {
-  if (item.href === undefined) {
-    return false;
+export function isNavItemActive(item: NavItem, pathname: string): boolean {
+  if (item.href === homeHref()) {
+    return pathname === "/home" || pathname === "/home/";
   }
-  const target = new URL(item.href, window.location.origin);
-  if (target.pathname === "/library") {
-    if (pathname.startsWith("/library/books/")) {
-      return target.searchParams.get("mediaType") === "all";
-    }
-    if (pathname !== "/library") {
-      return false;
-    }
-    return (
-      (target.searchParams.get("mediaType") ?? "all") ===
-      currentMediaType(search)
-    );
-  }
-  return pathname === target.pathname;
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
 export function isSettingsItemActive(

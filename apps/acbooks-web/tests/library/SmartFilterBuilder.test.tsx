@@ -86,22 +86,28 @@ describe("SmartFilterBuilder", () => {
     expect(start).toHaveValue(1);
     expect(end).toHaveValue(5);
 
-    await user.selectOptions(
+    await user.click(
       screen.getByRole("combobox", { name: "第 1 条筛选字段" }),
-      "hasCover",
+    );
+    await user.click(
+      await screen.findByRole("option", { name: "有封面" }),
     );
     expect(screen.getByText("无需填写值")).toBeInTheDocument();
 
-    await user.selectOptions(
+    await user.click(
       screen.getByRole("combobox", { name: "第 1 条筛选字段" }),
-      "createdAt",
+    );
+    await user.click(
+      await screen.findByRole("option", { name: "加入时间" }),
     );
     const dateValue = screen.getByLabelText("加入时间筛选值");
     expect(dateValue).toHaveAttribute("type", "date");
 
-    await user.selectOptions(
+    await user.click(
       screen.getByRole("combobox", { name: "第 1 条筛选运算符" }),
-      "between",
+    );
+    await user.click(
+      await screen.findByRole("option", { name: "介于" }),
     );
     expect(
       screen.getByLabelText("加入时间起始值"),

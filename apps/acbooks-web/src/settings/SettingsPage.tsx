@@ -81,17 +81,19 @@ export function SettingsPage() {
             label={t("settings.theme")}
           >
             <Select
-              className="min-w-44"
+              ariaLabel={t("settings.theme")}
+              containerClassName="min-w-44"
               id="settings-theme"
-              onChange={(event) => {
-                setTheme(event.target.value as "system" | "light" | "dark");
+              onValueChange={(value) => {
+                setTheme(value as "system" | "light" | "dark");
               }}
+              options={[
+                { label: t("settings.themeSystem"), value: "system" },
+                { label: t("settings.themeLight"), value: "light" },
+                { label: t("settings.themeDark"), value: "dark" },
+              ]}
               value={theme}
-            >
-              <option value="system">{t("settings.themeSystem")}</option>
-              <option value="light">{t("settings.themeLight")}</option>
-              <option value="dark">{t("settings.themeDark")}</option>
-            </Select>
+            />
           </SettingsRow>
         </SettingsGroup>
       );
@@ -109,26 +111,26 @@ export function SettingsPage() {
           label={t("settings.languageMode")}
         >
           <Select
-            className="min-w-44"
+            ariaLabel={t("settings.languageMode")}
+            containerClassName="min-w-44"
             id="settings-language"
-            onChange={(event) => {
-              setLanguage(
-                event.target.value as "system" | "zh-CN" | "en",
-              );
+            onValueChange={(value) => {
+              setLanguage(value as "system" | "zh-CN" | "en");
             }}
+            options={[
+              { label: t("settings.languageSystem"), value: "system" },
+              { label: t("settings.languageZh"), value: "zh-CN" },
+              { label: t("settings.languageEn"), value: "en" },
+            ]}
             value={language}
-          >
-            <option value="system">{t("settings.languageSystem")}</option>
-            <option value="zh-CN">{t("settings.languageZh")}</option>
-            <option value="en">{t("settings.languageEn")}</option>
-          </Select>
+          />
         </SettingsRow>
       </SettingsGroup>
     );
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[960px] flex-col gap-5">
+    <div className="mx-auto flex w-full max-w-[960px] flex-col gap-4">
       <PageHeader
         description={
           currentItem === undefined
@@ -138,9 +140,32 @@ export function SettingsPage() {
         title={t("settings.title")}
       />
 
+      <nav
+        aria-label={t("settings.personal")}
+        className="hidden items-center gap-1 md:flex"
+      >
+        {items.map((item) => {
+          const active = section === item.section;
+          return (
+            <Link
+              aria-current={active ? "page" : undefined}
+              className={`inline-flex h-7 items-center rounded-control px-2 text-[13px] transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
+                active
+                  ? "bg-accent-soft font-medium text-accent-text"
+                  : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+              }`}
+              key={item.section}
+              to={settingsHref(item.section)}
+            >
+              {t(item.labelKey)}
+            </Link>
+          );
+        })}
+      </nav>
+
       {section !== null ? (
         <Link
-          className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none lg:hidden"
+          className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:hidden"
           to={settingsHref()}
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
@@ -149,23 +174,23 @@ export function SettingsPage() {
       ) : null}
 
       {section === null ? (
-        <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1 sm:grid-cols-3 lg:hidden">
+        <div className="grid grid-cols-2 gap-2 max-[360px]:grid-cols-1 sm:grid-cols-3 md:hidden">
           {items.map((item) => {
             const Icon = item.icon;
             const label = t(item.labelKey);
             return (
               <Link
                 aria-label={t("settings.openSection", { name: label })}
-                className="flex min-h-28 flex-col gap-2 rounded-card border border-border bg-surface p-4 transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                className="flex min-h-24 flex-col gap-1.5 rounded-card border border-border bg-surface p-3 transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 key={item.section}
                 to={settingsHref(item.section)}
               >
                 <Icon
                   aria-hidden="true"
-                  className="size-5 text-accent-text"
+                  className="size-4 text-accent-text"
                   strokeWidth={2}
                 />
-                <span className="text-sm font-medium">{label}</span>
+                <span className="text-[13px] font-medium">{label}</span>
                 <span className="text-xs text-muted-foreground">
                   {t(item.descriptionKey)}
                 </span>
@@ -176,15 +201,15 @@ export function SettingsPage() {
       ) : null}
 
       {section === null ? (
-        <div className="hidden flex-col gap-8 lg:flex">
+        <div className="hidden flex-col gap-6 md:flex">
           {items.map(renderSection)}
         </div>
       ) : currentItem !== undefined ? (
-        <div className="flex flex-col gap-8">{renderSection(currentItem)}</div>
+        <div className="flex flex-col gap-6">{renderSection(currentItem)}</div>
       ) : null}
 
       {section === null ? (
-        <p className="text-xs text-muted-foreground lg:hidden">
+        <p className="text-xs text-muted-foreground md:hidden">
           {t("settings.categoryHint")}
         </p>
       ) : null}

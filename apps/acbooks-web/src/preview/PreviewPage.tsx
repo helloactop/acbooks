@@ -3,9 +3,12 @@ import {
   Field,
   IconButton,
   Input,
+  MultiValueInput,
   PasswordInput,
   SegmentedControl,
   Spinner,
+  Tabs,
+  Textarea,
   useLanguage,
   useTheme,
   type LanguageMode,
@@ -28,7 +31,7 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 interface IconSample {
@@ -123,6 +126,8 @@ export function PreviewPage() {
   const { language, resolvedLanguage, setLanguage } = useLanguage();
   const { t } = useTranslation("preview");
   const { t: tCommon } = useTranslation("common");
+  const [previewValues, setPreviewValues] = useState(["示例"]);
+  const [previewTab, setPreviewTab] = useState("info");
 
   const themeOptions: readonly SegmentedControlOption<ThemeMode>[] = [
     { value: "system", label: tCommon("theme.system") },
@@ -264,6 +269,36 @@ export function PreviewPage() {
                 value={t("forms.disabledValue")}
               />
             </Field>
+          </div>
+
+          <div className="mt-4 grid max-w-2xl gap-4 md:grid-cols-2">
+            <Field label={t("forms.multiValueLabel")}>
+              <MultiValueInput
+                onChange={setPreviewValues}
+                placeholder={t("forms.multiValuePlaceholder")}
+                values={previewValues}
+              />
+            </Field>
+            <Field label={t("forms.textareaLabel")}>
+              <Textarea placeholder={t("forms.textareaPlaceholder")} />
+            </Field>
+          </div>
+
+          <div className="mt-4 max-w-2xl">
+            <Tabs
+              ariaLabel={t("forms.tabsLabel")}
+              idPrefix="preview-tab"
+              items={[
+                { label: t("forms.tabInfo"), value: "info" },
+                { label: t("forms.tabNotes"), value: "notes" },
+              ]}
+              onValueChange={setPreviewTab}
+              panelId="preview-tab-panel"
+              value={previewTab}
+            />
+            <div className="pt-3 text-[13px] text-muted-foreground" id="preview-tab-panel" role="tabpanel">
+              {t("forms.tabPanel")}
+            </div>
           </div>
         </PreviewSection>
 

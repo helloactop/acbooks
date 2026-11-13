@@ -1,9 +1,14 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { Select } from "../../src/components/select";
+
+const OPTIONS = [
+  { label: "最近添加", value: "recent" },
+  { label: "书名", value: "title" },
+];
 
 function Harness() {
   const [value, setValue] = useState("recent");
@@ -11,37 +16,98 @@ function Harness() {
     <>
       <label htmlFor="sort">排序</label>
       <Select
+        ariaLabel="排序"
         id="sort"
-        onChange={(event) => {
-          setValue(event.target.value);
-        }}
+        onValueChange={setValue}
+        options={OPTIONS}
         value={value}
-      >
-        <option value="recent">最近添加</option>
-        <option value="title">书名</option>
-      </Select>
+      />
     </>
   );
 }
 
 describe("Select", () => {
-  it("uses native select semantics and updates the value", async () => {
+  it("opens the listbox and selects an option", async () => {
+    const user = userEvent.setup();
     render(<Harness />);
-    const select = screen.getByRole("combobox", { name: "排序" });
+    const trigger = screen.getByRole("combobox", { name: "排序" });
 
-    expect(select).toHaveValue("recent");
-    await userEvent.selectOptions(select, "title");
-    expect(select).toHaveValue("title");
+    expect(trigger).toHaveTextContent("最近添加");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(trigger);
+    const listbox = await screen.findByRole("listbox");
+    expect(within(listbox).getAllByRole("option")).toHaveLength(2);
+    expect(
+      within(listbox).getByRole("option", { name: "最近添加" }),
+    ).toHaveAttribute("aria-selected", "true");
+
+    await user.click(
+      within(listbox).getByRole("option", { name: "书名" }),
+    );
+    expect(trigger).toHaveTextContent("书名");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
   });
 
-  it("keeps disabled styling on the native select", () => {
+  it("supports keyboard navigation, selection and Escape", async () => {
+    render(<Harness />);
+    const trigger = screen.getByRole("combobox", { name: "排序" });
+
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    expect(trigger).toHaveTextContent("书名");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    fireEvent.keyDown(trigger, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("renders grouped options", async () => {
+    const user = userEvent.setup();
     render(
-      <Select aria-label="排序" disabled value="recent">
-        <option value="recent">最近添加</option>
-      </Select>,
+      <Select
+        ariaLabel="字段"
+        groups={[
+          {
+            label: "图书元数据",
+            options: [
+              { label: "书名", value: "title" },
+              { label: "作者", value: "author" },
+            ],
+          },
+        ]}
+        onValueChange={() => undefined}
+        value="title"
+      />,
     );
-    const select = screen.getByRole("combobox", { name: "排序" });
-    expect(select).toBeDisabled();
-    expect(select).toHaveClass("disabled:bg-disabled-surface");
+
+    await user.click(screen.getByRole("combobox", { name: "字段" }));
+    const group = await screen.findByRole("group", {
+      name: "图书元数据",
+    });
+    expect(
+      within(group).getAllByRole("option").map((option) => option.textContent),
+    ).toEqual(["书名", "作者"]);
+  });
+
+  it("keeps disabled styling on the trigger", () => {
+    render(
+      <Select
+        ariaLabel="排序"
+        disabled
+        onValueChange={() => undefined}
+        options={OPTIONS}
+        value="recent"
+      />,
+    );
+    const trigger = screen.getByRole("combobox", { name: "排序" });
+    expect(trigger).toBeDisabled();
+    expect(trigger).toHaveClass("disabled:bg-disabled-surface");
   });
 });
