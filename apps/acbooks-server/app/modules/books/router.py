@@ -64,7 +64,7 @@ def books_router(
         sort: Annotated[BookSort, Query()] = "createdAt",
         order: Annotated[BookOrder, Query()] = "desc",
         limit: Annotated[int, Query(ge=1, le=100)] = 20,
-        offset: Annotated[int, Query(ge=0)] = 0,
+        offset: Annotated[int, Query(ge=0, le=1_000_000)] = 0,
     ) -> BookPage:
         response.headers["Cache-Control"] = "no-store"
         return service.list_books(

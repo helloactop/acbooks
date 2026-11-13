@@ -298,7 +298,7 @@ def test_library_migration_preserves_existing_rows(tmp_path: Path) -> None:
             connection.exec_driver_sql(
                 "INSERT INTO reading_sessions"
                 " (id, book_id, started_at, ended_at, active_seconds, source)"
-                " VALUES ('read', 'book', 0, 60_000, 60, 'manual')"
+                " VALUES ('read', 'book', 0, 60000, 60, 'manual')"
             )
 
         command.upgrade(config, "head")

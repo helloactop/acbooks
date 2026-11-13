@@ -25,6 +25,7 @@ dist/
 coverage/
 *.tsbuildinfo
 /apps/acbooks-web/.e2e-data/
+/apps/acbooks-web/e2e/.auth/
 /apps/acbooks-web/test-results/
 /apps/acbooks-web/playwright-report/
 /apps/acbooks-web/blob-report/

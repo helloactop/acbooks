@@ -276,6 +276,7 @@ def test_list_books_searches_filters_sorts_and_paginates(
     assert first_page["total"] == 3
     second_page = browser.get(BOOKS, params={"limit": 2, "offset": 2}).json()
     assert len(second_page["items"]) == 1
+    assert browser.get(BOOKS, params={"offset": 1_000_001}).status_code == 422
 
     items = {item["id"]: item for item in page.json()["items"]}
     assert items[alpha["id"]]["copyCount"] == 1

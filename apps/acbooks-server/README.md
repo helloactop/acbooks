@@ -71,9 +71,9 @@ Web Cookie 会话默认在签发 7 天后到期。可通过 `ACBOOKS_WEB_SESSION
 ## 数据库备份与恢复
 
 ```sh
-python -m app.modules.backup backup --output /data/acbooks/backups/acbooks.db
-python -m app.modules.backup verify /data/acbooks/backups/acbooks.db
-python -m app.modules.backup restore /data/acbooks/backups/acbooks.db
+python -m app.modules.backup backup --retain-days 7
+python -m app.modules.backup verify /data/acbooks/backups/acbooks-20260101T000000Z.db
+python -m app.modules.backup restore /data/acbooks/backups/acbooks-20260101T000000Z.db --offline
 ```
 
 备份使用 SQLite Online Backup API 并生成 SHA-256 清单；恢复前停止 API 与 Worker，

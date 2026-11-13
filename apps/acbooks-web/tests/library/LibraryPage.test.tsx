@@ -467,6 +467,50 @@ describe("LibraryPage", () => {
     await user.keyboard("{Escape}");
   });
 
+  it("prefers an explicit grid view over the stored list preference", async () => {
+    window.localStorage.setItem("acbooks-library-view-mode", "list");
+    window.history.replaceState({}, "", "/library?view=grid");
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1, BOOK2]));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    renderLibrary();
+
+    expect(
+      await screen.findByRole("article", { name: "呐喊" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", { name: "书籍列表" }),
+    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(currentLocation).toContain("view=grid");
+    });
+  });
+
+  it("aligns a non-page URL offset with the library page size", async () => {
+    window.history.replaceState({}, "", "/library?offset=13");
+    installApi(
+      baseHandler((url, init) => {
+        if (url.pathname === "/api/v1/books" && methodOf(init) === "GET") {
+          return jsonResponse(makePage([BOOK1], 30, 12));
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(latestBookRequest()?.searchParams.get("offset")).toBe("12");
+    });
+    await waitFor(() => {
+      expect(currentLocation).toContain("offset=12");
+    });
+  });
+
   it("sends search, smart filters, sorting and pagination to the server", async () => {
     installApi(
       baseHandler((url, init) => {

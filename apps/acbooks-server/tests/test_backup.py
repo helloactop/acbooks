@@ -10,7 +10,9 @@ from app.db.version import SCHEMA_HEAD_REVISION
 from app.modules.backup.service import (
     BackupError,
     backup_database,
+    database_lock,
     manifest_path,
+    prune_backups,
     restore_database,
     verify_backup,
 )
@@ -69,7 +71,7 @@ def test_restore_replaces_database_and_keeps_pre_restore_snapshot(tmp_path: Path
     add_titles(database, ("Later",))
     assert read_titles(database) == ["Original", "Later"]
 
-    snapshot = restore_database(output, database)
+    snapshot = restore_database(output, database, offline=True)
 
     assert snapshot is not None and snapshot.is_file()
     assert snapshot.name.startswith("acbooks.db.pre-restore-")
@@ -92,7 +94,7 @@ def test_restore_rejects_newer_schema(tmp_path: Path) -> None:
 
     target = tmp_path / "restore-target.db"
     with pytest.raises(BackupError, match="newer than"):
-        restore_database(output, target)
+        restore_database(output, target, offline=True)
     assert not target.exists()
 
 
@@ -109,7 +111,7 @@ def test_verify_rejects_tampered_backup_and_manifest(tmp_path: Path) -> None:
     with pytest.raises(BackupError, match="manifest"):
         verify_backup(output)
 
-    backup_database(output, database)
+    backup_database(output, database, overwrite=True)
     output.write_bytes(output.read_bytes() + b"tampered")
     with pytest.raises(BackupError, match="manifest"):
         verify_backup(output)
@@ -121,3 +123,86 @@ def test_verify_rejects_non_database_file(tmp_path: Path) -> None:
 
     with pytest.raises(BackupError, match="Cannot verify|integrity"):
         verify_backup(backup)
+
+
+def test_backup_refuses_overwrite_and_database_paths(tmp_path: Path) -> None:
+    database = tmp_path / "acbooks.db"
+    create_database(database, ("Book",))
+    output = tmp_path / "snapshot.db"
+
+    backup_database(output, database)
+    with pytest.raises(BackupError, match="already exists"):
+        backup_database(output, database)
+    backup_database(output, database, overwrite=True)
+
+    for unsafe in (
+        database,
+        database.with_name("acbooks.db-wal"),
+        database.with_name("acbooks.db-shm"),
+    ):
+        with pytest.raises(BackupError, match="must not point"):
+            backup_database(unsafe, database)
+    with pytest.raises(BackupError, match="must not point"):
+        restore_database(output, output, offline=True)
+
+
+def test_backup_lock_blocks_concurrent_operations(tmp_path: Path) -> None:
+    database = tmp_path / "acbooks.db"
+    create_database(database, ("Book",))
+
+    with database_lock(database):
+        with pytest.raises(BackupError, match="Another backup or restore"):
+            backup_database(tmp_path / "snapshot.db", database)
+
+
+def test_restore_requires_offline_and_an_idle_database(tmp_path: Path) -> None:
+    database = tmp_path / "acbooks.db"
+    create_database(database, ("Original",))
+    output = tmp_path / "snapshot.db"
+    backup_database(output, database)
+    add_titles(database, ("Later",))
+
+    with pytest.raises(BackupError, match="offline"):
+        restore_database(output, database)
+
+    busy = sqlite3.connect(database)
+    try:
+        busy.execute("BEGIN IMMEDIATE")
+        busy.execute(
+            "INSERT INTO books (id, title, created_at, updated_at)"
+            " VALUES ('pending', 'Pending', 1, 1)"
+        )
+        with pytest.raises(BackupError, match="busy|in use"):
+            restore_database(output, database, offline=True)
+    finally:
+        busy.rollback()
+        busy.close()
+
+    restore_database(output, database, offline=True)
+    assert read_titles(database) == ["Original"]
+
+
+def test_prune_backups_removes_only_old_managed_files(tmp_path: Path) -> None:
+    database = tmp_path / "acbooks.db"
+    create_database(database, ("Book",))
+    backups = []
+    for index in range(3):
+        path = tmp_path / f"backup-{index}.db"
+        backup_database(path, database)
+        backups.append(path)
+    for path, created_at in ((backups[0], 1), (backups[1], 1), (backups[2], 2)):
+        manifest = manifest_path(path)
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+        payload["created_at_ms"] = created_at
+        manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    unmanaged = tmp_path / "manual.db"
+    unmanaged.write_bytes(b"keep me")
+
+    removed = prune_backups(backups[2], 2)
+
+    assert {path.name for path in removed} == {"backup-0.db", "backup-1.db"}
+    assert backups[2].is_file()
+    assert manifest_path(backups[2]).is_file()
+    assert unmanaged.is_file()
+    assert not list(tmp_path.glob(".*.tmp"))

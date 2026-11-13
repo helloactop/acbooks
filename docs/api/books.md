@@ -74,7 +74,7 @@ Books Core V1 提供书目创建、列表、详情和部分更新。所有端点
 | `sort` | `title` / `author` / `createdAt` / `updatedAt` |
 | `order` | `asc` / `desc` |
 | `limit` | 1–100，默认 20 |
-| `offset` | ≥0，默认 0 |
+| `offset` | 0–1000000，默认 0 |
 
 默认按 `createdAt` 降序，使用 `id` 升序作为稳定补充排序。返回：
 

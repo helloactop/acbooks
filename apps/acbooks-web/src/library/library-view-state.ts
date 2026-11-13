@@ -10,6 +10,8 @@ export type SortOrder = "author" | "recent" | "title";
 export type ViewMode = "grid" | "list";
 export type CoverSize = "large" | "medium" | "small";
 
+export const LIBRARY_PAGE_SIZE = 12;
+
 export interface LibraryViewState {
   filters: SmartFilterRules;
   offset: number;

@@ -24,6 +24,7 @@ import { LibraryAlert } from "./LibraryAlert";
 import { LibraryFilterToolbar } from "./LibraryFilterToolbar";
 import {
   coverSizePx,
+  LIBRARY_PAGE_SIZE,
   type CoverSize,
   type SortOrder,
   type StatusFilter,
@@ -38,8 +39,6 @@ import { useLibraryFilters } from "./use-library-filters";
 import { useLibraryScrollRestoration } from "./use-library-scroll-restoration";
 import { useLibraryUrlState } from "./use-library-url-state";
 import { useLibraryViewPreferences } from "./use-library-view-preferences";
-
-const PAGE_SIZE = 12;
 
 export function LibraryPage() {
   const { t } = useTranslation("library");
@@ -80,7 +79,7 @@ export function LibraryPage() {
       appliedFilters,
       expireSession,
       offset,
-      pageSize: PAGE_SIZE,
+      pageSize: LIBRARY_PAGE_SIZE,
       searchTerm,
       setOffset,
       sort,
@@ -435,7 +434,7 @@ export function LibraryPage() {
 
       <Pagination
         disabled={loading}
-        limit={PAGE_SIZE}
+        limit={LIBRARY_PAGE_SIZE}
         offset={offset}
         onOffsetChange={changePage}
         total={total}

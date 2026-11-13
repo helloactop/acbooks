@@ -81,7 +81,7 @@ docker compose -f deploy/compose.yaml exec -T api cat /data/acbooks/secrets/setu
 ```sh
 docker compose -f deploy/compose.yaml stop api worker
 docker compose -f deploy/compose.yaml run --rm --no-deps api \
-  python -m app.modules.backup backup --output /data/acbooks/backups/pre-upgrade.db
+  python -m app.modules.backup backup --retain-days 7
 ```
 
 保留原数据卷和 Compose 项目名，再执行升级。`migrate` 会应用新迁移；若迁移拒绝
@@ -91,5 +91,6 @@ docker compose -f deploy/compose.yaml run --rm --no-deps api \
 docker compose -f deploy/compose.yaml up -d --build --wait
 ```
 
-恢复时保持 API 与 Worker 停止，使用 `restore` 子命令；该命令会先为当前数据库创建
-`pre-restore` 快照。详见[数据库备份与恢复](backup.md)。
+恢复时保持 API 与 Worker 停止，使用带 `--offline` 的 `restore` 子命令；
+该命令会检查数据库空闲、合并 WAL，并先为当前数据库创建 `pre-restore` 快照。
+详见[数据库备份与恢复](backup.md)。

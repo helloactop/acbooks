@@ -1,9 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-import { addBook, chooseStatus, login, uniqueTitle } from "./helpers";
+import { addBook, chooseStatus, uniqueTitle } from "./helpers";
 
 test("adds a book and filters it by reading status", async ({ page }) => {
-  await login(page);
   const title = uniqueTitle("E2E 筛选");
   await addBook(page, title);
 
@@ -17,7 +16,6 @@ test("adds a book and filters it by reading status", async ({ page }) => {
 });
 
 test("edits a book through the detail dialog", async ({ page }) => {
-  await login(page);
   const title = uniqueTitle("E2E 编辑");
   const card = await addBook(page, title);
   await card.click();

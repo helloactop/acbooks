@@ -75,8 +75,10 @@ Vite 代理，不改变认证方式。
 ## 端到端测试
 
 Playwright 测试位于 `e2e/`，用真实 SQLite、真实登录和单源静态托管运行，
-覆盖登录失败与成功、添加书籍、阅读状态筛选、详情编辑弹窗以及 390px 移动端抽屉流程。
-测试串行执行，使用临时数据库 `apps/acbooks-web/.e2e-data/`，不会写入现有数据。
+覆盖登录失败与成功、添加书籍、阅读状态筛选、详情编辑弹窗、Dialog 内 Select、
+Escape 关闭顺序、搜索 A→B→A、高级筛选、浏览器返回以及 390px 移动端抽屉与下拉菜单。
+测试串行执行，登录状态在 setup 项目中保存并复用，使用临时数据库
+`apps/acbooks-web/.e2e-data/`，不会写入现有数据。
 
 ```sh
 pnpm --filter @acbooks/web exec playwright install chromium

@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 
 import { login, PASSWORD, USERNAME } from "./helpers";
 
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test("rejects invalid credentials and signs in", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "登录 acbooks" })).toBeVisible();

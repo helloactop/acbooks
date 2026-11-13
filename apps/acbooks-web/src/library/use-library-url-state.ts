@@ -62,7 +62,10 @@ export function useLibraryUrlState(): LibraryUrlState {
 
   const write = useCallback(
     (next: LibraryViewState) => {
-      const search = libraryUrlSearch(next);
+      const search = libraryUrlSearch(
+        next,
+        new URLSearchParams(searchRef.current).has("view"),
+      );
       const target = search.length > 0 ? `?${search}` : "";
       if (target === searchRef.current) {
         return;
@@ -99,7 +102,10 @@ export function useLibraryUrlState(): LibraryUrlState {
   }, [location.search]);
 
   useEffect(() => {
-    const search = libraryUrlSearch(parsed);
+    const search = libraryUrlSearch(
+      parsed,
+      new URLSearchParams(location.search).has("view"),
+    );
     const canonical = search.length > 0 ? `?${search}` : "";
     if (canonical === location.search) {
       return;

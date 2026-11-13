@@ -3,6 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 const baseURL = "http://127.0.0.1:4174";
 const channel = process.env.ACBOOKS_E2E_CHANNEL;
 const channelOptions = channel === undefined ? {} : { channel };
+const authFile = "e2e/.auth/user.json";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -25,12 +26,23 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "setup",
+      testMatch: /auth\.setup\.ts/,
+      use: channelOptions,
+    },
+    {
       name: "chromium",
-      testIgnore: /mobile\.spec\.ts/,
-      use: { ...devices["Desktop Chrome"], ...channelOptions },
+      dependencies: ["setup"],
+      testIgnore: [/mobile\.spec\.ts/, /auth\.setup\.ts/],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authFile,
+        ...channelOptions,
+      },
     },
     {
       name: "mobile",
+      dependencies: ["setup"],
       testMatch: /mobile\.spec\.ts/,
       use: {
         viewport: { width: 390, height: 844 },
@@ -38,6 +50,7 @@ export default defineConfig({
         hasTouch: true,
         isMobile: true,
         locale: "zh-CN",
+        storageState: authFile,
         ...channelOptions,
       },
     },

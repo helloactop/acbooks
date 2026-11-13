@@ -5,6 +5,7 @@ import {
 } from "./filter-model";
 import {
   DEFAULT_LIBRARY_VIEW,
+  LIBRARY_PAGE_SIZE,
   type LibraryViewState,
   type SortOrder,
   type StatusFilter,
@@ -51,7 +52,7 @@ export function readLibraryUrlState(search: string): LibraryViewState {
           ),
     offset:
       Number.isInteger(offsetValue) && offsetValue >= 0
-        ? offsetValue
+        ? Math.floor(offsetValue / LIBRARY_PAGE_SIZE) * LIBRARY_PAGE_SIZE
         : initial.offset,
     searchTerm: initial.searchTerm,
     sort: isOneOf(SORTS, sort) ? sort : initial.sort,
@@ -82,7 +83,10 @@ function applyNonListParams(
   return next;
 }
 
-export function libraryUrlSearch(state: LibraryViewState): string {
+export function libraryUrlSearch(
+  state: LibraryViewState,
+  includeView = false,
+): string {
   const params = new URLSearchParams();
   if (state.searchTerm.length > 0) {
     params.set("q", state.searchTerm);
@@ -100,7 +104,7 @@ export function libraryUrlSearch(state: LibraryViewState): string {
   if (state.sort !== "recent") {
     params.set("sort", state.sort);
   }
-  if (state.view !== "grid") {
+  if (includeView || state.view !== "grid") {
     params.set("view", state.view);
   }
   if (state.offset > 0) {
