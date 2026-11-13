@@ -26,6 +26,9 @@ from app.modules.copies.router import copies_router
 from app.modules.copies.service import CopiesService
 from app.modules.files.router import files_router
 from app.modules.files.service import FilesService
+from app.modules.imports.router import imports_router
+from app.modules.library.router import library_router
+from app.modules.library.service import LibraryService
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -92,6 +95,20 @@ def create_app(
     app.include_router(copies_router(copies, dependencies), prefix="/api/v1")
     files = FilesService(engine, library)
     app.include_router(files_router(files, dependencies), prefix="/api/v1")
+    data_root = database_path.parent.parent
+    library_service = LibraryService(
+        engine,
+        [
+            database_path.parent,
+            covers,
+            data_root / "secrets",
+            data_root / "backups",
+        ],
+    )
+    app.include_router(
+        library_router(library_service, dependencies), prefix="/api/v1"
+    )
+    app.include_router(imports_router(engine, dependencies), prefix="/api/v1")
     if web_dist is not None:
         app.mount("/", SPAStaticFiles(directory=web_dist, html=True), name="web")
 

@@ -64,6 +64,23 @@ _BUSINESS_PROBLEMS = {
         HTTPStatus.CONFLICT,
         "External files cannot be deleted.",
     ),
+    BusinessErrorCode.STORAGE_ROOT_NOT_FOUND: (
+        HTTPStatus.NOT_FOUND,
+        "Storage root not found.",
+    ),
+    BusinessErrorCode.STORAGE_ROOT_INVALID: (
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        "Storage root path is invalid.",
+    ),
+    BusinessErrorCode.STORAGE_ROOT_OVERLAP: (
+        HTTPStatus.CONFLICT,
+        "Storage root overlaps another root or protected directory.",
+    ),
+    BusinessErrorCode.STORAGE_ROOT_IN_USE: (
+        HTTPStatus.CONFLICT,
+        "Storage root still indexes files.",
+    ),
+    BusinessErrorCode.JOB_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Job not found."),
 }
 
 

@@ -42,6 +42,8 @@ def main() -> None:
 
     from app.db.models.jobs import BackgroundJob
     from app.db.session import DATABASE_PATH, create_sqlite_engine
+    from app.modules.imports.service import ScanError
+    from app.workers import queue, registry
 
     if not DATABASE_PATH.is_file():
         raise SystemExit("Run the database migration before starting the worker.")
@@ -62,12 +64,33 @@ def main() -> None:
         try:
             with engine.connect() as connection:
                 connection.execute(select(BackgroundJob.id).limit(0))
+            queue.recover(engine)
             # The probe sees readiness only while this container's worker holds the lock.
             with READY_LOCK.open("a", encoding="utf-8") as ready:
                 if not try_lock(ready):
                     raise SystemExit("Another worker holds the readiness lock.")
                 logger.info("Worker started.")
-                stop.wait()
+                while not stop.is_set():
+                    try:
+                        job = queue.claim_next(engine)
+                    except Exception:  # noqa: BLE001 - keep the worker alive
+                        logger.exception("Worker could not claim a job.")
+                        stop.wait(2.0)
+                        continue
+                    if job is None:
+                        stop.wait(2.0)
+                        continue
+                    try:
+                        result = registry.run_job(engine, job)
+                    except ScanError as error:
+                        queue.finish(engine, job.id, "failed", error_code=error.code)
+                    except Exception:  # noqa: BLE001 - isolate per-job failures
+                        logger.exception("Job %s failed.", job.id)
+                        queue.finish(
+                            engine, job.id, "failed", error_code="INTERNAL_ERROR"
+                        )
+                    else:
+                        queue.finish(engine, job.id, "succeeded", result=result)
         finally:
             engine.dispose()
         logger.info("Worker stopped.")
