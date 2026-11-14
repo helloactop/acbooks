@@ -49,6 +49,22 @@ def test_stats_scope_overlap_gap_and_mutations(
     assert overview["sessionCount"] == 2
     assert overview["averageGapSeconds"] == 1800
     assert overview["hourlySeconds"][:2] == [1350, 600]
+    daily_url = "/api/v1/stats/daily"
+    daily_query = {"day": query["startDate"], "timeZone": query["timeZone"]}
+    daily = client.get(daily_url, params=daily_query)
+    assert daily.status_code == 200, daily.text
+    assert daily.json()["activeSeconds"] == 1950
+    assert daily.json()["sessionCount"] == 2
+    assert {item["id"]: item["activeSeconds"] for item in daily.json()["books"]["items"]} == {
+        book: 1050,
+        other: 900,
+    }
+    scoped = client.get(daily_url, params={**daily_query, "bookId": book}).json()
+    assert scoped["activeSeconds"] == 1500
+    assert scoped["books"]["total"] == 1
+    second = client.get(daily_url, params={**daily_query, "limit": 1, "offset": 1}).json()
+    assert second["books"]["total"] == 2
+    assert second["books"]["items"][0]["id"] == other
     assert overview["typeSeconds"] == {"manual": 1950, "electronic": 0, "unknown": 0}
     assert overview["days"] == [
         {"date": "2026-11-15", "sessionCount": 2, "activeSeconds": 1950, "averageGapSeconds": 1800}
@@ -78,6 +94,35 @@ def test_stats_scope_overlap_gap_and_mutations(
         422,
         "VALIDATION_ERROR",
     )
+
+
+def test_history_and_inactive_timeline(management: tuple[TestClient, Path, Path]) -> None:
+    client, _, _ = management
+    book = create_book(client)["id"]
+    other = create_book(client)["id"]
+    add(client, other, "2000-01-01T12:00Z", "2000-01-01T12:30Z", 1800)
+    add(client, book, "2022-01-01T00:30Z", "2022-01-01T01:30Z", 3600)
+    inactive = add(client, book, "2024-01-01T00:00Z", "2024-01-01T00:00Z", 0)
+    query = {"timeZone": "America/New_York"}
+    overview = client.get(f"{BOOKS}/{book}/stats", params=query)
+    assert overview.status_code == 200, overview.text
+    assert overview.json()["startDate"] == "2021-12-31"
+    assert overview.json()["activeSeconds"] == 3600
+    assert client.get("/api/v1/stats/overview", params=query).json()["activeSeconds"] == 5400
+
+    extended = {**query, "startDate": "2021-12-31", "endDate": "2024-01-02"}
+    assert client.get(f"{BOOKS}/{book}/stats", params=extended).json()["sessionCount"] == 1
+    assert_problem(
+        client.get("/api/v1/stats/timeline", params={**query, "startDate": "2022-01-01"}),
+        422,
+        "VALIDATION_ERROR",
+    )
+    timeline = "/api/v1/stats/timeline"
+    scoped = {**query, "bookId": book}
+    assert client.get(timeline, params=scoped).json()["total"] == 1
+    page = client.get(timeline, params={**scoped, "includeInactive": "true", "limit": 1}).json()
+    assert page["total"] == 2
+    assert page["items"][0]["id"] == inactive
 
 
 @pytest.mark.parametrize(

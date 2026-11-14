@@ -1,4 +1,4 @@
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.models.books import Book
@@ -19,6 +19,17 @@ def matching(start: int, end: int, book_id: str | None) -> Select[Reading]:
     return statement
 
 
+def earliest_start(db: Session, end: int, book_id: str | None) -> int | None:
+    statement = select(func.min(Reading.started_at)).where(Reading.started_at < end)
+    if book_id is not None:
+        statement = statement.where(Reading.book_id == book_id)
+    return db.scalar(statement)
+
+
+def books_by_id(db: Session, ids: list[str]) -> dict[str, Book]:
+    return {book.id: book for book in db.scalars(select(Book).where(Book.id.in_(ids)))}
+
+
 def previous_ends(db: Session, start: int, book_ids: set[str]) -> dict[str, int]:
     if not book_ids:
         return {}
@@ -37,11 +48,24 @@ def previous_ends(db: Session, start: int, book_ids: set[str]) -> dict[str, int]
 
 
 def timeline(
-    db: Session, start: int, end: int, book_id: str | None, limit: int, offset: int
+    db: Session,
+    start: int,
+    end: int,
+    book_id: str | None,
+    limit: int,
+    offset: int,
+    include_inactive: bool,
 ) -> tuple[list[TimelineSession], int]:
+    sessions = matching(start, end, book_id)
+    if include_inactive:
+        sessions = select(Reading).where(
+            Reading.started_at < end,
+            or_(Reading.started_at >= start, Reading.ended_at > start),
+        )
+        if book_id is not None:
+            sessions = sessions.where(Reading.book_id == book_id)
     statement = (
-        matching(start, end, book_id)
-        .add_columns(Book.title, BookFile.format)
+        sessions.add_columns(Book.title, BookFile.format)
         .join(Book, Book.id == Reading.book_id)
         .outerjoin(BookFile, BookFile.id == Reading.book_file_id)
     )

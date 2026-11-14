@@ -976,6 +976,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stats/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Daily */
+        get: operations["getDailyReadingStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1503,6 +1520,29 @@ export interface components {
             /** Csrftoken */
             csrfToken: string;
         };
+        /** DailyReadingBook */
+        DailyReadingBook: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Hascover */
+            hasCover: boolean;
+            /** Coverupdatedat */
+            coverUpdatedAt: number | null;
+            /** Updatedat */
+            updatedAt: number;
+            /** Activeseconds */
+            activeSeconds: number;
+        };
+        /** DailyReadingStats */
+        DailyReadingStats: {
+            /** Activeseconds */
+            activeSeconds: number;
+            /** Sessioncount */
+            sessionCount: number;
+            books: components["schemas"]["ReadingPage_DailyReadingBook_"];
+        };
         /** DeviceLoginRequest */
         DeviceLoginRequest: {
             /** Username */
@@ -1946,6 +1986,17 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** ReadingPage[DailyReadingBook] */
+        ReadingPage_DailyReadingBook_: {
+            /** Items */
+            items: components["schemas"]["DailyReadingBook"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** ReadingPage[SessionRead] */
         ReadingPage_SessionRead_: {
             /** Items */
@@ -1970,6 +2021,8 @@ export interface components {
         };
         /** ReadingStats */
         ReadingStats: {
+            /** Timezone */
+            timeZone: string;
             /**
              * Startdate
              * Format: date
@@ -1980,8 +2033,6 @@ export interface components {
              * Format: date
              */
             endDate: string;
-            /** Timezone */
-            timeZone: string;
             /** Activeseconds */
             activeSeconds: number;
             /** Sessioncount */
@@ -10934,9 +10985,9 @@ export interface operations {
     getReadingStats: {
         parameters: {
             query: {
-                startDate: string;
-                endDate: string;
                 timeZone: string;
+                startDate?: string | null;
+                endDate?: string | null;
             };
             header?: never;
             path?: never;
@@ -11068,9 +11119,9 @@ export interface operations {
     getBookReadingStats: {
         parameters: {
             query: {
-                startDate: string;
-                endDate: string;
                 timeZone: string;
+                startDate?: string | null;
+                endDate?: string | null;
             };
             header?: never;
             path: {
@@ -11207,9 +11258,10 @@ export interface operations {
                 bookId?: string | null;
                 limit?: number;
                 offset?: number;
-                startDate: string;
-                endDate: string;
+                includeInactive?: boolean;
                 timeZone: string;
+                startDate?: string | null;
+                endDate?: string | null;
             };
             header?: never;
             path?: never;
@@ -11224,6 +11276,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadingPage_TimelineSession_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    getDailyReadingStats: {
+        parameters: {
+            query: {
+                day: string;
+                timeZone: string;
+                bookId?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyReadingStats"];
                 };
             };
             /** @description Unauthorized */

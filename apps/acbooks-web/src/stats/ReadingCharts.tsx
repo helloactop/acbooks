@@ -37,17 +37,29 @@ function Chart({ title, summary, children }: {
   </section>;
 }
 
-export function ReadingCharts({ stats, annual }: { stats: ReadingStats; annual: ReadingStats }) {
+export function ReadingCharts({ stats, annual, today }: {
+  stats: ReadingStats; annual: ReadingStats; today: string;
+}) {
   const { t } = useTranslation("stats");
   const format = useStatsFormat();
   const { resolvedTheme } = useTheme();
   const gradient = useId();
-  const today = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: stats.timeZone, year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
   const days = stats.days.filter(row => row.date <= today);
+  const buckets = new Map<string, number>();
+  const precision = days.length > 366 * 5 ? 4 : days.length > 366 ? 7 : 10;
+  for (const row of days) {
+    const key = row.date.slice(0, precision);
+    buckets.set(key, (buckets.get(key) ?? 0) + row.activeSeconds);
+  }
+  const points = [...buckets].map(([x, y]) => ({ x, y }));
+  const trendDate = (value: string) => {
+    if (precision === 10) return format.day(value);
+    const config: Intl.DateTimeFormatOptions = { year: "numeric", timeZone: "UTC" };
+    if (precision === 7) config.month = "short";
+    return new Intl.DateTimeFormat(format.lang, config).format(new Date(value + (precision === 4 ? "-01" : "") + "-01T00:00:00Z"));
+  };
   const hourlySeconds = stats.hourlySeconds;
-  const ticks = days.filter((_, index) => index % Math.max(1, Math.ceil(days.length / 4)) === 0).map(row => row.date);
+  const ticks = points.filter((_, index) => index % Math.max(1, Math.ceil(points.length / 4)) === 0).map(point => point.x);
   const hour = (i: number) => `${String(i).padStart(2, "0")}:00`;
   const hasTime = stats.activeSeconds > 0;
   const graph = "mt-2 h-52 min-w-0 sm:h-56";
@@ -58,18 +70,18 @@ export function ReadingCharts({ stats, annual }: { stats: ReadingStats; annual: 
   }));
   const durationTrend = (
     <div className={graph}><ResponsiveLine
-      data={[{ id: "duration", data: days.map(row => ({ x: row.date, y: row.activeSeconds })) }]}
+      data={[{ id: "duration", data: points }]}
       xScale={{ type: "point" }} yScale={{ type: "linear", min: 0, max: "auto" }}
-      axisBottom={{ ...axis, tickValues: ticks, format: value => format.day(String(value)) }}
+      axisBottom={{ ...axis, tickValues: ticks, format: value => trendDate(String(value)) }}
       axisLeft={{ ...axis, tickValues: 3, format: format.duration }}
       margin={margin} animate={false} enableGridX={false} gridYValues={3}
-      enablePoints={days.length === 1} pointSize={7}
+      enablePoints={points.length === 1} pointSize={7}
       enableArea areaOpacity={1} curve="monotoneX" lineWidth={2.5}
       defs={[{ id: `${gradient}-area`, type: "linearGradient", colors: [
         { offset: 0, color: accent, opacity: 0.32 }, { offset: 100, color: accent, opacity: 0.02 },
       ] }]}
       fill={[{ match: "*", id: `${gradient}-area` }]}
-      tooltip={({ point }) => <ChartTooltip label={format.day(String(point.data.x))}
+      tooltip={({ point }) => <ChartTooltip label={trendDate(String(point.data.x))}
         value={typeof point.data.y === "number" ? format.duration(point.data.y) : "—"} />}
       colors={colors} theme={theme} useMesh crosshairType="x" role="img" ariaLabel={t("durationTrend")}
     /></div>
