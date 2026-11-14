@@ -96,7 +96,7 @@ REST 手动扫描 / 监听事件 / 定时校验
 `GET /api/v1/files/{bookFileId}/content`（流式、`Range`/`206`/`416`、`ETag`）与
 `DELETE /api/v1/files/{bookFileId}`（仅 `managed`，`external` 拒绝）。默认 managed 根位于
 `ACBOOKS_LIBRARY_DIR`（默认 `/data/acbooks/library`），首次上传时登记。契约见
-[Files API](../api/files.md)。扫描与阅读器尚未实现。
+[Files API](../api/files.md)。NAS 扫描契约见 [Storage Roots API](../api/storage-roots.md)。
 
 **解除关联与永久删除**：`DELETE /files/{id}?purge=false` 仅移除 `book_files` 关联并保留
 `storage_objects` 与原始文件，供扫描重新索引；`purge=true` 才在 `managed` 根上永久删除

@@ -3,7 +3,7 @@
 > 目标路径：`docs/api/files.md`
 > 上位规范：[文件存储与扫描规范](../architecture/storage.md)、[API 约定](conventions.md)、
 > [SQLite](../architecture/sqlite.md)、[后端架构](../architecture/backend.md)。
-> 本文记录电子书文件（EPUB/PDF）后端的已实现契约；不定义新的表结构，不含扫描与阅读器。
+> 本文记录 EPUB/PDF 文件的上传、下载和关联管理契约。NAS 扫描见 [Storage Roots API](storage-roots.md)。
 
 ## 1. 范围与鉴权
 
