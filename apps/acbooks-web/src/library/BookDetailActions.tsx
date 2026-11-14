@@ -11,6 +11,7 @@ export interface BookDetailActionsProps {
   detail: BookDetail;
   onDelete: () => void;
   onEdit: () => void;
+  onMetadata: () => void;
   onStatusChange: (status: ReadingStatus) => void;
   statusSaving: boolean;
 }
@@ -20,6 +21,7 @@ export function BookDetailActions({
   detail,
   onDelete,
   onEdit,
+  onMetadata,
   onStatusChange,
   statusSaving,
 }: BookDetailActionsProps) {
@@ -44,7 +46,8 @@ export function BookDetailActions({
           variant="boxed"
         />
         <DropdownMenu
-          actions={[{ danger: true, icon: Trash2, label: t("detail.delete"), onSelect: onDelete }]}
+          actions={[
+            { label: t("metadata.search"), onSelect: onMetadata },{ danger: true, icon: Trash2, label: t("detail.delete"), onSelect: onDelete }]}
           disabled={busy}
           label={t("actions.more")}
           triggerVariant="outline"

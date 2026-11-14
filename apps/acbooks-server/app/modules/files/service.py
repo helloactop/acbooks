@@ -17,6 +17,7 @@ from app.db.models.storage import BookFile, StorageObject
 from app.db.session import create_session_factory
 from app.modules.books.schemas import BookFile as BookFileDTO
 from app.modules.files import repository
+from app.modules.metadata.service import MetadataService
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -154,7 +155,10 @@ def enforce_request_size(content_length: str | None) -> None:
 
 
 class FilesService:
-    def __init__(self, engine: Engine, library_dir: Path) -> None:
+    def __init__(
+        self, engine: Engine, library_dir: Path, metadata: MetadataService | None = None,
+    ) -> None:
+        self.metadata = metadata
         self.read_sessions = create_session_factory(engine)
         self.write_sessions = create_session_factory(
             engine.execution_options(sqlite_begin_immediate=True)
@@ -190,6 +194,9 @@ class FilesService:
         size = 0
         final_path: Path | None = None
         published = False
+        cover: Path | None = None
+        keep_cover = False
+        fields: list[str] = []
         try:
             with os.fdopen(descriptor, "wb") as handle:
                 while True:
@@ -230,9 +237,16 @@ class FilesService:
                 raise BusinessError(BusinessErrorCode.FILE_NOT_FOUND)
             mtime_ms = int(final_path.stat().st_mtime * 1000)
 
+            embedded = (
+                self.metadata.extract(temp, file_format) if self.metadata is not None else None
+            )
+            if embedded is not None and self.metadata is not None:
+                cover = self.metadata.prepare_cover(key, embedded.cover)
+
             with self.write_sessions.begin() as session:
                 root_row = repository.ensure_managed_root(session, str(root))
-                if repository.get_book(session, key) is None:
+                book = repository.get_book(session, key)
+                if book is None:
                     raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
                 if repository.book_has_sha(session, key, sha256):
                     raise BusinessError(BusinessErrorCode.FILE_DUPLICATE)
@@ -253,18 +267,25 @@ class FilesService:
                     format=file_format,
                 )
                 repository.add_book_file(session, book_file)
-                return BookFileDTO(
+                if embedded is not None and self.metadata is not None:
+                    fields = self.metadata.fill(session, book, embedded, cover)
+                    self.metadata.enqueue_auto_fill(session, key)
+                result = BookFileDTO(
                     id=UUID(book_file.id),
                     format=file_format,
                     file_status="present",
                     size_bytes=size,
                 )
+            keep_cover = "cover" in fields
+            return result
         except BaseException:
             if published and final_path is not None:
                 final_path.unlink(missing_ok=True)
             raise
         finally:
             temp.unlink(missing_ok=True)
+            if cover is not None and not keep_cover:
+                cover.unlink(missing_ok=True)
 
     def content(self, file_id: UUID, range_header: str | None) -> Content:
         with self.read_sessions() as session:

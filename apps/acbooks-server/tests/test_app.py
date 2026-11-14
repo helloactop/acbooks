@@ -183,6 +183,9 @@ def test_business_error_contract(code: BusinessErrorCode) -> None:
         BusinessErrorCode.STORAGE_ROOT_INVALID: ("STORAGE_ROOT_INVALID", 422),
         BusinessErrorCode.STORAGE_ROOT_OVERLAP: ("STORAGE_ROOT_OVERLAP", 409),
         BusinessErrorCode.STORAGE_ROOT_IN_USE: ("STORAGE_ROOT_IN_USE", 409),
+        BusinessErrorCode.METADATA_STALE: ("METADATA_STALE", 409),
+        BusinessErrorCode.METADATA_UNAVAILABLE: ("METADATA_UNAVAILABLE", 502),
+        BusinessErrorCode.IMPORT_FILE_CHANGED: ("IMPORT_FILE_CHANGED", 409),
         BusinessErrorCode.JOB_NOT_FOUND: ("JOB_NOT_FOUND", 404),
     }[code]
     app = create_app()

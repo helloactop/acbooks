@@ -16,6 +16,7 @@ import { PageContainer } from "../layout/PageContainer";
 import { useDocumentTitle } from "../layout/use-document-title";
 import { BookDetailHeader } from "./BookDetailHeader";
 import { BookInfoPanel } from "./BookInfoPanel";
+import { MetadataDialog } from "./MetadataDialog";
 import { BookFormDialog } from "./BookFormDialog";
 import {
   deleteBook,
@@ -47,6 +48,7 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [metadataOpen, setMetadataOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [statusDraft, setStatusDraft] = useState<{
     bookId: string;
@@ -334,6 +336,7 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
             onDeleteCover={() => {
               void removeCover();
             }}
+            onMetadata={() => setMetadataOpen(true)}
             onEdit={() => {
               setEditing(true);
             }}
@@ -384,6 +387,10 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
         </>
       ) : null}
 
+      {metadataOpen && detail !== null ? (
+        <MetadataDialog bookId={detail.id} isbn={detail.isbn} title={detail.title}
+          onApplied={refreshDetail} onClose={() => setMetadataOpen(false)} />
+      ) : null}
       {editing && detail !== null ? (
         <BookFormDialog
           book={detail}

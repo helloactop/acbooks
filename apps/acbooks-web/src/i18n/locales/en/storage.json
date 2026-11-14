@@ -15,7 +15,7 @@
   "scanRunning": "Scanning…",
   "scanSucceeded": "Scan complete",
   "scanFailed": "Scan failed",
-  "scanResult": "Scanned {{scanned}} · added {{created}} · updated {{updated}} · unchanged {{unchanged}} · missing {{missing}} · skipped {{skipped}} · errors {{errors}}",
+  "scanResult": "Scanned {{scanned}} · added {{created}} · pending {{pending}} · updated {{updated}} · unchanged {{unchanged}} · missing {{missing}} · skipped {{skipped}} · errors {{errors}}",
   "delete": "Delete",
   "deleteTitle": "Delete storage root “{{name}}”?",
   "deleteDescription": "This only removes the index registration; no files on disk are deleted. Roots that still index files cannot be deleted.",
@@ -28,5 +28,26 @@
   "pathHint": "Must be an absolute server path; external directories are read-only.",
   "mode": "Mode",
   "cancel": "Cancel",
-  "save": "Save"
+  "save": "Save",
+  "imports": {
+    "title": "Unlinked files",
+    "empty": "No files to review.",
+    "candidates": "Possible matches",
+    "noCandidates": "No matching books found.",
+    "attach": "Attach to this book",
+    "create": "Create a separate book",
+    "done": "File imported.",
+    "openBook": "View book",
+    "back": "Back to files",
+    "close": "Close",
+    "previous": "Previous",
+    "next": "Next",
+    "changed": "The file changed. Scan the folder and try again.",
+    "error": "Could not process the file. Try again.",
+    "reason": {
+      "title": "Same title",
+      "isbn": "Same ISBN",
+      "sha256": "Same file hash"
+    }
+  }
 }

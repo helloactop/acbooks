@@ -58,6 +58,8 @@
     "requestId": "Request ID: {{requestId}}"
   },
   "settings": {
+    "metadata": "Metadata",
+    "metadataDescription": "Manage automatic filling and allowed fields.",
     "backToSettings": "Back to settings",
     "title": "Settings",
     "description": "Manage your account, appearance and language.",

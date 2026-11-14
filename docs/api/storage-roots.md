@@ -99,3 +99,22 @@
 操作 ID：`listStorageRoots`、`createStorageRoot`、`deleteStorageRoot`、
 `startStorageScan`、`getJob`。类型由 `openapi-typescript` 写入
 `packages/acbooks-api-client/schema.d.ts`，不得手改。
+
+## 7. 扫描元数据与未关联文件
+
+扫描新 EPUB/PDF 时读取内嵌元数据。EPUB 支持 OPF Dublin Core 及 EPUB 2/3
+声明的封面。PDF 优先读取 XMP，再回退到文档信息字典，封面取首面已有的 JPEG
+缩略图。缺标题时用文件名，缺其他字段时留空。扫描不渲染 PDF 首页、不联网，
+也不会用后来提取的值回填已有书目。新文件命中候选时仅写入存储索引，
+任务结果的 `pending` 统计本次新增的待处理文件。
+
+| 方法 | 路径 | 行为 |
+| --- | --- | --- |
+| GET | `/api/v1/storage-roots/{rootId}/unlinked-files` | 按相对路径分页列出当前存在且无 BookFile 的文件。支持 `limit`（1–100，默认 20）及 `offset`（默认 0） |
+| GET | `/api/v1/unlinked-files/{objectId}` | 核验文件并返回解析后的书名、作者、简介、ISBN 和最多 20 个候选。候选含 `bookId`、`title` 和匹配原因 `title`、`isbn`、`sha256` |
+| POST | `/api/v1/unlinked-files/{objectId}/resolve` | 传 `{"bookId":"…"}` 明确关联已有书目，传 `{}` 或 `{"bookId":null}` 新建独立书目。返回 `bookId`、`fileId` |
+
+读取需要会话，提交需要会话及 CSRF。关联现有书目只增加文件关系。缺失或已处理
+的文件返回 404，磁盘文件和索引不一致返回 `409 IMPORT_FILE_CHANGED`，应重扫再试。
+未关联状态由 `StorageObject` 与 `BookFile` 的关系推导，复用已有数据表。
+生成客户端操作 ID 为 `listUnlinkedFiles`、`previewUnlinkedFile`、`resolveUnlinkedFile`。

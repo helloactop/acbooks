@@ -16,6 +16,7 @@ import { rememberDetailReturn } from "../layout/routes";
 import { rememberReturnScroll } from "../layout/scroll-restoration";
 import { PageContainer } from "../layout/PageContainer";
 import { useDocumentTitle } from "../layout/use-document-title";
+import { MetadataDialog } from "./MetadataDialog";
 import { BatchEditDialog } from "./BatchEditDialog";
 import { BookCard } from "./BookCard";
 import { BookFormDialog } from "./BookFormDialog";
@@ -78,6 +79,7 @@ export function LibraryPage() {
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
     new Set(),
   );
+  const [batchMetadataOpen, setBatchMetadataOpen] = useState(false);
   const [batchEditOpen, setBatchEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -469,6 +471,10 @@ export function LibraryPage() {
             setBatchTargetIds(Array.from(selectedIds));
             setBatchEditOpen(true);
           }}
+          onMetadata={() => {
+            setBatchTargetIds(Array.from(selectedIds));
+            setBatchMetadataOpen(true);
+          }}
           onSelectAll={togglePageSelection}
         />
       ) : null}
@@ -621,6 +627,10 @@ export function LibraryPage() {
         />
       ) : null}
 
+      {batchMetadataOpen ? (
+        <MetadataDialog bookIds={batchTargetIds} onApplied={reload}
+          onClose={() => { setBatchMetadataOpen(false); reload(); }} />
+      ) : null}
       {batchEditOpen ? (
         <BatchEditDialog
           bookIds={batchTargetIds}

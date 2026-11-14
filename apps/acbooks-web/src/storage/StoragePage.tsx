@@ -21,6 +21,8 @@ import {
   type StorageRootCreate,
 } from "./storage-api";
 
+import { UnlinkedFilesDialog } from "./UnlinkedFilesDialog";
+
 type Mode = StorageRootCreate["mode"];
 
 interface ScanState {
@@ -45,6 +47,7 @@ function scanCounts(result: JobStatus["result"]) {
   return {
     scanned: value("scanned"),
     created: value("created"),
+    pending: value("pending"),
     updated: value("updated"),
     unchanged: value("unchanged"),
     missing: value("missing"),
@@ -71,6 +74,7 @@ export function StoragePage() {
   const [deleteTarget, setDeleteTarget] = useState<StorageRoot | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<ApiError | null>(null);
+  const [unlinkedRoot, setUnlinkedRoot] = useState<string>();
   const [scan, setScan] = useState<ScanState | null>(null);
   const [actionError, setActionError] = useState<ApiError | null>(null);
   const scanToken = useRef(0);
@@ -353,6 +357,9 @@ export function StoragePage() {
                   >
                     {t("scanDeep")}
                   </Button>
+                  <Button onClick={() => setUnlinkedRoot(root.id)} size="sm" variant="outline">
+                    {t("imports.title")}
+                  </Button>
                   <IconButton
                     label={t("delete")}
                     onClick={() => {
@@ -504,6 +511,9 @@ export function StoragePage() {
             </div>
           </div>
         </Modal>
+      ) : null}
+      {unlinkedRoot !== undefined ? (
+        <UnlinkedFilesDialog onClose={() => { setUnlinkedRoot(undefined); setAttempt((value) => value + 1); }} rootId={unlinkedRoot} />
       ) : null}
     </PageContainer>
   );

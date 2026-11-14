@@ -63,6 +63,7 @@ function sameNames(left: readonly string[], right: readonly string[]): boolean {
 interface BookFormValues {
   authors: string[];
   description: string | null;
+  series: string | null;
   isbn: string | null;
   readingStatus: ReadingStatus;
   shelves: string[];
@@ -76,6 +77,7 @@ function buildUpdate(book: BookDetail, values: BookFormValues): BookUpdate {
   if (values.title !== book.title) {
     update.title = values.title;
   }
+  if (values.series !== (book.series ?? null)) update.series = values.series;
   if ((values.description ?? "") !== (book.description ?? "")) {
     update.description = values.description;
   }
@@ -114,6 +116,7 @@ export function BookForm({
   const { resolvedLanguage } = useLanguage();
   const filesInput = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(book?.title ?? "");
+  const [series, setSeries] = useState(book?.series ?? "");
   const [description, setDescription] = useState(book?.description ?? "");
   const [authors, setAuthors] = useState<string[]>(book?.authors ?? []);
   const [translators, setTranslators] = useState<string[]>(
@@ -133,6 +136,7 @@ export function BookForm({
 
   const formValues: BookFormValues = {
     title: title.trim(),
+    series: series.trim() || null,
     description: description.trim().length > 0 ? description.trim() : null,
     authors,
     translators,
@@ -147,6 +151,7 @@ export function BookForm({
       ? Object.keys(buildUpdate(book, formValues)).length > 0
       : title.trim().length > 0 ||
         description.trim().length > 0 ||
+        series.trim().length > 0 ||
         isbn.trim().length > 0 ||
         authors.length > 0 ||
         translators.length > 0 ||
@@ -191,6 +196,7 @@ export function BookForm({
 
     const values: BookFormValues = {
       title: trimmedTitle,
+      series: series.trim() || null,
       description:
         description.trim().length > 0 ? description.trim() : null,
       authors,
@@ -217,6 +223,11 @@ export function BookForm({
           ...values,
           ...(inlineCopies.length > 0 ? { copies: inlineCopies } : {}),
         };
+        if (!values.series) delete body.series;
+        if (!values.description) delete body.description;
+        if (!values.isbn) delete body.isbn;
+        if (values.authors.length === 0) delete body.authors;
+        if (values.translators.length === 0) delete body.translators;
         saved = await createBook(body);
         const failed: string[] = [];
         for (const file of files) {
@@ -417,6 +428,10 @@ export function BookForm({
               </Field>
             </div>
 
+            <Field htmlFor="book-series" label={t("metadata.fields.series")}>
+              <Input id="book-series" maxLength={200} value={series}
+                onChange={(event) => setSeries(event.target.value)} />
+            </Field>
             <Field htmlFor="book-description" label={t("form.description")}>
               <Textarea
                 disabled={busy}

@@ -15,7 +15,7 @@
 
 | 分组 | 表（主要字段） | 关系/职责 |
 | --- | --- | --- |
-| 书目 | `books(id, title, description, reading_status, cover_path, cover_updated_at, created_at, updated_at)` | 唯一书籍主记录；允许无实体副本、无电子文件 |
+| 书目 | `books(id, title, description, series, metadata_locks, reading_status, cover_path, cover_updated_at, created_at, updated_at)` | 唯一书籍主记录；允许无实体副本、无电子文件 |
 | 书目 | `contributors(id, name)`、`book_contributors(book_id, contributor_id, role)` | 作者、译者等；多对多 |
 | 书目 | `book_identifiers(id, book_id, scheme, value)` | ISBN/外部 ID；**不按 ISBN 自动合并** |
 | 分类 | `tags`、`book_tags`、`shelves`、`shelf_books` | 标签与书架，多对多 |
@@ -71,6 +71,8 @@
 更新父级须防止循环（不得设为自身或后代）。删除位置前若存在子位置则拒绝；删除叶子
 位置时 `book_copies.location_id` 经外键 `SET NULL` 置空，副本与书目保留。
 `locations`（实体存放位置）与虚拟分类 `shelves` 是不同模型，不得混用。
+
+`books.series` 为可空的系列名称。迁移 0006 增加的 `metadata_locks` 默认 0，保存用户明确编辑或清空的作者、译者、简介、ISBN、系列、封面标记，以及扫描生成的文件名标题标记。旧书的既有字段和标题仍受保护。自动配置复用 `app_settings`。
 
 **删除与扫描规则**：扫描不到文件时将 `storage_objects.file_status` 标为 `missing`，不自动删除 `Book`、笔记或阅读历史；移动文件尽量更新存储索引并保持书籍/文件 ID 稳定。ISBN、书名、文件哈希只用于候选匹配，歧义需人工确认。
 

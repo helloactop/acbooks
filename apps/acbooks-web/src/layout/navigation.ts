@@ -4,6 +4,7 @@ import {
   Languages,
   LibraryBig,
   MapPin,
+  BookOpen,
   SunMoon,
   UserRound,
   type LucideIcon,
@@ -37,7 +38,7 @@ export const APP_NAV_GROUPS: readonly {
   },
 ];
 
-export type SettingsSection = "account" | "appearance" | "language";
+export type SettingsSection = "account" | "appearance" | "language" | "metadata";
 
 export interface SettingsNavItem {
   descriptionKey: string;
@@ -73,6 +74,12 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
         labelKey: "settings.language",
         section: "language",
       },
+      {
+        descriptionKey: "settings.metadataDescription",
+        icon: BookOpen,
+        labelKey: "settings.metadata",
+        section: "metadata",
+      },
     ],
   },
 ];
@@ -83,7 +90,7 @@ export function settingsSectionFromSearch(
   const value = new URLSearchParams(search).get("section");
   return value === "account" ||
     value === "appearance" ||
-    value === "language"
+    value === "language" || value === "metadata"
     ? value
     : null;
 }

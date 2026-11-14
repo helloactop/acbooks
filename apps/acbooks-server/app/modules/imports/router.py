@@ -1,4 +1,5 @@
 import json
+from pathlib import Path as FilePath
 from typing import Annotated
 from uuid import UUID
 
@@ -12,15 +13,28 @@ from app.db.models.storage import StorageRoot
 from app.db.session import create_session_factory
 from app.modules.auth.dependencies import AuthDependencies
 from app.modules.auth.service import WebSession
-from app.modules.imports.schemas import JobStatus, ScanAccepted
+from app.modules.imports.schemas import (
+    JobStatus,
+    PendingFilePreview,
+    PendingFiles,
+    ResolvedFile,
+    ResolveFile,
+    ScanAccepted,
+)
+from app.modules.imports.service import ScanService
 from app.workers import queue
 
 no_store = {"Cache-Control": {"schema": {"type": "string", "const": "no-store"}}}
 
 
-def imports_router(engine: Engine, dependencies: AuthDependencies) -> APIRouter:
+def imports_router(
+    engine: Engine,
+    dependencies: AuthDependencies,
+    covers_dir: FilePath,
+) -> APIRouter:
     router = APIRouter(tags=["imports"])
     read_sessions = create_session_factory(engine)
+    service = ScanService(engine, covers_dir)
 
     @router.post(
         "/storage-roots/{rootId}/scan",
@@ -29,10 +43,7 @@ def imports_router(engine: Engine, dependencies: AuthDependencies) -> APIRouter:
         response_model=ScanAccepted,
         responses={
             202: {"headers": no_store},
-            **{
-                status: problem_openapi(status)
-                for status in (401, 403, 404, 409, 500)
-            },
+            **{status: problem_openapi(status) for status in (401, 403, 404, 409, 500)},
         },
     )
     def start_storage_scan(
@@ -89,5 +100,47 @@ def imports_router(engine: Engine, dependencies: AuthDependencies) -> APIRouter:
             result=result if isinstance(result, dict) else None,
             error_code=error_code if isinstance(error_code, str) else None,
         )
+
+    @router.get(
+        "/storage-roots/{rootId}/unlinked-files",
+        operation_id="listUnlinkedFiles",
+        responses={status: problem_openapi(status) for status in (401, 404, 500)},
+    )
+    def list_unlinked(
+        root_id: Annotated[UUID, Path(alias="rootId")],
+        response: Response,
+        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ) -> PendingFiles:
+        response.headers["Cache-Control"] = "no-store"
+        return service.pending(str(root_id), limit, offset)
+
+    @router.get(
+        "/unlinked-files/{objectId}",
+        operation_id="previewUnlinkedFile",
+        responses={status: problem_openapi(status) for status in (401, 404, 409, 500)},
+    )
+    def preview_unlinked(
+        object_id: Annotated[UUID, Path(alias="objectId")],
+        response: Response,
+        current: Annotated[WebSession, Depends(dependencies.require_session)],
+    ) -> PendingFilePreview:
+        response.headers["Cache-Control"] = "no-store"
+        return service.preview(str(object_id))
+
+    @router.post(
+        "/unlinked-files/{objectId}/resolve",
+        operation_id="resolveUnlinkedFile",
+        responses={status: problem_openapi(status) for status in (401, 403, 404, 409, 500)},
+    )
+    def resolve_unlinked(
+        object_id: Annotated[UUID, Path(alias="objectId")],
+        request: ResolveFile,
+        response: Response,
+        current: Annotated[WebSession, Depends(dependencies.require_write)],
+    ) -> ResolvedFile:
+        response.headers["Cache-Control"] = "no-store"
+        return service.resolve(str(object_id), str(request.book_id) if request.book_id else None)
 
     return router

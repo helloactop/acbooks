@@ -47,6 +47,11 @@ _BUSINESS_PROBLEMS = {
         HTTPStatus.UNPROCESSABLE_ENTITY,
         "Location parent would create a cycle.",
     ),
+    BusinessErrorCode.METADATA_STALE: (HTTPStatus.CONFLICT, "Book ISBN changed."),
+    BusinessErrorCode.METADATA_UNAVAILABLE: (
+        HTTPStatus.BAD_GATEWAY, "Metadata source unavailable.",
+    ),
+    BusinessErrorCode.IMPORT_FILE_CHANGED: (HTTPStatus.CONFLICT, "File changed. Scan again."),
     BusinessErrorCode.FILE_NOT_FOUND: (HTTPStatus.NOT_FOUND, "File not found."),
     BusinessErrorCode.FILE_FORMAT_UNSUPPORTED: (
         HTTPStatus.UNPROCESSABLE_ENTITY,

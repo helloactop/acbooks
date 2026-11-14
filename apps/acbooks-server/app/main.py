@@ -29,6 +29,8 @@ from app.modules.files.service import FilesService
 from app.modules.imports.router import imports_router
 from app.modules.library.router import library_router
 from app.modules.library.service import LibraryService
+from app.modules.metadata.router import metadata_router
+from app.modules.metadata.service import MetadataService
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -93,7 +95,9 @@ def create_app(
         prefix="/api/v1",
     )
     app.include_router(copies_router(copies, dependencies), prefix="/api/v1")
-    files = FilesService(engine, library)
+    metadata = MetadataService(engine, covers)
+    app.include_router(metadata_router(engine, metadata, dependencies), prefix="/api/v1")
+    files = FilesService(engine, library, metadata)
     app.include_router(files_router(files, dependencies), prefix="/api/v1")
     data_root = database_path.parent.parent
     library_service = LibraryService(
@@ -108,7 +112,7 @@ def create_app(
     app.include_router(
         library_router(library_service, dependencies), prefix="/api/v1"
     )
-    app.include_router(imports_router(engine, dependencies), prefix="/api/v1")
+    app.include_router(imports_router(engine, dependencies, covers), prefix="/api/v1")
     if web_dist is not None:
         app.mount("/", SPAStaticFiles(directory=web_dist, html=True), name="web")
 

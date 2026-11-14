@@ -41,6 +41,7 @@ export interface BookDetailHeaderProps {
   onDelete: () => void;
   onDeleteCover: () => void;
   onEdit: () => void;
+  onMetadata: () => void;
   onStatusChange: (status: ReadingStatus) => void;
   onUploadCover: () => void;
   statusSaving: boolean;
@@ -52,6 +53,7 @@ export function BookDetailHeader({
   onDelete,
   onDeleteCover,
   onEdit,
+  onMetadata,
   onStatusChange,
   onUploadCover,
   statusSaving,
@@ -128,6 +130,12 @@ export function BookDetailHeader({
           </p>
         ) : null}
 
+        {detail.series ? (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("metadata.fields.series")} · {detail.series}
+          </p>
+        ) : null}
+
         {detail.isbn !== null ? (
           <BookIsbn isbn={detail.isbn} key={detail.isbn} />
         ) : null}
@@ -155,6 +163,7 @@ export function BookDetailHeader({
           detail={detail}
           onDelete={onDelete}
           onEdit={onEdit}
+          onMetadata={onMetadata}
           onStatusChange={onStatusChange}
           statusSaving={statusSaving}
         />

@@ -1373,13 +1373,11 @@ describe("LibraryPage", () => {
     ).toBe("csrf-token");
     expect(JSON.parse(String(init.body))).toEqual({
       authors: ["作者甲", "作者乙"],
-      description: null,
       isbn: "978-0-306-40615-7",
       readingStatus: "reading",
       shelves: ["书房", "客厅"],
       tags: ["文学", "经典"],
       title: "新书",
-      translators: [],
     });
   });
 

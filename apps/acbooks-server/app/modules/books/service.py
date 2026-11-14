@@ -47,6 +47,7 @@ from app.modules.books.schemas import (
 )
 from app.modules.books.types import BookOrder, BookSort, MediaType
 from app.modules.copies.service import CopiesService
+from app.modules.metadata.locks import COVER, FIELDS, PLACEHOLDER_TITLE
 
 logger = logging.getLogger("uvicorn.error")
 MAX_COVER_BYTES = 5 * 1024 * 1024
@@ -153,6 +154,7 @@ class BooksService:
         return BookDetail(
             **summary.model_dump(),
             description=record.book.description,
+            series=record.book.series,
             identifiers=[
                 BookIdentifier(scheme=scheme, value=value)
                 for scheme, value in record.identifiers
@@ -307,10 +309,14 @@ class BooksService:
                 id=book_id,
                 title=payload.title,
                 description=payload.description,
+                series=payload.series,
                 reading_status=payload.reading_status or "unread",
                 cover_path=None,
                 created_at=now,
                 updated_at=now,
+            )
+            book.metadata_locks = sum(
+                mask for key, mask in FIELDS.items() if key in payload.model_fields_set
             )
             repository.add_book(session, book)
             repository.replace_contributors(
@@ -338,9 +344,13 @@ class BooksService:
             if book is None:
                 raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
 
+            book.metadata_locks |= sum(mask for key, mask in FIELDS.items() if key in fields)
             if "title" in fields:
                 assert payload.title is not None
                 book.title = payload.title
+                book.metadata_locks &= ~PLACEHOLDER_TITLE
+            if "series" in fields:
+                book.series = payload.series
             if "description" in fields:
                 book.description = payload.description
             if "reading_status" in fields:
@@ -460,28 +470,8 @@ class BooksService:
         )
 
     def save_cover(self, book_id: UUID, content: bytes) -> BookDetail:
-        if not content or len(content) > MAX_COVER_BYTES:
-            raise BusinessError(BusinessErrorCode.INVALID_COVER)
-        suffix = _cover_suffix(content)
-        if suffix is None:
-            raise BusinessError(BusinessErrorCode.INVALID_COVER)
-
         with COVER_LOCK:
-            self.covers_dir.mkdir(parents=True, exist_ok=True)
-            # A unique target keeps the previous file intact until the DB commits.
-            target = (
-                self.covers_dir / f"{book_id}-{uuid4().hex}.{suffix}"
-            )
-            descriptor, temp_name = tempfile.mkstemp(
-                prefix=f".{book_id}-", suffix=".tmp", dir=self.covers_dir
-            )
-            temp = Path(temp_name)
-            try:
-                os.close(descriptor)
-                temp.write_bytes(content)
-                os.replace(temp, target)
-            finally:
-                temp.unlink(missing_ok=True)
+            target = publish_cover(self.covers_dir, str(book_id), content)
 
             now = time_ns() // 1_000_000
             old_name: str | None = None
@@ -491,6 +481,7 @@ class BooksService:
                     if book is None:
                         raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
                     old_name = book.cover_path
+                    book.metadata_locks |= COVER
                     book.cover_path = target.name
                     book.cover_updated_at = now
                     book.updated_at = now
@@ -514,6 +505,7 @@ class BooksService:
                 if book is None:
                     raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
                 old_name = book.cover_path
+                book.metadata_locks |= COVER
                 book.cover_path = None
                 book.cover_updated_at = now
                 book.updated_at = now
@@ -540,3 +532,25 @@ class BooksService:
             path.suffix.lstrip(".").lower(), "application/octet-stream"
         )
         return path, media_type
+
+
+def publish_cover(covers_dir: Path, book_id: str, content: bytes) -> Path:
+    if not content or len(content) > MAX_COVER_BYTES:
+        raise BusinessError(BusinessErrorCode.INVALID_COVER)
+    suffix = _cover_suffix(content)
+    if suffix is None:
+        raise BusinessError(BusinessErrorCode.INVALID_COVER)
+
+    covers_dir.mkdir(parents=True, exist_ok=True)
+    # A unique target keeps the previous file intact until the DB commits.
+    target = covers_dir / f"{book_id}-{uuid4().hex}.{suffix}"
+    descriptor, temp_name = tempfile.mkstemp(prefix=f".{book_id}-", suffix=".tmp", dir=covers_dir)
+    temp = Path(temp_name)
+    try:
+        os.close(descriptor)
+        temp.write_bytes(content)
+        os.replace(temp, target)
+    finally:
+        temp.unlink(missing_ok=True)
+
+    return target

@@ -26,26 +26,28 @@ def _now() -> int:
 
 
 def _write(engine: Engine) -> sessionmaker[Session]:
-    return create_session_factory(
-        engine.execution_options(sqlite_begin_immediate=True)
-    )
+    return create_session_factory(engine.execution_options(sqlite_begin_immediate=True))
 
 
 def enqueue(engine: Engine, job_type: str, input_payload: dict[str, Any]) -> str:
+    with _write(engine).begin() as session:
+        return add_job(session, job_type, input_payload)
+
+
+def add_job(session: Session, job_type: str, input_payload: dict[str, Any]) -> str:
     job_id = str(uuid4())
     now = _now()
     payload = {"input": input_payload, "runtime": {"attempt": 0}}
-    with _write(engine).begin() as session:
-        session.add(
-            BackgroundJob(
-                id=job_id,
-                type=job_type,
-                status="queued",
-                payload_json=json.dumps(payload),
-                created_at=now,
-                updated_at=now,
-            )
+    session.add(
+        BackgroundJob(
+            id=job_id,
+            type=job_type,
+            status="queued",
+            payload_json=json.dumps(payload),
+            created_at=now,
+            updated_at=now,
         )
+    )
     return job_id
 
 
@@ -71,14 +73,12 @@ def queued_for(
 
 def claim_next(engine: Engine) -> ClaimedJob | None:
     with _write(engine).begin() as session:
-        row = (
-            session.scalars(
-                select(BackgroundJob)
-                .where(BackgroundJob.status == "queued")
-                .order_by(BackgroundJob.created_at, BackgroundJob.id)
-                .limit(1)
-            ).first()
-        )
+        row = session.scalars(
+            select(BackgroundJob)
+            .where(BackgroundJob.status == "queued")
+            .order_by(BackgroundJob.created_at, BackgroundJob.id)
+            .limit(1)
+        ).first()
         if row is None:
             return None
         result = cast(
@@ -133,9 +133,7 @@ def finish(
 
 def recover(engine: Engine) -> None:
     with _write(engine).begin() as session:
-        rows = session.scalars(
-            select(BackgroundJob).where(BackgroundJob.status == "running")
-        ).all()
+        rows = session.scalars(select(BackgroundJob).where(BackgroundJob.status == "running")).all()
         for row in rows:
             data: Any = json.loads(row.payload_json)
             if not isinstance(data, dict):

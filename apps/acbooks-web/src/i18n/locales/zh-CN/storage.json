@@ -15,7 +15,7 @@
   "scanRunning": "正在扫描…",
   "scanSucceeded": "扫描完成",
   "scanFailed": "扫描失败",
-  "scanResult": "扫描 {{scanned}} · 新增 {{created}} · 更新 {{updated}} · 未变 {{unchanged}} · 缺失 {{missing}} · 跳过 {{skipped}} · 错误 {{errors}}",
+  "scanResult": "扫描 {{scanned}} · 新增 {{created}} · 待处理 {{pending}} · 更新 {{updated}} · 未变 {{unchanged}} · 缺失 {{missing}} · 跳过 {{skipped}} · 错误 {{errors}}",
   "delete": "删除",
   "deleteTitle": "删除存储根「{{name}}」？",
   "deleteDescription": "仅删除索引登记，不删除磁盘上的任何文件。含已索引文件时无法删除。",
@@ -28,5 +28,26 @@
   "pathHint": "必须是服务器上的绝对路径；外部目录只读。",
   "mode": "模式",
   "cancel": "取消",
-  "save": "保存"
+  "save": "保存",
+  "imports": {
+    "title": "未关联文件",
+    "empty": "没有待处理文件。",
+    "candidates": "可能重复的书籍",
+    "noCandidates": "没有找到匹配候选。",
+    "attach": "关联到此书",
+    "create": "新建独立书目",
+    "done": "文件已入库。",
+    "openBook": "查看书籍",
+    "back": "返回文件列表",
+    "close": "关闭",
+    "previous": "上一页",
+    "next": "下一页",
+    "changed": "文件已变化，请重新扫描后再试。",
+    "error": "暂时无法处理文件，请重试。",
+    "reason": {
+      "title": "同名",
+      "isbn": "相同 ISBN",
+      "sha256": "相同文件哈希"
+    }
+  }
 }

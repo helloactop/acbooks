@@ -8,6 +8,7 @@ export interface LibraryBatchBarProps {
   onClear: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  onMetadata: () => void;
   onSelectAll: () => void;
 }
 
@@ -18,6 +19,7 @@ export function LibraryBatchBar({
   onClear,
   onDelete,
   onEdit,
+  onMetadata,
   onSelectAll,
 }: LibraryBatchBarProps) {
   const { t } = useTranslation("library");
@@ -41,6 +43,9 @@ export function LibraryBatchBar({
           variant="outline"
         >
           {t("selection.edit")}
+        </Button>
+        <Button disabled={disabled || count === 0} onClick={onMetadata} size="sm" variant="outline">
+          {t("metadata.batch")}
         </Button>
         <Button
           disabled={disabled || count === 0}

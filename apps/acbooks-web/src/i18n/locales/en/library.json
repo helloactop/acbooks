@@ -370,5 +370,37 @@
     "errorTitle": "Cannot load the library",
     "errorDescription": "Make sure the server is running and try again.",
     "retry": "Retry"
+  },
+  "metadata": {
+    "search": "Search metadata",
+    "batch": "Fill metadata in bulk",
+    "auto": "Automatically fill metadata",
+    "autoHint": "On upload or scan, match by ISBN and fill the fields enabled below.",
+    "policy": "Fills missing fields and filename placeholders. Manual edits are preserved.",
+    "query": "ISBN or book title",
+    "apply": "Use candidate",
+    "start": "Start filling",
+    "limit": "Select up to 20 books at a time.",
+    "pending": "Job in progress",
+    "finished": "Batch finished",
+    "empty": "No candidates found.",
+    "error": "Metadata operation failed. Try again.",
+    "close": "Close",
+    "fields": {
+      "title": "Title",
+      "authors": "Authors",
+      "translators": "Translators",
+      "series": "Series",
+      "description": "Description",
+      "isbn": "ISBN",
+      "cover": "Cover"
+    },
+    "status": {
+      "filled": "Filled",
+      "unchanged": "Unchanged",
+      "review": "Needs review",
+      "missing": "Book missing",
+      "failed": "Failed"
+    }
   }
 }

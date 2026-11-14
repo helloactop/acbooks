@@ -58,6 +58,8 @@
     "requestId": "请求 ID：{{requestId}}"
   },
   "settings": {
+    "metadata": "元数据",
+    "metadataDescription": "管理自动补全及允许补全的字段。",
     "backToSettings": "返回设置",
     "title": "设置",
     "description": "管理账户、外观和语言。",

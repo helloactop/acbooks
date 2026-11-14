@@ -47,3 +47,20 @@ export function getJob(
     signal,
   });
 }
+export type PendingFilePreview = components["schemas"]["PendingFilePreview"];
+export type ResolvedFile = components["schemas"]["ResolvedFile"];
+
+export function listUnlinkedFiles(rootId: string, offset: number, signal: AbortSignal) {
+  return apiRequest<components["schemas"]["PendingFiles"]>(
+    `/storage-roots/${encodeURIComponent(rootId)}/unlinked-files?limit=20&offset=${offset}`,
+    { signal },
+  );
+}
+
+export function previewUnlinkedFile(id: string, signal: AbortSignal) {
+  return apiRequest<PendingFilePreview>(`/unlinked-files/${encodeURIComponent(id)}`, { signal });
+}
+
+export function resolveUnlinkedFile(id: string, bookId: string | null) {
+  return postWithCsrf<ResolvedFile>(`/unlinked-files/${encodeURIComponent(id)}/resolve`, { bookId });
+}

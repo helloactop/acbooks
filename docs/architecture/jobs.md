@@ -17,6 +17,7 @@
 | --- | --- | --- |
 | `library_scan` | `modules/imports` | 增量/全量扫描、索引与缺失核对 |
 | `file_import` | `modules/imports` + `modules/files` | 上传后导入、候选关联、索引 |
+| `metadata_fill` | `modules/metadata` | ISBN 精确补全，逐书返回结果 |
 | `metadata_extract` | `modules/metadata` | 格式解析、元数据/封面提取 |
 | `cover_generate` | `modules/metadata` | 派生缩略图/封面缓存 |
 | `file_operation` | `modules/files` | **经明确授权**的移动、整理等文件操作 |

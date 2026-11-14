@@ -370,5 +370,37 @@
     "errorTitle": "无法载入书库",
     "errorDescription": "请确认服务端已启动并稍后重试。",
     "retry": "重试"
+  },
+  "metadata": {
+    "search": "搜索元数据",
+    "batch": "批量补全",
+    "auto": "自动补全元数据",
+    "autoHint": "开启后，上传和扫描入库会按 ISBN 匹配，补全下方启用的字段。",
+    "policy": "只补空缺字段和文件名占位。手动修改的内容会保留。",
+    "query": "输入 ISBN 或书名",
+    "apply": "采用候选",
+    "start": "开始补全",
+    "limit": "每次最多选择 20 本书。",
+    "pending": "任务执行中",
+    "finished": "批量补全已完成",
+    "empty": "没有找到候选。",
+    "error": "元数据操作失败，请重试。",
+    "close": "关闭",
+    "fields": {
+      "title": "书名",
+      "authors": "作者",
+      "translators": "译者",
+      "series": "系列",
+      "description": "简介",
+      "isbn": "ISBN",
+      "cover": "封面"
+    },
+    "status": {
+      "filled": "已补全",
+      "unchanged": "无可补字段",
+      "review": "需要手动确认",
+      "missing": "书目不存在",
+      "failed": "失败"
+    }
   }
 }
