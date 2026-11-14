@@ -9,7 +9,7 @@ test("uses the drawer and adds a book on mobile", async ({ page }) => {
   const drawer = page.getByRole("dialog", { name: "应用侧边栏" });
   await expect(drawer).toBeVisible();
 
-  await drawer.getByRole("link", { name: "书库" }).click();
+  await drawer.getByRole("link", { name: "书库", exact: true }).click();
   await expect(page).toHaveURL(/\/library$/);
   await expect(drawer).toBeHidden();
 
