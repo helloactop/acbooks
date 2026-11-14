@@ -26,8 +26,8 @@ React + TypeScript + Vite Web 客户端。共享主题令牌与基础组件来�
 
 已登录页面共享 `AppShell`、侧栏、移动抽屉、全库搜索和底部账户入口；侧栏在
 ≥1024px 固定显示，窄屏改为抽屉。布局说明见
-[管理面板布局规范](../../docs/development/management-layout-spec.md)，详情见
-[图书详情页规范](../../docs/development/book-detail-spec.md)。
+[UI 规范 · 应用框架与导航](../../docs/development/ui.md#7-应用框架与导航)，详情见
+[UI 规范 · 书籍详情](../../docs/development/ui.md#86-书籍详情)。
 
 初始化、登录、书库写操作和退出登录统一使用 HttpOnly Cookie 与 CSRF：
 写请求先获取 `GET /api/v1/auth/csrf` 的 `csrfToken` 并放入 `X-CSRF-Token`，
@@ -129,8 +129,7 @@ ACBOOKS_PUBLIC_ORIGIN=http://localhost:5173 python -m uvicorn app.main:create_ap
 - Vitest + Testing Library（共享组件、预览页、认证及书库 API 联调测试）
 
 所有颜色、圆角、尺寸和组件状态以
-[UI 设计规范](../../docs/development/ui.md)与
-[公共组件规范](../../docs/development/ui-components.md)为准。
+[UI 规范](../../docs/development/ui.md)为准。
 
 当前前端依赖均为 MIT、ISC 或 Apache-2.0 许可，与项目的 GPL-3.0-only
 许可证兼容。

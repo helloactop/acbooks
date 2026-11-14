@@ -10,6 +10,7 @@ export interface SegmentedControlOption<T extends string> {
 export interface SegmentedControlProps<T extends string> {
   ariaLabel: string;
   className?: string;
+  disabled?: boolean;
   onValueChange: (value: T) => void;
   options: readonly SegmentedControlOption<T>[];
   value: T;
@@ -19,6 +20,7 @@ export interface SegmentedControlProps<T extends string> {
 export function SegmentedControl<T extends string>({
   ariaLabel,
   className,
+  disabled = false,
   onValueChange,
   options,
   value,
@@ -87,8 +89,9 @@ export function SegmentedControl<T extends string>({
               buttons.current[index] = node;
             }}
             aria-checked={selected}
+            disabled={disabled}
             className={cn(
-              "inline-flex items-center justify-center border text-[13px] transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
+              "inline-flex items-center justify-center border text-[13px] disabled:opacity-60 transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
               variant === "boxed"
                 ? "h-7 rounded-control px-2 font-medium [&_svg]:size-4 max-md:h-11 max-md:rounded-control max-md:px-3"
                 : "h-7 rounded-full px-2.5 font-medium max-md:h-11",

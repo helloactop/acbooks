@@ -54,6 +54,7 @@ test("uploads, replaces, and removes a cover", async ({ page }) => {
   const image = page.locator('img[src*="/cover?v="]');
   await expect(image).toBeVisible();
 
-  await page.getByRole("button", { name: "删除封面" }).click();
+  await page.getByRole("button", { name: "封面管理" }).click();
+  await page.getByRole("menuitem", { name: "删除封面" }).click();
   await expect(image).toBeHidden();
 });

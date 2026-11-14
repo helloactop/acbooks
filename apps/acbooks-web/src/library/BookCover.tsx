@@ -1,4 +1,5 @@
 import { cn } from "@acbooks/ui";
+import { Book } from "lucide-react";
 import { useState } from "react";
 
 import { coverUrl, type BookSummary } from "./books-api";
@@ -18,6 +19,7 @@ export interface BookCoverProps {
   >;
   className?: string;
   flat?: boolean;
+  thumbnail?: boolean;
   titleClassName?: string;
 }
 
@@ -27,6 +29,7 @@ export function BookCover({
   book,
   className,
   flat = false,
+  thumbnail = false,
   titleClassName,
 }: BookCoverProps) {
   const cover = coverFor(book);
@@ -44,38 +47,47 @@ export function BookCover({
       )}
       style={{ backgroundColor: cover.background, color: cover.foreground }}
     >
-      <div
-        className="absolute inset-2 flex flex-col justify-between rounded border px-3 py-3.5"
-        style={{ borderColor: cover.line }}
-      >
-        <div
-          className={cn("overflow-hidden font-bold break-all", titleClassName)}
-          style={{ fontFamily: COVER_FONT }}
-        >
-          {book.title}
+      {thumbnail ? (
+        <div className="absolute inset-0 grid place-items-center">
+          <Book className="size-4" />
         </div>
-        {authorLabel !== undefined && authorLabel.length > 0 ? (
+      ) : (
+        <div
+          className="absolute inset-2 flex flex-col justify-between rounded border px-3 py-3.5"
+          style={{ borderColor: cover.line }}
+        >
           <div
-            className={cn(
-              "overflow-hidden text-ellipsis whitespace-nowrap opacity-85",
-              authorClassName,
-            )}
+            className={cn("overflow-hidden font-bold wrap-break-word", titleClassName)}
+            style={{ fontFamily: COVER_FONT }}
           >
-            {authorLabel}
+            {book.title}
           </div>
-        ) : null}
-      </div>
+          {authorLabel !== undefined && authorLabel.length > 0 ? (
+            <div
+              className={cn(
+                "overflow-hidden text-ellipsis whitespace-nowrap opacity-85",
+                authorClassName,
+              )}
+            >
+              {authorLabel}
+            </div>
+          ) : null}
+        </div>
+      )}
       {src !== null && !imageFailed ? (
-        <img
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-          decoding="async"
-          loading="lazy"
-          onError={() => {
-            setFailedSrc(src);
-          }}
-          src={src}
-        />
+        <div className="absolute inset-0">
+          <img
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            decoding="async"
+            loading="lazy"
+            onError={() => {
+              setFailedSrc(src);
+            }}
+            src={src}
+          />
+          <span className="pointer-events-none absolute inset-0 rounded-cover ring-1 ring-foreground/10 ring-inset" />
+        </div>
       ) : null}
     </div>
   );

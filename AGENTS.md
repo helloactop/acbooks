@@ -12,15 +12,15 @@
 | SQLite、ORM、迁移、同步数据表 | `docs/architecture/sqlite.md` |
 | FastAPI、业务模块、后台 Worker | `docs/architecture/backend.md` |
 | 客户端 UI、主题、设计令牌与动效 | [UI 设计规范](docs/development/ui.md) |
-| 公共 UI 组件的实现、修改与复用 | [UI 设计规范](docs/development/ui.md)、[UI 公共组件规范](docs/development/ui-components.md) |
-| 页面布局、组件组合与交互流程 | [UI 设计规范](docs/development/ui.md)、[UI 公共组件规范](docs/development/ui-components.md)、[UI 页面设计规范](docs/development/ui-pages.md) |
-| 图书详情页、简介折叠与编辑弹窗 | [图书详情页规范](docs/development/book-detail-spec.md) |
-| 管理面板 AppShell、导航、搜索与设置布局 | [管理面板布局规范](docs/development/management-layout-spec.md) |
+| 公共 UI 组件的实现、修改与复用 | [UI 规范 · 组件](docs/development/ui.md#6-组件) |
+| 页面布局、组件组合与交互流程 | [UI 规范 · 应用框架与导航](docs/development/ui.md#7-应用框架与导航)、[UI 规范 · 页面](docs/development/ui.md#8-页面) |
+| 图书详情页、简介折叠与编辑弹窗 | [UI 规范 · 书籍详情](docs/development/ui.md#86-书籍详情) |
+| 管理面板 AppShell、导航、搜索与设置布局 | [UI 规范 · 应用框架与导航](docs/development/ui.md#7-应用框架与导航)、[UI 规范 · 设置](docs/development/ui.md#87-设置) |
 | 测试计划、报告 | `docs/testing/` 中适用文档（存在时） |
 | REST / OPDS / WebDAV | `docs/api/` 中适用文档（存在时） |
 | NAS、Docker、备份与部署 | `docs/deployment/` 中适用文档（存在时） |
 
-权威边界：`system.md` 定义产品和目录；`sqlite.md` 定义数据库；`backend.md` 定义后端职责；`standards.md` 定义开发与交付方式。UI 按 `ui.md`、`ui-components.md`、`ui-pages.md` 的顺序阅读，分别对应全局视觉与动效、公共组件、页面布局与交互。**发现冲突先指出，不另造一套规则**。尚未创建的专项文档不视为现有规范。
+权威边界：`system.md` 定义产品和目录；`sqlite.md` 定义数据库；`backend.md` 定义后端职责；`standards.md` 定义开发与交付方式。UI 以 `docs/development/ui.md` 为唯一规范，按任务阅读对应章节。**发现冲突先指出，不另造一套规则**。尚未创建的专项文档不视为现有规范。
 
 ## 2. 不可破坏的项目约束
 

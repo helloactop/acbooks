@@ -1,21 +1,4 @@
 {
-  "nav": {
-    "main": "主导航",
-    "sidebar": "书库侧边栏",
-    "library": "图书馆",
-    "home": "首页",
-    "allBooks": "全部书籍",
-    "shelves": "书架",
-    "reading": "阅读",
-    "history": "阅读记录",
-    "statistics": "阅读统计",
-    "management": "管理",
-    "storage": "存储与导入",
-    "jobs": "任务",
-    "settings": "设置",
-    "openMenu": "打开导航菜单",
-    "notAvailable": "暂未实现"
-  },
   "header": {
     "searchLabel": "搜索书库",
     "searchPlaceholder": "搜索书名、作者、ISBN",
@@ -27,8 +10,8 @@
     "libraryTitle": "书库",
     "physicalTitle": "实体书",
     "digitalTitle": "电子书",
-    "count_one": "共 {{formattedCount}} 本，实体书与电子书统一管理",
-    "count_other": "共 {{formattedCount}} 本，实体书与电子书统一管理"
+    "count_one": "共 {{formattedCount}} 本",
+    "count_other": "共 {{formattedCount}} 本"
   },
   "actions": {
     "addBook": "添加书籍",
@@ -63,6 +46,7 @@
     "deleting": "正在删除"
   },
   "cover": {
+    "manage": "封面管理",
     "upload": "上传封面",
     "replace": "更换封面",
     "remove": "删除封面"
@@ -73,6 +57,7 @@
     "status": "状态",
     "shelf": "书架",
     "sort": "排序",
+    "statusCurrent": "状态：{{value}}",
     "sortCurrent": "排序：{{value}}",
     "format": "格式",
     "tag": "标签",
@@ -185,6 +170,7 @@
     "done": "已读",
     "reading": "阅读中",
     "unread": "未读",
+    "recentShort": "最近添加",
     "recent": "最近添加",
     "title": "书名",
     "author": "作者",
@@ -194,9 +180,12 @@
     "label": "视图",
     "grid": "网格视图",
     "list": "列表视图",
-    "coverSmall": "小封面",
-    "coverMedium": "中封面",
-    "coverLarge": "大封面"
+    "coverSize": "封面尺寸",
+    "cover": {
+      "small": "小封面",
+      "medium": "中封面",
+      "large": "大封面"
+    }
   },
   "status": {
     "done": "已读",

@@ -86,15 +86,6 @@ function renderApp() {
   );
 }
 
-async function chooseOption(
-  user: ReturnType<typeof userEvent.setup>,
-  trigger: string,
-  option: string,
-) {
-  await user.click(screen.getByRole("combobox", { name: trigger }));
-  await user.click(await screen.findByRole("option", { name: option }));
-}
-
 describe("App routes", () => {
   it("renders the auth page at the root", async () => {
     window.history.replaceState({}, "", "/");
@@ -250,7 +241,7 @@ describe("App routes", () => {
       await screen.findByRole("heading", { level: 1, name: "设置" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "账户" }),
+      screen.getByRole("link", { name: "打开账户设置" }),
     ).toBeInTheDocument();
   });
 
@@ -269,17 +260,21 @@ describe("App routes", () => {
     renderApp();
     await screen.findByRole("heading", { level: 1, name: "设置" });
 
-    await chooseOption(user, "主题", "深色");
+    expect(screen.queryByRole("radiogroup", { name: "主题" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("link", { name: "打开外观设置" }));
+    await user.click(screen.getByRole("radio", { name: "深色" }));
     await waitFor(() => {
       expect(document.documentElement.dataset.theme).toBe("dark");
     });
 
-    await chooseOption(user, "界面语言", "English");
+    await user.click(screen.getByRole("link", { name: "返回设置" }));
+    await user.click(screen.getByRole("link", { name: "打开语言设置" }));
+    await user.click(screen.getByRole("radio", { name: "English" }));
     await waitFor(() => {
       expect(document.documentElement.lang).toBe("en");
     });
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Settings" }),
+      await screen.findByRole("heading", { level: 1, name: "Language" }),
     ).toBeInTheDocument();
   });
 
@@ -332,7 +327,7 @@ describe("App routes", () => {
     await waitFor(() => {
       expect(document.title).toBe("设置 · acbooks");
     });
-    await user.click(screen.getAllByRole("link", { name: "外观" })[0]!);
+    await user.click(screen.getByRole("link", { name: "打开外观设置" }));
     await waitFor(() => {
       expect(document.title).toBe("外观 · 设置 · acbooks");
     });

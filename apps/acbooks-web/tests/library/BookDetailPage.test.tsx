@@ -170,8 +170,7 @@ async function chooseReadingStatus(
   user: ReturnType<typeof userEvent.setup>,
   label: string,
 ) {
-  await user.click(screen.getByRole("combobox", { name: "阅读状态" }));
-  await user.click(await screen.findByRole("option", { name: label }));
+  await user.click(screen.getByRole("radio", { name: label }));
 }
 
 const ORIGINAL_SCROLL_HEIGHT = Object.getOwnPropertyDescriptor(
@@ -261,9 +260,7 @@ describe("BookDetailPage", () => {
       ),
     ).toHaveAttribute("href", "/library");
 
-    expect(
-      screen.getByRole("tab", { name: "信息" }),
-    ).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(screen.getByText("实体副本")).toBeInTheDocument();
     expect(screen.getByText("书房书架")).toBeInTheDocument();
     expect(screen.getByText("未设置")).toBeInTheDocument();
@@ -281,7 +278,7 @@ describe("BookDetailPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows explicit unavailable panels for reading and notes", async () => {
+  it("shows book information directly while reading and notes are unavailable", async () => {
     installApi(
       baseHandler((url, init) => {
         if (
@@ -293,22 +290,9 @@ describe("BookDetailPage", () => {
         throw new Error(`Unexpected request ${url.pathname}`);
       }),
     );
-    const user = userEvent.setup();
     renderDetail();
     await screen.findByRole("heading", { level: 1, name: BOOK.title });
-
-    await user.click(screen.getByRole("tab", { name: "阅读" }));
-    expect(
-      screen.getByRole("heading", { name: "阅读功能尚未开放" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("实体副本")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("tab", { name: "笔记" }));
-    expect(
-      screen.getByRole("heading", { name: "笔记功能尚未开放" }),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole("tab", { name: "信息" }));
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(screen.getByText("实体副本")).toBeInTheDocument();
   });
 
@@ -423,12 +407,11 @@ describe("BookDetailPage", () => {
     renderDetail();
     await screen.findByRole("heading", { level: 1, name: BOOK.title });
 
-    const select = screen.getByRole("combobox", { name: "阅读状态" });
-    expect(select).toHaveTextContent("阅读中");
+    expect(screen.getByRole("radio", { name: "阅读中" })).toBeChecked();
     await chooseReadingStatus(user, "已读");
 
     await waitFor(() => {
-      expect(select).toHaveTextContent("已读");
+      expect(screen.getByRole("radio", { name: "已读" })).toBeChecked();
     });
     const patch = findCall("PATCH", `/api/v1/books/${BOOK_ID}`);
     expect(patch).toBeDefined();
@@ -462,13 +445,12 @@ describe("BookDetailPage", () => {
     renderDetail();
     await screen.findByRole("heading", { level: 1, name: BOOK.title });
 
-    const select = screen.getByRole("combobox", { name: "阅读状态" });
     await chooseReadingStatus(user, "已读");
 
     expect(
       await screen.findByText("服务器暂时无法完成请求，请稍后重试。"),
     ).toBeInTheDocument();
-    expect(select).toHaveTextContent("阅读中");
+    expect(screen.getByRole("radio", { name: "阅读中" })).toBeChecked();
   });
 
   it("edits authors through token chips instead of comma text", async () => {
@@ -673,7 +655,7 @@ describe("BookDetailPage", () => {
     });
   });
 
-  it("supports keyboard tab navigation and closing the action menu", async () => {
+  it("supports closing the action menu with Escape and restores focus", async () => {
     installApi(
       baseHandler((url, init) => {
         if (
@@ -688,13 +670,6 @@ describe("BookDetailPage", () => {
     const user = userEvent.setup();
     renderDetail();
     await screen.findByRole("heading", { level: 1, name: BOOK.title });
-
-    const infoTab = screen.getByRole("tab", { name: "信息" });
-    infoTab.focus();
-    await user.keyboard("{ArrowRight}");
-    const readingTab = screen.getByRole("tab", { name: "阅读" });
-    expect(readingTab).toHaveAttribute("aria-selected", "true");
-    expect(readingTab).toHaveFocus();
 
     const more = screen.getByRole("button", { name: "更多操作" });
     await user.click(more);
@@ -722,7 +697,7 @@ describe("BookDetailPage", () => {
       await screen.findByRole("heading", { level: 1, name: BOOK.title }),
     ).toBeInTheDocument();
     expect(screen.getByText("Translated by 译者甲")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Information" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(screen.getByText("Physical copies")).toBeInTheDocument();
     expect(screen.getByText("Electronic files")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
@@ -744,9 +719,8 @@ describe("BookDetailPage", () => {
     const user = userEvent.setup();
     renderDetail();
 
-    await user.click(
-      await screen.findByRole("button", { name: "删除书籍" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "删除书籍" }));
     expect(
       await screen.findByRole("heading", { name: "删除 1 本书？" }),
     ).toBeInTheDocument();
@@ -805,7 +779,8 @@ describe("BookDetailPage", () => {
         document.querySelector(`img[src*="/books/${BOOK_ID}/cover?v="]`),
       ).not.toBeNull();
     });
-    await user.click(screen.getByRole("button", { name: "删除封面" }));
+    await user.click(screen.getByRole("button", { name: "封面管理" }));
+    await user.click(screen.getByRole("menuitem", { name: "删除封面" }));
     await waitFor(() => {
       expect(
         document.querySelector(`img[src*="/books/${BOOK_ID}/cover?v="]`),
@@ -844,19 +819,19 @@ describe("BookDetailPage", () => {
       expect(resolvePatch).toBeDefined();
     });
 
-    expect(screen.getByRole("button", { name: "上传封面" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "封面管理" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "编辑" })).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "阅读状态" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "已读" })).toBeDisabled();
 
     await act(async () => {
       resolvePatch?.(jsonResponse({ ...BOOK, readingStatus: "done" }));
     });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "上传封面" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "封面管理" })).toBeEnabled();
     });
     expect(
-      screen.getByRole("combobox", { name: "阅读状态" }),
-    ).toHaveTextContent("已读");
+      screen.getByRole("radio", { name: "已读" }),
+    ).toBeChecked();
     expect(findCall("PUT", `/api/v1/books/${BOOK_ID}/cover`)).toBeUndefined();
   });
 
@@ -898,9 +873,9 @@ describe("BookDetailPage", () => {
       expect(resolveCover).toBeDefined();
     });
 
-    expect(screen.getByRole("combobox", { name: "阅读状态" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "已读" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "编辑" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "上传封面" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "封面管理" })).toBeDisabled();
 
     await act(async () => {
       resolveCover?.(
@@ -913,7 +888,7 @@ describe("BookDetailPage", () => {
     });
     await waitFor(() => {
       expect(
-        screen.getByRole("combobox", { name: "阅读状态" }),
+        screen.getByRole("radio", { name: "已读" }),
       ).toBeEnabled();
     });
     expect(findCall("PATCH", `/api/v1/books/${BOOK_ID}`)).toBeUndefined();

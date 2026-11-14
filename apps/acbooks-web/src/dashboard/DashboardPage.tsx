@@ -1,5 +1,5 @@
 import { Button, Spinner } from "@acbooks/ui";
-import { BookOpen } from "lucide-react";
+import { ArrowRight, BookOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -16,6 +16,7 @@ import {
 import { useAppShell } from "../layout/app-shell-context";
 import { PageHeader } from "../layout/PageHeader";
 import { libraryMediaHref, rememberDetailReturn } from "../layout/routes";
+import { PageContainer } from "../layout/PageContainer";
 import { useDocumentTitle } from "../layout/use-document-title";
 
 const RECENT_LIMIT = 12;
@@ -78,7 +79,7 @@ export function DashboardPage() {
   const requestId = error === null ? undefined : libraryRequestId(error);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4">
+    <PageContainer>
       <PageHeader
         actions={
           <Button
@@ -146,25 +147,25 @@ export function DashboardPage() {
         </div>
       ) : (
         <section className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-base font-semibold">{t("recentTitle")}</h2>
             <Link
-              className="text-sm font-medium text-accent-text hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className="inline-flex items-center gap-1 text-[13px] font-medium text-accent-text hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               to={libraryMediaHref("all")}
             >
               {t("viewAll")}
+              <ArrowRight aria-hidden="true" className="size-3.5" />
             </Link>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-2">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,140px)] sm:gap-4">
             {books.map((book) => (
-              <div className="w-[140px] shrink-0" key={book.id}>
-                <BookCard
-                  book={book}
-                  onOpen={() => {
-                    rememberDetailReturn("/home");
-                  }}
-                />
-              </div>
+              <BookCard
+                book={book}
+                key={book.id}
+                onOpen={() => {
+                  rememberDetailReturn("/home");
+                }}
+              />
             ))}
           </div>
         </section>
@@ -183,6 +184,6 @@ export function DashboardPage() {
           onSessionExpired={expireSession}
         />
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

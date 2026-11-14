@@ -1,21 +1,4 @@
 {
-  "nav": {
-    "main": "Main navigation",
-    "sidebar": "Library sidebar",
-    "library": "Library",
-    "home": "Home",
-    "allBooks": "All books",
-    "shelves": "Shelves",
-    "reading": "Reading",
-    "history": "Reading log",
-    "statistics": "Reading statistics",
-    "management": "Management",
-    "storage": "Storage & import",
-    "jobs": "Jobs",
-    "settings": "Settings",
-    "openMenu": "Open navigation menu",
-    "notAvailable": "Not available yet"
-  },
   "header": {
     "searchLabel": "Search library",
     "searchPlaceholder": "Search title, author or ISBN",
@@ -27,8 +10,8 @@
     "libraryTitle": "Library",
     "physicalTitle": "Physical",
     "digitalTitle": "Digital",
-    "count_one": "{{formattedCount}} book · physical and digital editions managed together",
-    "count_other": "{{formattedCount}} books · physical and digital editions managed together"
+    "count_one": "{{formattedCount}} book",
+    "count_other": "{{formattedCount}} books"
   },
   "actions": {
     "addBook": "Add book",
@@ -63,6 +46,7 @@
     "deleting": "Deleting"
   },
   "cover": {
+    "manage": "Manage cover",
     "upload": "Upload cover",
     "replace": "Replace cover",
     "remove": "Remove cover"
@@ -73,6 +57,7 @@
     "status": "Status",
     "shelf": "Shelf",
     "sort": "Sort",
+    "statusCurrent": "Status: {{value}}",
     "sortCurrent": "Sort: {{value}}",
     "format": "Format",
     "tag": "Tag",
@@ -185,6 +170,7 @@
     "done": "Read",
     "reading": "Reading",
     "unread": "Unread",
+    "recentShort": "Newest",
     "recent": "Recently added",
     "title": "Title",
     "author": "Author",
@@ -194,9 +180,12 @@
     "label": "View",
     "grid": "Grid view",
     "list": "List view",
-    "coverSmall": "Small covers",
-    "coverMedium": "Medium covers",
-    "coverLarge": "Large covers"
+    "coverSize": "Cover size",
+    "cover": {
+      "small": "Small covers",
+      "medium": "Medium covers",
+      "large": "Large covers"
+    }
   },
   "status": {
     "done": "Read",

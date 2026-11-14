@@ -34,9 +34,9 @@ export function BookInfoPanel({
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="grid gap-8 @min-[900px]:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-8 @min-[900px]:grid-cols-2">
         <section>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-base font-semibold">{t("detail.copies")}</h2>
             {onAddCopy !== undefined ? (
               <Button onClick={onAddCopy} size="sm" variant="outline">

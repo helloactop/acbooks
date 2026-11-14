@@ -26,11 +26,9 @@ import {
 export interface SmartFilterBuilderProps {
   error?: ReactNode;
   fields: readonly BookFilterField[];
-  hasExternalFilters: boolean;
   loading: boolean;
   maxConditions: number;
   onChange: (rules: SmartFilterRules) => void;
-  onClearAll: () => void;
   onRetry: () => void;
   rules: SmartFilterRules;
 }
@@ -48,11 +46,9 @@ function initialValue(operator: string): string | string[] | undefined {
 export function SmartFilterBuilder({
   error,
   fields,
-  hasExternalFilters,
   loading,
   maxConditions,
   onChange,
-  onClearAll,
   onRetry,
   rules,
 }: SmartFilterBuilderProps) {
@@ -509,16 +505,6 @@ export function SmartFilterBuilder({
                 .join(" · ")}
         </span>
         <div className="flex flex-wrap items-center gap-1">
-          {hasExternalFilters ? (
-            <Button
-              className="self-start max-md:min-h-11 sm:self-auto"
-              onClick={onClearAll}
-              size="sm"
-              variant="ghost"
-            >
-              {t("filters.clearAll")}
-            </Button>
-          ) : null}
           <Button
             className="self-start max-md:min-h-11 sm:self-auto"
             disabled={summary.total === 0}

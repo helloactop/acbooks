@@ -6,7 +6,7 @@ import {
   useLanguage,
 } from "@acbooks/ui";
 import { BookOpen, Search, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { toApiError, type ApiError } from "../api/client";
@@ -14,6 +14,7 @@ import { useAppShell } from "../layout/app-shell-context";
 import { PageHeader } from "../layout/PageHeader";
 import { rememberDetailReturn } from "../layout/routes";
 import { rememberReturnScroll } from "../layout/scroll-restoration";
+import { PageContainer } from "../layout/PageContainer";
 import { useDocumentTitle } from "../layout/use-document-title";
 import { BatchEditDialog } from "./BatchEditDialog";
 import { BookCard } from "./BookCard";
@@ -293,6 +294,28 @@ export function LibraryPage() {
     status !== "all" ||
     type !== "all";
   const hasFilters = hasExternalFilters || activeCount > 0;
+  const statusLabel = status === "all" ? t("filters.all") : t(`status.${status}`);
+  const sortLabel = t(sort === "recent" ? "filters.recentShort" : `filters.${sort}`);
+  const typeLabel = t(type === "physical" ? "page.physicalTitle" : "page.digitalTitle");
+  const filterChips = [
+    ...(searchTerm.length > 0
+      ? [{ label: searchTerm, removeLabel: t("filters.clearSearch"), onRemove: clearSearch }]
+      : []),
+    ...(status !== "all"
+      ? [{
+          label: t("filters.statusCurrent", { value: statusLabel }),
+          removeLabel: t("filters.summaryRemove", { condition: statusLabel }),
+          onRemove: () => changeStatus("all"),
+        }]
+      : []),
+    ...(type !== "all"
+      ? [{
+          label: typeLabel,
+          removeLabel: t("filters.summaryRemove", { condition: typeLabel }),
+          onRemove: () => changeType("all"),
+        }]
+      : []),
+  ];
   useDocumentTitle(t("page.libraryTitle"));
   const formattedTotal = new Intl.NumberFormat(resolvedLanguage).format(total);
   const countMessage =
@@ -312,18 +335,20 @@ export function LibraryPage() {
   const maxConditions = filterSchema.schema?.maxConditions ?? 30;
 
   return (
-    <>
+    <PageContainer className="flex-1">
       <PageHeader
         actions={
           <>
             <Button
               aria-pressed={selecting}
+              className="max-[360px]:px-2"
               onClick={toggleSelection}
               variant="outline"
             >
               {selecting ? t("selection.done") : t("selection.start")}
             </Button>
             <Button
+              className="max-[360px]:px-2"
               onClick={() => {
                 setCreateOpen(true);
               }}
@@ -338,24 +363,6 @@ export function LibraryPage() {
             <span>{countMessage}</span>
             {loading && books.length > 0 ? (
               <Spinner label={t("loading.updating")} />
-            ) : null}
-            {searchTerm.length > 0 ? (
-              <button
-                aria-label={t("filters.clearSearch")}
-                className="inline-flex min-h-7 max-w-56 min-w-0 items-center gap-1 rounded-control border border-border bg-surface px-1.5 text-[12px] text-foreground transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-md:min-h-11"
-                onClick={clearSearch}
-                type="button"
-              >
-                <Search
-                  aria-hidden="true"
-                  className="size-3.5 shrink-0 text-muted-foreground"
-                />
-                <span className="min-w-0 truncate">{searchTerm}</span>
-                <X
-                  aria-hidden="true"
-                  className="size-3.5 shrink-0 text-muted-foreground"
-                />
-              </button>
             ) : null}
           </span>
         }
@@ -383,10 +390,10 @@ export function LibraryPage() {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+      <div className="flex flex-wrap items-center gap-2">
         <SegmentedControl
           ariaLabel={t("filters.type")}
-          className="w-full [&>button]:flex-1 md:w-auto md:self-start md:[&>button]:flex-none"
+          className="w-full [&>button]:min-w-0 [&>button]:flex-1 max-md:[&>button]:px-1 md:w-auto md:self-start md:[&>button]:flex-none"
           onValueChange={(value) => {
             changeType(value as TypeFilter);
           }}
@@ -399,10 +406,10 @@ export function LibraryPage() {
           variant="boxed"
         />
 
-        <div className="flex flex-wrap items-center gap-2 lg:ml-auto lg:flex-nowrap">
+        <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
           <Select
             ariaLabel={t("filters.status")}
-            containerClassName="min-w-0 flex-1 max-md:min-w-[120px] md:w-[100px] md:flex-none"
+            containerClassName="min-w-0 flex-1 basis-[112px] md:w-[140px] md:flex-none"
             onValueChange={(value) => {
               changeStatus(value as StatusFilter);
             }}
@@ -412,11 +419,12 @@ export function LibraryPage() {
               { label: t("status.reading"), value: "reading" },
               { label: t("status.done"), value: "done" },
             ]}
+            triggerLabel={t("filters.statusCurrent", { value: statusLabel })}
             value={status}
           />
           <Select
             ariaLabel={t("filters.sort")}
-            containerClassName="min-w-0 flex-1 max-md:min-w-[120px] md:w-[152px] md:flex-none"
+            containerClassName="min-w-0 flex-1 basis-[144px] md:w-[168px] md:flex-none"
             onValueChange={(value) => {
               changeSort(value as SortOrder);
             }}
@@ -425,15 +433,14 @@ export function LibraryPage() {
               { label: t("filters.title"), value: "title" },
               { label: t("filters.author"), value: "author" },
             ]}
+            triggerLabel={t("filters.sortCurrent", { value: sortLabel })}
             value={sort}
           />
-          <div className="ml-auto shrink-0 max-md:ml-0 max-md:w-full">
+          <div className="shrink-0 max-md:w-full">
             <LibraryFilterToolbar
               activeCount={activeCount}
-              canClear={hasFilters}
               coverSize={preferences.coverSize}
               filtersOpen={filtersOpen}
-              onClearAll={clearAllFilters}
               onCoverSizeChange={changeCoverSize}
               onRefresh={refreshLibrary}
               onToggleFilters={() => {
@@ -466,31 +473,29 @@ export function LibraryPage() {
         />
       ) : null}
 
-      <div className="flex flex-col gap-2">
-        {filtersOpen ? (
-          <SmartFilterBuilder
-            error={schemaError}
-            fields={fields}
-            hasExternalFilters={hasExternalFilters}
-            loading={schemaLoading}
-            maxConditions={maxConditions}
-            onChange={changeRules}
-            onClearAll={clearAllFilters}
-            onRetry={filterSchema.retry}
-            rules={rules}
-          />
-        ) : summary.total > 0 ? (
-          <ActiveFilterSummary
-            combinator={rules.combinator}
-            fields={fields}
-            onOpenFilters={() => {
-              setFiltersOpen(true);
-            }}
-            onRemove={removeCondition}
-            summary={summary}
-          />
-        ) : null}
-      </div>
+      {hasExternalFilters || summary.total > 0 ? (
+        <ActiveFilterSummary
+          chips={filterChips}
+          combinator={rules.combinator}
+          fields={fields}
+          onClearAll={hasFilters ? clearAllFilters : undefined}
+          onOpenFilters={() => setFiltersOpen(true)}
+          onRemove={removeCondition}
+          summary={summary}
+        />
+      ) : null}
+
+      {filtersOpen ? (
+        <SmartFilterBuilder
+          error={schemaError}
+          fields={fields}
+          loading={schemaLoading}
+          maxConditions={maxConditions}
+          onChange={changeRules}
+          onRetry={filterSchema.retry}
+          rules={rules}
+        />
+      ) : null}
 
       {errorMessage !== undefined && books.length > 0 ? (
         <div className="flex flex-col gap-2">
@@ -564,10 +569,13 @@ export function LibraryPage() {
         </div>
       ) : view === "grid" ? (
         <div
-          className="grid justify-start gap-3 sm:gap-4"
+          className={preferences.coverSize === "large"
+            ? "grid grid-cols-[repeat(auto-fill,min(100%,var(--cover-width)))] gap-3 sm:gap-4"
+            : "grid grid-cols-[repeat(auto-fill,minmax(min(var(--cover-width),calc((100%_-_12px)/2)),1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,var(--cover-width))] sm:gap-4"
+          }
           style={{
-            gridTemplateColumns: `repeat(auto-fill, ${coverSizePx(preferences.coverSize)}px)`,
-          }}
+            "--cover-width": `${coverSizePx(preferences.coverSize)}px`,
+          } as CSSProperties}
         >
           {books.map((book) => (
             <BookCard
@@ -644,6 +652,6 @@ export function LibraryPage() {
           }}
         />
       ) : null}
-    </>
+    </PageContainer>
   );
 }

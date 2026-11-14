@@ -433,7 +433,7 @@ describe("LibraryPage", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByRole("article")).toHaveLength(2);
     expect(
-      screen.getByText("共 2 本，实体书与电子书统一管理"),
+      screen.getByText("共 2 本"),
     ).toBeInTheDocument();
     expect(screen.queryByText("文学")).not.toBeInTheDocument();
     expect(screen.queryByText("PDF")).not.toBeInTheDocument();
@@ -446,8 +446,7 @@ describe("LibraryPage", () => {
       screen.getByRole("button", { name: "打开导航菜单" }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "视图" }));
-    await user.click(await screen.findByRole("menuitem", { name: "列表视图" }));
+    await user.click(screen.getByRole("radio", { name: "列表视图" }));
     await screen.findByRole("table", { name: "书籍列表" });
     expect(screen.getAllByText("文学").length).toBeGreaterThan(0);
     expect(screen.getAllByText("长篇").length).toBeGreaterThan(0);
@@ -457,15 +456,11 @@ describe("LibraryPage", () => {
     expect(screen.getAllByText("阅读中").length).toBeGreaterThan(0);
     expect(screen.getAllByText("已读").length).toBeGreaterThan(0);
 
-    await user.click(screen.getByRole("button", { name: "视图" }));
-    const listItem = await screen.findByRole("menuitem", {
-      name: "列表视图",
-    });
-    const mediumCovers = screen.getByRole("menuitem", {
-      name: "中封面",
-    });
-    expect(listItem.querySelector("svg")).not.toBeNull();
-    expect(mediumCovers.querySelector("svg")).toBeNull();
+    expect(screen.getByRole("radio", { name: "列表视图" })).toBeChecked();
+    expect(screen.queryByRole("button", { name: "封面尺寸" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "网格视图" }));
+    await user.click(screen.getByRole("button", { name: "封面尺寸" }));
+    expect(screen.getByRole("menuitem", { name: "中封面" }).querySelector("svg")).not.toBeNull();
     await user.keyboard("{Escape}");
   });
 
@@ -544,8 +539,7 @@ describe("LibraryPage", () => {
     renderLibrary();
 
     await screen.findByRole("article", { name: "呐喊" });
-    await user.click(screen.getByRole("button", { name: "视图" }));
-    await user.click(await screen.findByRole("menuitem", { name: "列表视图" }));
+    await user.click(screen.getByRole("radio", { name: "列表视图" }));
     await screen.findByRole("table", { name: "书籍列表" });
     await user.click(screen.getByRole("button", { name: "选择" }));
     expect(
@@ -620,10 +614,7 @@ describe("LibraryPage", () => {
     const beforeDuplicate = bookRequests().length;
     expect(statusSelect).toHaveTextContent("已读");
     await chooseOption(user, "状态", "已读");
-    await user.click(screen.getByRole("button", { name: "视图" }));
-    await user.click(
-      await screen.findByRole("menuitem", { name: "网格视图" }),
-    );
+    await user.click(screen.getByRole("radio", { name: "网格视图" }));
     expect(bookRequests()).toHaveLength(beforeDuplicate);
 
     await user.click(screen.getByRole("button", { name: "筛选" }));
@@ -1116,12 +1107,7 @@ describe("LibraryPage", () => {
     renderLibrary();
     await screen.findByRole("article", { name: "呐喊" });
 
-    await user.click(
-      screen.getByRole("button", { name: "更多操作" }),
-    );
-    await user.click(
-      await screen.findByRole("menuitem", { name: "清除全部筛选" }),
-    );
+    await user.click(screen.getByRole("button", { name: "清除全部筛选" }));
 
     await waitFor(() => {
       expect(resolveCleared).toBeDefined();
@@ -1514,16 +1500,9 @@ describe("LibraryPage", () => {
       await screen.findByRole("heading", { level: 1, name: "Library" }),
     ).toBeInTheDocument();
     await screen.findByRole("article", { name: "呐喊" });
-    expect(
-      screen.getByText(
-        /physical and digital editions managed together/,
-      ),
-    ).toHaveTextContent("1 book ·");
+    expect(screen.getByText("1 book")).toBeInTheDocument();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "View" }));
-    await user.click(
-      await screen.findByRole("menuitem", { name: "List view" }),
-    );
+    await user.click(screen.getByRole("radio", { name: "List view" }));
     await screen.findByRole("table", { name: "Book list" });
     expect(screen.getAllByText("Physical ×2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Reading").length).toBeGreaterThan(0);

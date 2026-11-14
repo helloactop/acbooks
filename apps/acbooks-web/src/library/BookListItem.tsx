@@ -64,7 +64,7 @@ export function BookListItem({
           book={book}
           className="w-8"
           flat
-          titleClassName="text-[7px] leading-tight"
+          thumbnail
         />
       </div>
 

@@ -17,11 +17,24 @@ export interface NavItem {
   labelKey: string;
 }
 
-export const APP_NAV_ITEMS: readonly NavItem[] = [
-  { href: homeHref(), icon: House, labelKey: "nav.home" },
-  { href: libraryHref(), icon: LibraryBig, labelKey: "nav.library" },
-  { href: locationsHref(), icon: MapPin, labelKey: "nav.locations" },
-  { href: storageHref(), icon: HardDrive, labelKey: "nav.storage" },
+export const APP_NAV_GROUPS: readonly {
+  labelKey: string;
+  items: readonly NavItem[];
+}[] = [
+  {
+    labelKey: "nav.contentGroup",
+    items: [
+      { href: homeHref(), icon: House, labelKey: "nav.home" },
+      { href: libraryHref(), icon: LibraryBig, labelKey: "nav.library" },
+    ],
+  },
+  {
+    labelKey: "nav.managementGroup",
+    items: [
+      { href: locationsHref(), icon: MapPin, labelKey: "nav.locations" },
+      { href: storageHref(), icon: HardDrive, labelKey: "nav.storage" },
+    ],
+  },
 ];
 
 export type SettingsSection = "account" | "appearance" | "language";

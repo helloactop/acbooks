@@ -19,7 +19,7 @@ test("uploads, downloads and deletes an ebook file", async ({ page }) => {
     mimeType: "application/pdf",
     name: "book.pdf",
   });
-  await expect(page.getByText("PDF", { exact: true })).toBeVisible();
+  await expect(page.getByRole("list", { name: "电子文件" }).getByText("PDF", { exact: true })).toBeVisible();
   await expect(page.getByText("可用")).toBeVisible();
 
   const [download] = await Promise.all([
@@ -52,5 +52,5 @@ test("attaches a file while adding a book", async ({ page }) => {
   const card = page.getByRole("link", { name: `查看《${title}》详情` });
   await expect(card).toBeVisible();
   await card.click();
-  await expect(page.getByText("PDF", { exact: true })).toBeVisible();
+  await expect(page.getByRole("list", { name: "电子文件" }).getByText("PDF", { exact: true })).toBeVisible();
 });

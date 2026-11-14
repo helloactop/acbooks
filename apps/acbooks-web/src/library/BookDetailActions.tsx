@@ -1,34 +1,10 @@
-import { Button, DropdownMenu, Select, Spinner } from "@acbooks/ui";
-import { Ellipsis } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Button, DropdownMenu, SegmentedControl, Spinner } from "@acbooks/ui";
+import { Ellipsis, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { BookDetail, ReadingStatus } from "./books-api";
 
 const STATUSES: readonly ReadingStatus[] = ["unread", "reading", "done"];
-
-type CopyState = "idle" | "copied" | "error";
-
-async function copyToClipboard(value: string): Promise<void> {
-  if (navigator.clipboard !== undefined) {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.top = "-9999px";
-  document.body.appendChild(textarea);
-  textarea.select();
-  try {
-    if (!document.execCommand("copy")) {
-      throw new Error("Copy failed.");
-    }
-  } finally {
-    textarea.remove();
-  }
-}
 
 export interface BookDetailActionsProps {
   coverBusy: boolean;
@@ -49,119 +25,39 @@ export function BookDetailActions({
 }: BookDetailActionsProps) {
   const { t } = useTranslation("library");
   const busy = statusSaving || coverBusy;
-  const [copyState, setCopyState] = useState<CopyState>("idle");
-  const copyTimer = useRef<number | undefined>(undefined);
-
-  useEffect(
-    () => () => {
-      if (copyTimer.current !== undefined) {
-        window.clearTimeout(copyTimer.current);
-      }
-    },
-    [],
-  );
-
-  const copyIsbn = async () => {
-    const isbn = detail.isbn;
-    if (isbn === null) {
-      setCopyState("error");
-      return;
-    }
-    try {
-      await copyToClipboard(isbn);
-      setCopyState("copied");
-    } catch {
-      setCopyState("error");
-    } finally {
-      if (copyTimer.current !== undefined) {
-        window.clearTimeout(copyTimer.current);
-      }
-      copyTimer.current = window.setTimeout(() => {
-        copyTimer.current = undefined;
-        setCopyState("idle");
-      }, 2500);
-    }
-  };
-
   return (
-    <div className="flex w-full flex-col gap-2 @min-[640px]:flex-row @min-[640px]:flex-wrap @min-[640px]:items-center @min-[1000px]:flex-col @min-[1000px]:items-stretch">
-      <Button
-        className="w-full @min-[640px]:w-auto @min-[1000px]:w-full"
-        disabled={busy}
-        onClick={onEdit}
-        size="lg"
-        variant="soft"
-      >
+    <div className="flex w-full flex-col gap-2">
+      <Button disabled={busy} onClick={onEdit} size="lg" variant="soft">
         {t("detail.edit")}
       </Button>
-
-      <div className="flex min-w-0 flex-1 items-center gap-2 @min-[1000px]:w-full">
-        <label className="sr-only" htmlFor="book-reading-status">
-          {t("detail.readingStatus")}
-        </label>
-        <Select
-          ariaBusy={statusSaving || undefined}
+      <div className="flex items-center gap-2" aria-busy={statusSaving || undefined}>
+        <SegmentedControl
           ariaLabel={t("detail.readingStatus")}
-          className="h-11 @min-[640px]:h-8"
-          containerClassName="min-w-0 flex-1"
+          className="min-w-0 flex-1 [&>button]:min-w-0 [&>button]:flex-1 max-md:[&>button]:px-1"
           disabled={busy}
-          id="book-reading-status"
-          onValueChange={(value) => {
-            onStatusChange(value as ReadingStatus);
-          }}
+          onValueChange={onStatusChange}
           options={STATUSES.map((status) => ({
             label: t(`status.${status}`),
             value: status,
           }))}
           value={detail.readingStatus}
+          variant="boxed"
         />
-
-        {statusSaving ? <Spinner label={t("detail.savingStatus")} /> : null}
-
-        {detail.isbn !== null ? (
-          <DropdownMenu
-            actions={[
-              {
-                label: t("detail.copyIsbn"),
-                onSelect: () => {
-                  void copyIsbn();
-                },
-              },
-            ]}
-            className="shrink-0"
-            label={t("actions.more")}
-            side="top"
-            triggerClassName="@max-[639px]:size-11"
-            triggerVariant="outline"
-          >
-            <Ellipsis aria-hidden="true" />
-          </DropdownMenu>
-        ) : null}
-      </div>
-
-      {copyState !== "idle" ? (
-        <p
-          className={
-            copyState === "error"
-              ? "text-xs text-destructive-text"
-              : "text-xs text-muted-foreground"
-          }
-          role={copyState === "error" ? "alert" : "status"}
+        <DropdownMenu
+          actions={[{ danger: true, icon: Trash2, label: t("detail.delete"), onSelect: onDelete }]}
+          disabled={busy}
+          label={t("actions.more")}
+          triggerVariant="outline"
         >
-          {copyState === "error"
-            ? t("detail.copyFailed")
-            : t("detail.isbnCopied")}
-        </p>
+          <Ellipsis aria-hidden="true" />
+        </DropdownMenu>
+      </div>
+      {statusSaving ? (
+        <div role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Spinner label={t("detail.savingStatus")} />
+          {t("detail.savingStatus")}
+        </div>
       ) : null}
-
-      <Button
-        className="w-full text-destructive-text @min-[640px]:w-auto @min-[1000px]:w-full"
-        onClick={onDelete}
-        size="lg"
-        variant="ghost"
-      >
-        {t("detail.delete")}
-      </Button>
     </div>
   );
 }

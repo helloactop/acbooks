@@ -12,9 +12,10 @@ import {
   isDetailReturnFromHome,
 } from "../layout/routes";
 import { takeReturnScroll } from "../layout/scroll-restoration";
+import { PageContainer } from "../layout/PageContainer";
 import { useDocumentTitle } from "../layout/use-document-title";
 import { BookDetailHeader } from "./BookDetailHeader";
-import { BookDetailTabs } from "./BookDetailTabs";
+import { BookInfoPanel } from "./BookInfoPanel";
 import { BookFormDialog } from "./BookFormDialog";
 import {
   deleteBook,
@@ -275,7 +276,7 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
     (error.code === "BOOK_NOT_FOUND" || error.status === 404);
 
   return (
-    <div className="@container mx-auto flex min-h-0 w-full max-w-[1200px] flex-col gap-4">
+    <PageContainer className="@container min-h-0">
       <div className="flex items-center gap-2">
         <MobileNavigationTrigger className="-ml-1 md:hidden" />
         <nav aria-label={t("detail.breadcrumb")}>
@@ -363,21 +364,23 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
             </LibraryAlert>
           ) : null}
 
-          <BookDetailTabs
-            detail={detail ?? headerDetail}
-            onAddCopy={() => {
-              setCopyDialog({});
-            }}
-            onDeleteCopy={(copy) => {
-              setCopyDeleteError(null);
-              setCopyDeleteTarget(copy);
-            }}
-            onEditCopy={(copy) => {
-              setCopyDialog({ copy });
-            }}
-            onFilesChanged={refreshDetail}
-            onSessionExpired={expireSession}
-          />
+          <div className="border-t border-border pt-4">
+            <BookInfoPanel
+              detail={detail ?? headerDetail}
+              onAddCopy={() => {
+                setCopyDialog({});
+              }}
+              onDeleteCopy={(copy) => {
+                setCopyDeleteError(null);
+                setCopyDeleteTarget(copy);
+              }}
+              onEditCopy={(copy) => {
+                setCopyDialog({ copy });
+              }}
+              onFilesChanged={refreshDetail}
+              onSessionExpired={expireSession}
+            />
+          </div>
         </>
       ) : null}
 
@@ -484,6 +487,6 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
           </div>
         </Modal>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

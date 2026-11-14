@@ -1,6 +1,8 @@
 {
   "brand": "acbooks",
   "nav": {
+    "contentGroup": "Browse",
+    "managementGroup": "Management",
     "main": "Main navigation",
     "sidebar": "Application sidebar",
     "openMenu": "Open navigation menu",
@@ -10,7 +12,7 @@
     "home": "Home",
     "library": "Library",
     "locations": "Locations",
-    "storage": "Storage & scan",
+    "storage": "Storage",
     "allBooks": "All books",
     "physical": "Physical books",
     "digital": "Digital books",
@@ -25,6 +27,7 @@
     "label": "Global search",
     "placeholder": "Search library",
     "shortcut": "Ctrl K",
+    "shortcutMac": "⌘K",
     "loading": "Searching",
     "empty": "No matching books",
     "error": "Search failed. Try again.",
@@ -55,6 +58,7 @@
     "requestId": "Request ID: {{requestId}}"
   },
   "settings": {
+    "backToSettings": "Back to settings",
     "title": "Settings",
     "description": "Manage your account, appearance and language.",
     "back": "Back",

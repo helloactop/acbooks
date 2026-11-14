@@ -23,7 +23,7 @@ export function LibraryBatchBar({
   const { t } = useTranslation("library");
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-panel border border-border bg-surface px-3 py-2">
+    <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-card border border-border bg-background px-3 py-2">
       <span className="text-[13px] font-medium" role="status">
         {t("selection.count", { count })}
       </span>
@@ -46,7 +46,7 @@ export function LibraryBatchBar({
           disabled={disabled || count === 0}
           onClick={onDelete}
           size="sm"
-          variant="danger-confirm"
+          variant="danger"
         >
           {t("selection.delete")}
         </Button>

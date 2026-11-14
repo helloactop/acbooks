@@ -168,10 +168,10 @@ describe("AppShell", () => {
       "/home",
     );
     expect(
-      within(rail).getByRole("link", { name: "图书库" }),
+      within(rail).getByRole("link", { name: "书库" }),
     ).toHaveAttribute("href", "/library");
     expect(
-      within(rail).getByRole("link", { name: "图书库" }),
+      within(rail).getByRole("link", { name: "书库" }),
     ).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("combobox", { name: "全局搜索" })).toBeInTheDocument();
     expect(
@@ -191,7 +191,7 @@ describe("AppShell", () => {
     });
 
     expect(
-      within(rail).getByRole("link", { name: "图书库" }),
+      within(rail).getByRole("link", { name: "书库" }),
     ).toHaveAttribute("aria-current", "page");
   });
 
@@ -207,7 +207,7 @@ describe("AppShell", () => {
 
     expect(dialog.open).toBe(true);
     expect(
-      within(dialog).getByRole("link", { name: "图书库" }),
+      within(dialog).getByRole("link", { name: "书库" }),
     ).toHaveAttribute("href", "/library");
     expect(
       within(dialog).getByRole("combobox", { name: "全局搜索" }),

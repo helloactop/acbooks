@@ -1,5 +1,5 @@
-import { Button, Select, useLanguage, useTheme } from "@acbooks/ui";
-import { ArrowLeft } from "lucide-react";
+import { Button, SegmentedControl, useLanguage, useTheme } from "@acbooks/ui";
+import { ArrowLeft, ChevronRight, Monitor, Moon, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -11,6 +11,7 @@ import {
 } from "../layout/navigation";
 import { PageHeader } from "../layout/PageHeader";
 import { settingsHref } from "../layout/routes";
+import { PageContainer } from "../layout/PageContainer";
 import { useDocumentTitle } from "../layout/use-document-title";
 import { SettingsGroup, SettingsRow } from "./SettingsGroup";
 
@@ -38,10 +39,7 @@ export function SettingsPage() {
     if (item.section === "account") {
       return (
         <div className="flex flex-col gap-2" key={item.section}>
-          <SettingsGroup
-            description={t("settings.accountDescription")}
-            title={t(item.labelKey)}
-          >
+          <SettingsGroup ariaLabel={t(item.labelKey)}>
             <SettingsRow label={t("settings.accountName")}>
               <span className="text-sm text-muted-foreground">
                 {accountName}
@@ -70,29 +68,22 @@ export function SettingsPage() {
 
     if (item.section === "appearance") {
       return (
-        <SettingsGroup
-          description={t("settings.appearanceDescription")}
-          key={item.section}
-          title={t(item.labelKey)}
-        >
+        <SettingsGroup ariaLabel={t(item.labelKey)} key={item.section}>
           <SettingsRow
             description={t("settings.themeDescription")}
-            htmlFor="settings-theme"
             label={t("settings.theme")}
           >
-            <Select
+            <SegmentedControl
               ariaLabel={t("settings.theme")}
-              containerClassName="min-w-44"
-              id="settings-theme"
-              onValueChange={(value) => {
-                setTheme(value as "system" | "light" | "dark");
-              }}
+              className="h-auto max-w-full flex-wrap [&>button]:flex-1 [&>button]:gap-1.5 max-md:[&>button]:px-1"
+              onValueChange={setTheme}
               options={[
-                { label: t("settings.themeSystem"), value: "system" },
-                { label: t("settings.themeLight"), value: "light" },
-                { label: t("settings.themeDark"), value: "dark" },
+                { label: <><Monitor aria-hidden="true" />{t("settings.themeSystem")}</>, value: "system" },
+                { label: <><Sun aria-hidden="true" />{t("settings.themeLight")}</>, value: "light" },
+                { label: <><Moon aria-hidden="true" />{t("settings.themeDark")}</>, value: "dark" },
               ]}
               value={theme}
+              variant="boxed"
             />
           </SettingsRow>
         </SettingsGroup>
@@ -100,29 +91,22 @@ export function SettingsPage() {
     }
 
     return (
-      <SettingsGroup
-        description={t("settings.languageDescription")}
-        key={item.section}
-        title={t(item.labelKey)}
-      >
+      <SettingsGroup ariaLabel={t(item.labelKey)} key={item.section}>
         <SettingsRow
           description={t("settings.languageDescriptionShort")}
-          htmlFor="settings-language"
           label={t("settings.languageMode")}
         >
-          <Select
+          <SegmentedControl
             ariaLabel={t("settings.languageMode")}
-            containerClassName="min-w-44"
-            id="settings-language"
-            onValueChange={(value) => {
-              setLanguage(value as "system" | "zh-CN" | "en");
-            }}
+            className="h-auto max-w-full flex-wrap [&>button]:flex-1 max-md:[&>button]:px-1"
+            onValueChange={setLanguage}
             options={[
               { label: t("settings.languageSystem"), value: "system" },
               { label: t("settings.languageZh"), value: "zh-CN" },
               { label: t("settings.languageEn"), value: "en" },
             ]}
             value={language}
+            variant="boxed"
           />
         </SettingsRow>
       </SettingsGroup>
@@ -130,89 +114,39 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[960px] flex-col gap-4">
-      <PageHeader
-        description={
-          currentItem === undefined
-            ? t("settings.description")
-            : t(currentItem.descriptionKey)
-        }
-        title={t("settings.title")}
-      />
-
-      <nav
-        aria-label={t("settings.personal")}
-        className="hidden items-center gap-1 md:flex"
-      >
-        {items.map((item) => {
-          const active = section === item.section;
-          return (
-            <Link
-              aria-current={active ? "page" : undefined}
-              className={`inline-flex h-7 items-center rounded-control px-2 text-[13px] transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
-                active
-                  ? "bg-accent-soft font-medium text-accent-text"
-                  : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-              }`}
-              key={item.section}
-              to={settingsHref(item.section)}
-            >
-              {t(item.labelKey)}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {section !== null ? (
+    <PageContainer width="form">
+      {currentItem !== undefined ? (
         <Link
-          className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:hidden"
+          className="inline-flex min-h-8 w-fit items-center gap-2 rounded-control text-[13px] font-medium text-muted-foreground hover:text-accent-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-md:min-h-11"
           to={settingsHref()}
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
-          {t("settings.title")}
+          {t("settings.backToSettings")}
         </Link>
       ) : null}
+      <PageHeader title={t(currentItem?.labelKey ?? "settings.title")} />
 
-      {section === null ? (
-        <div className="grid grid-cols-2 gap-2 max-[360px]:grid-cols-1 sm:grid-cols-3 md:hidden">
-          {items.map((item) => {
-            const Icon = item.icon;
-            const label = t(item.labelKey);
-            return (
-              <Link
-                aria-label={t("settings.openSection", { name: label })}
-                className="flex min-h-24 flex-col gap-1.5 rounded-card border border-border bg-surface p-3 transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                key={item.section}
-                to={settingsHref(item.section)}
-              >
-                <Icon
-                  aria-hidden="true"
-                  className="size-4 text-accent-text"
-                  strokeWidth={2}
-                />
-                <span className="text-[13px] font-medium">{label}</span>
-                <span className="text-xs text-muted-foreground">
-                  {t(item.descriptionKey)}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {section === null ? (
-        <div className="hidden flex-col gap-6 md:flex">
-          {items.map(renderSection)}
-        </div>
-      ) : currentItem !== undefined ? (
-        <div className="flex flex-col gap-6">{renderSection(currentItem)}</div>
-      ) : null}
-
-      {section === null ? (
-        <p className="text-xs text-muted-foreground md:hidden">
-          {t("settings.categoryHint")}
-        </p>
-      ) : null}
-    </div>
+      {currentItem === undefined ? (
+        <nav aria-label={t("settings.personal")} className="flex flex-col gap-2">
+          {items.map(({ descriptionKey, icon: Icon, labelKey, section }) => (
+            <Link
+              aria-label={t("settings.openSection", { name: t(labelKey) })}
+              className="flex min-h-16 items-center gap-2 rounded-card border border-border px-3 py-3 sm:gap-3 sm:px-4 transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              key={section}
+              to={settingsHref(section)}
+            >
+              <span className="grid size-9 shrink-0 place-items-center rounded-control bg-accent-soft text-accent-text">
+                <Icon aria-hidden="true" className="size-4" />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-sm font-semibold wrap-anywhere">{t(labelKey)}</span>
+                <span className="text-xs wrap-anywhere text-muted-foreground">{t(descriptionKey)}</span>
+              </span>
+              <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+            </Link>
+          ))}
+        </nav>
+      ) : renderSection(currentItem)}
+    </PageContainer>
   );
 }

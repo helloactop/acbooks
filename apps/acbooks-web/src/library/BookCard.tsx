@@ -24,12 +24,6 @@ const COVER_TITLE: Record<CoverSize, string> = {
   small: "text-[13px] leading-tight",
 };
 
-const COVER_AUTHOR: Record<CoverSize, string> = {
-  large: "text-[11px]",
-  medium: "text-[10px]",
-  small: "text-[8px]",
-};
-
 export function BookCard({
   book,
   coverSize = "medium",
@@ -79,20 +73,20 @@ export function BookCard({
         to={bookDetailHref(book.id)}
       >
         <BookCover
-          authorClassName={COVER_AUTHOR[coverSize]}
-          authorLabel={authors}
+          authorClassName="text-[11px]"
+          authorLabel={coverSize === "large" ? joinNames(book.authors, resolvedLanguage) : undefined}
           book={book}
           flat
           titleClassName={cn("font-semibold", COVER_TITLE[coverSize])}
         />
 
         <h3
-          className="mt-1.5 line-clamp-2 min-h-[2.6em] text-[13px] leading-[1.3] font-medium group-hover:text-accent-text"
+          className="mt-1.5 line-clamp-2 text-[13px] leading-[1.3] font-semibold group-hover:text-accent-text"
           id={titleId}
         >
           {book.title}
         </h3>
-        <p className="truncate text-xs text-muted-foreground">{authors}</p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">{authors}</p>
       </Link>
     </article>
   );

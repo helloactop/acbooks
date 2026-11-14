@@ -10,7 +10,9 @@ import {
 } from "./filter-model";
 
 export interface ActiveFilterSummaryProps {
+  chips: readonly { label: string; removeLabel: string; onRemove: () => void }[];
   combinator: FilterCombinator;
+  onClearAll?: () => void;
   fields: readonly BookFilterField[];
   onOpenFilters: () => void;
   onRemove: (id: string) => void;
@@ -21,7 +23,9 @@ const CHIP_CLASS =
   "inline-flex h-6 max-w-full items-center gap-1.5 rounded-full border border-border bg-surface px-2 text-[11px] text-foreground transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-md:h-11 max-md:text-xs";
 
 export function ActiveFilterSummary({
+  chips,
   combinator,
+  onClearAll,
   fields,
   onOpenFilters,
   onRemove,
@@ -76,7 +80,7 @@ export function ActiveFilterSummary({
     });
   };
 
-  if (summary.total === 0) {
+  if (summary.total === 0 && chips.length === 0) {
     return null;
   }
 
@@ -86,13 +90,26 @@ export function ActiveFilterSummary({
       className="flex flex-wrap items-center gap-2"
       role="group"
     >
-      <span className="inline-flex h-6 max-md:h-11 items-center rounded-full bg-surface px-2 text-[11px] font-medium text-muted-foreground max-md:text-xs">
+      {chips.map((chip) => (
+        <button
+          aria-label={chip.removeLabel}
+          className={CHIP_CLASS}
+          key={chip.removeLabel}
+          onClick={chip.onRemove}
+          title={chip.label}
+          type="button"
+        >
+          <span className="min-w-0 truncate">{chip.label}</span>
+          <X aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+        </button>
+      ))}
+      {summary.validRules.conditions.length > 0 ? <span className="inline-flex h-6 max-md:h-11 items-center rounded-full bg-surface px-2 text-[11px] font-medium text-muted-foreground max-md:text-xs">
         {t(
           combinator === "ALL"
             ? "filters.summaryAnd"
             : "filters.summaryOr",
         )}
-      </span>
+      </span> : null}
 
       {summary.validRules.conditions.map((condition) => {
         const label = conditionLabel(condition);
@@ -136,6 +153,15 @@ export function ActiveFilterSummary({
           type="button"
         >
           {t("filters.summaryInvalid", { total: summary.invalidCount })}
+        </button>
+      ) : null}
+      {onClearAll !== undefined ? (
+        <button
+          className="min-h-7 rounded-control px-2 text-[13px] font-medium text-accent-text hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-md:min-h-11"
+          onClick={onClearAll}
+          type="button"
+        >
+          {t("filters.clearAll")}
         </button>
       ) : null}
     </div>

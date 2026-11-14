@@ -54,6 +54,7 @@ export function GlobalSearch({
   const composingRef = useRef(false);
   const listId = useId();
   const input = inputRef ?? localInputRef;
+  const macShortcut = /^Mac/i.test(window.navigator.platform);
 
   useEffect(
     () => () => {
@@ -305,8 +306,8 @@ export function GlobalSearch({
           type="search"
           value={value}
         />
-        <kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border border-border bg-surface px-1.5 py-0.5 text-[10px] leading-4 text-muted-foreground">
-          {t("search.shortcut")}
+        <kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border border-border bg-surface px-1.5 py-0.5 text-[11px] leading-4 text-muted-foreground">
+          {t(macShortcut ? "search.shortcutMac" : "search.shortcut")}
         </kbd>
       </div>
 
@@ -375,7 +376,8 @@ export function GlobalSearch({
                       <BookCover
                         book={book}
                         className="w-9 shrink-0"
-                        titleClassName="text-[8px] leading-tight"
+                        flat
+                        thumbnail
                       />
                       <span className="min-w-0 flex-1">
                         <span className="line-clamp-2 text-sm font-medium">

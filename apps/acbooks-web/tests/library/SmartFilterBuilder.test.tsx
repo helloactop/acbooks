@@ -60,11 +60,9 @@ function Harness({
     <I18nProvider defaultLanguage="zh-CN" resources={appResources}>
       <SmartFilterBuilder
         fields={FIELDS}
-        hasExternalFilters={false}
         loading={false}
         maxConditions={30}
         onChange={setRules}
-        onClearAll={() => undefined}
         onRetry={() => undefined}
         rules={rules}
       />

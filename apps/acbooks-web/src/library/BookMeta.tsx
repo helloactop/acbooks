@@ -1,4 +1,5 @@
 import { cn } from "@acbooks/ui";
+import { BookOpen, Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -18,9 +19,9 @@ const SHELF_CLASS = cn(
 );
 
 const STATUS_CLASSES: Record<ReadingStatus, string> = {
-  done: cn(CHIP, "bg-accent-soft text-accent-text"),
-  reading: cn(CHIP, "border border-border bg-background text-foreground"),
-  unread: cn(CHIP, "text-muted-foreground"),
+  done: "bg-surface text-success",
+  reading: "bg-accent-soft text-accent-text",
+  unread: "bg-surface text-muted-foreground",
 };
 
 const STATUS_KEYS: Record<ReadingStatus, string> = {
@@ -135,7 +136,13 @@ export function ShelfBadges({ shelves }: { shelves: readonly string[] }) {
 
 export function ReadingStatusBadge({ status }: { status: ReadingStatus }) {
   const { t } = useTranslation("library");
-  return <span className={STATUS_CLASSES[status]}>{t(STATUS_KEYS[status])}</span>;
+  const Icon = status === "done" ? Check : status === "reading" ? BookOpen : null;
+  return (
+    <span className={cn(CHIP, "inline-flex items-center gap-1 whitespace-nowrap", STATUS_CLASSES[status])}>
+      {Icon !== null ? <Icon aria-hidden="true" className="size-3.5 shrink-0" /> : null}
+      {t(STATUS_KEYS[status])}
+    </span>
+  );
 }
 
 export function BookMeta({

@@ -37,6 +37,7 @@ export interface SelectProps {
   onValueChange: (value: string) => void;
   options?: readonly SelectOption[];
   placeholder?: ReactNode;
+  triggerLabel?: ReactNode;
   value: string;
 }
 
@@ -70,6 +71,7 @@ export function Select({
   onValueChange,
   options = [],
   placeholder,
+  triggerLabel,
   value,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
@@ -320,7 +322,7 @@ export function Select({
         type="button"
       >
         <span className="min-w-0 flex-1 truncate text-left">
-          {selectedLabel}
+          {triggerLabel ?? selectedLabel}
         </span>
         <ChevronDown
           aria-hidden="true"

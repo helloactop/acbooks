@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { GlobalSearch } from "./GlobalSearch";
-import { APP_NAV_ITEMS, isNavItemActive } from "./navigation";
+import { APP_NAV_GROUPS, isNavItemActive } from "./navigation";
 import {
   homeHref,
   rememberSettingsReturn,
@@ -75,33 +75,42 @@ export function AppSidebar({
         aria-label={t("nav.main")}
         className="mt-4 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pb-2"
       >
-        {APP_NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const label = t(item.labelKey);
-          const active = isNavItemActive(item, pathname);
-          return (
-            <Link
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                itemClass,
-                active
-                  ? "bg-accent-soft font-medium text-accent-text"
-                  : "text-foreground hover:bg-surface-hover",
-              )}
-              key={item.href}
-              onClick={onNavigate}
-              replace={replaceNavigation}
-              to={item.href}
-            >
-              <Icon
-                aria-hidden="true"
-                className="size-4 shrink-0"
-                strokeWidth={2}
-              />
-              <span className="truncate">{label}</span>
-            </Link>
-          );
-        })}
+        {APP_NAV_GROUPS.map(({ items, labelKey }) => (
+          <div
+            aria-label={t(labelKey)}
+            className="flex w-full shrink-0 flex-col gap-0.5 [&+&]:mt-1 [&+&]:border-t [&+&]:border-border [&+&]:pt-1.5"
+            key={labelKey}
+            role="group"
+          >
+            {items.map((item) => {
+              const Icon = item.icon;
+              const label = t(item.labelKey);
+              const active = isNavItemActive(item, pathname);
+              return (
+                <Link
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    itemClass,
+                    active
+                      ? "bg-accent-soft font-medium text-accent-text"
+                      : "text-foreground hover:bg-surface-hover",
+                  )}
+                  key={item.href}
+                  onClick={onNavigate}
+                  replace={replaceNavigation}
+                  to={item.href}
+                >
+                  <Icon
+                    aria-hidden="true"
+                    className="size-4 shrink-0"
+                    strokeWidth={2}
+                  />
+                  <span className="truncate">{label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <div className="mt-2 flex shrink-0 flex-col gap-1 border-t border-border pt-2">

@@ -1,6 +1,8 @@
 {
   "brand": "acbooks",
   "nav": {
+    "contentGroup": "浏览",
+    "managementGroup": "管理",
     "main": "主导航",
     "sidebar": "应用侧边栏",
     "openMenu": "打开导航菜单",
@@ -8,9 +10,9 @@
     "collapse": "折叠侧栏",
     "expand": "展开侧栏",
     "home": "首页",
-    "library": "图书库",
+    "library": "书库",
     "locations": "存放位置",
-    "storage": "存储与扫描",
+    "storage": "存储",
     "allBooks": "全部书籍",
     "physical": "实体书",
     "digital": "电子书",
@@ -25,6 +27,7 @@
     "label": "全局搜索",
     "placeholder": "搜索整个书库",
     "shortcut": "Ctrl K",
+    "shortcutMac": "⌘K",
     "loading": "正在搜索",
     "empty": "没有找到匹配的书籍",
     "error": "搜索失败，请重试。",
@@ -55,6 +58,7 @@
     "requestId": "请求 ID：{{requestId}}"
   },
   "settings": {
+    "backToSettings": "返回设置",
     "title": "设置",
     "description": "管理账户、外观和语言。",
     "back": "返回",

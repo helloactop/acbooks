@@ -77,9 +77,10 @@ export function Pagination({
         })}
       </span>
 
-      <div className="mx-auto flex items-center gap-1">
+      <div className="mx-auto flex min-w-0 items-center gap-1">
         <IconButton
           disabled={disabled || currentPage === 1}
+          className="shrink-0 max-md:size-[44px]"
           label={t("pagination.previous")}
           onClick={() => {
             requestPage(Math.max(0, offset - limit));
@@ -88,7 +89,7 @@ export function Pagination({
           <ChevronLeft aria-hidden="true" />
         </IconButton>
 
-        <span className="min-w-24 text-center text-[13px] whitespace-nowrap tabular-nums text-muted-foreground md:hidden">
+        <span className="min-w-0 text-center text-[13px] tabular-nums text-muted-foreground md:hidden">
           {t("pagination.pageOf", {
             page: currentPage,
             total: pageCount,
@@ -116,7 +117,7 @@ export function Pagination({
                   requestPage((item - 1) * limit);
                 }}
                 size="md"
-                variant={item === currentPage ? "soft" : "ghost"}
+                variant={item === currentPage ? "outline" : "ghost"}
               >
                 {item}
               </Button>
@@ -126,6 +127,7 @@ export function Pagination({
 
         <IconButton
           disabled={disabled || currentPage === pageCount}
+          className="shrink-0 max-md:size-[44px]"
           label={t("pagination.next")}
           onClick={() => {
             requestPage(

@@ -15,6 +15,7 @@ import { isAbortError, toApiError, type ApiError } from "../api/client";
 import { useAppShell } from "../layout/app-shell-context";
 import { PageHeader } from "../layout/PageHeader";
 import { locationBooksHref } from "../layout/routes";
+import { PageContainer } from "../layout/PageContainer";
 import { useDocumentTitle } from "../layout/use-document-title";
 import { libraryErrorMessage } from "../library/errors";
 import { locationOptions } from "../library/location-options";
@@ -164,7 +165,7 @@ export function LocationsPage() {
     error === null ? undefined : libraryErrorMessage(tLibrary, error);
 
   return (
-    <div className="@container mx-auto flex min-h-0 w-full max-w-[900px] flex-col gap-4">
+    <PageContainer className="@container min-h-0" width="form">
       <PageHeader
         actions={
           <Button
@@ -324,7 +325,7 @@ export function LocationsPage() {
           </div>
         </Modal>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }
 

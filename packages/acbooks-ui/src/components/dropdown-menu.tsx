@@ -17,6 +17,7 @@ import { IconButton } from "./icon-button";
 import type { ButtonProps } from "./button";
 
 export interface DropdownMenuAction {
+  danger?: boolean;
   disabled?: boolean;
   icon?: LucideIcon;
   label: string;
@@ -28,6 +29,8 @@ export interface DropdownMenuProps {
   align?: "start" | "end";
   children?: ReactNode;
   className?: string;
+  disabled?: boolean;
+  heading?: string;
   label: string;
   side?: "bottom" | "top";
   trigger?: ReactNode;
@@ -54,6 +57,8 @@ export function DropdownMenu({
   align = "end",
   children,
   className,
+  disabled = false,
+  heading,
   label,
   side = "bottom",
   trigger,
@@ -116,6 +121,7 @@ export function DropdownMenu({
   }, []);
 
   const openMenu = () => {
+    if (disabled) return;
     updatePosition();
     setPortalContainer(resolveOverlayContainer(triggerRef.current));
     setOpen(true);
@@ -229,6 +235,7 @@ export function DropdownMenu({
           aria-expanded={open}
           aria-haspopup="menu"
           aria-label={label}
+          disabled={disabled}
           className={triggerClassName}
           onClick={() => {
             if (open) {
@@ -244,6 +251,7 @@ export function DropdownMenu({
         </button>
       ) : (
         <IconButton
+          disabled={disabled}
           aria-controls={open ? menuId : undefined}
           aria-expanded={open}
           aria-haspopup="menu"
@@ -273,11 +281,21 @@ export function DropdownMenu({
               role="menu"
               style={menuStyle}
             >
-              {actions.map((action) => {
+              {heading !== undefined ? (
+                <div className="border-b border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground" role="presentation">
+                  {heading}
+                </div>
+              ) : null}
+              {actions.map((action, index) => {
                 const Icon = action.icon;
                 return (
                   <button
-                    className="flex min-h-8 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-[13px] text-foreground hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:hover:bg-transparent max-md:min-h-11 md:min-h-8"
+                    className={cn(
+                      "flex min-h-8 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-[13px] hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:hover:bg-transparent max-md:min-h-11 md:min-h-8",
+                      action.danger ? "text-destructive-text" : "text-foreground",
+                      action.danger && index > 0 && !actions[index - 1]?.danger &&
+                        "mt-1 rounded-t-none border-t border-border",
+                    )}
                     disabled={action.disabled}
                     key={action.label}
                     onClick={() => {

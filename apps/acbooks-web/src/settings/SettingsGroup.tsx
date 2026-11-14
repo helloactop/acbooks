@@ -1,25 +1,15 @@
 import type { ReactNode } from "react";
 
-export interface SettingsGroupProps {
-  children: ReactNode;
-  description?: string;
-  title: string;
-}
-
 export function SettingsGroup({
+  ariaLabel,
   children,
-  description,
-  title,
-}: SettingsGroupProps) {
+}: {
+  ariaLabel: string;
+  children: ReactNode;
+}) {
   return (
-    <section>
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {description !== undefined ? (
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      ) : null}
-      <div className="mt-3 divide-y divide-border rounded-card border border-border bg-surface">
-        {children}
-      </div>
+    <section aria-label={ariaLabel} className="divide-y divide-border rounded-card border border-border bg-surface">
+      {children}
     </section>
   );
 }
