@@ -1,0 +1,10 @@
+.reading-chart-tooltip,
+.react-activity-calendar__tooltip.react-activity-calendar__tooltip[data-color-scheme] {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--popover);
+  color: var(--foreground);
+  padding: 0.45rem 0.65rem;
+  font: 12px/1.45 var(--font-sans);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--foreground) 12%, transparent);
+}

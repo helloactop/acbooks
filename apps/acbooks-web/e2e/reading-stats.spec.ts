@@ -30,9 +30,11 @@ test("renders reading charts from real sessions in the library and book detail",
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/stats");
   await expect(page.getByRole("heading", { name: "阅读统计", exact: true })).toBeVisible();
-  for (const name of ["阅读时长趋势", "阅读间隔趋势", "阅读次数", "阅读时段分布"]) {
+  for (const name of ["阅读时长趋势", "阅读时段分布"]) {
     await expect(page.getByRole("img", { name, exact: true })).toBeVisible();
   }
+  await expect(page.getByRole("img", { name: "阅读次数", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("img", { name: "阅读间隔趋势", exact: true })).toHaveCount(0);
   const calendar = page.getByRole("region", { name: /年阅读热力图/ });
   await expect(calendar.locator("svg").first()).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -43,6 +45,6 @@ test("renders reading charts from real sessions in the library and book detail",
   await link.click();
   await page.getByRole("button", { name: "阅读统计", exact: true }).click();
   await expect(page.getByRole("img", { name: "阅读时长趋势", exact: true })).toBeVisible();
-  await expect(page.getByText("累计 60分钟")).toBeVisible();
+  await expect(page.getByText("累计 1小时")).toBeVisible();
   expect(errors).toEqual([]);
 });
