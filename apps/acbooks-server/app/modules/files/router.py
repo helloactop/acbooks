@@ -8,6 +8,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Header,
     HTTPException,
     Path,
     Query,
@@ -22,6 +23,7 @@ from app.modules.auth.dependencies import AuthDependencies
 from app.modules.auth.service import AuthIdentity
 from app.modules.books.schemas import BookFile
 from app.modules.files import service as files_service
+from app.modules.files.schemas import FileMatchPage
 from app.modules.files.service import FilesService, RangeNotSatisfiable
 
 no_store = {"Cache-Control": {"schema": {"type": "string", "const": "no-store"}}}
@@ -29,13 +31,21 @@ created_headers = {
     **no_store,
     "Location": {"schema": {"type": "string", "format": "uri-reference"}},
 }
+download_headers = {
+    "Accept-Ranges": {"schema": {"type": "string", "const": "bytes"}},
+    "Content-Length": {"schema": {"type": "integer"}},
+    "ETag": {"schema": {"type": "string"}},
+    "X-Content-SHA256": {"schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+}
 file_responses: dict[int | str, dict[str, Any]] = {
     200: {
         "description": "File content",
+        "headers": download_headers,
         "content": {"application/octet-stream": {}},
     },
     206: {
         "description": "Partial content",
+        "headers": {**download_headers, "Content-Range": {"schema": {"type": "string"}}},
         "content": {"application/octet-stream": {}},
     },
     **{status: problem_openapi(status) for status in (401, 404, 416, 500)},
@@ -54,10 +64,27 @@ def _iter_file(path: FsPath, start: int, length: int) -> Iterator[bytes]:
             yield data
 
 
-def files_router(
-    service: FilesService, dependencies: AuthDependencies
-) -> APIRouter:
+def files_router(service: FilesService, dependencies: AuthDependencies) -> APIRouter:
     router = APIRouter(tags=["files"])
+
+    @router.get(
+        "/files/matches",
+        operation_id="matchBookFiles",
+        responses={
+            200: {"headers": no_store},
+            **{status: problem_openapi(status) for status in (401, 403, 422, 500)},
+        },
+    )
+    def match_book_files(
+        response: Response,
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
+        sha256: Annotated[str, Query(pattern=r"^[0-9a-fA-F]{64}$")],
+        book_id: Annotated[UUID | None, Query(alias="bookId")] = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+        offset: Annotated[int, Query(ge=0, le=1_000_000)] = 0,
+    ) -> FileMatchPage:
+        response.headers["Cache-Control"] = "no-store"
+        return service.match(sha256.lower(), book_id, limit, offset)
 
     @router.get(
         "/books/{bookId}/files",
@@ -83,10 +110,12 @@ def files_router(
         response_model=BookFile,
         responses={
             201: {"headers": created_headers},
-            **{
-                status: problem_openapi(status)
-                for status in (401, 403, 404, 413, 422, 500)
+            200: {
+                "model": BookFile,
+                "headers": created_headers,
+                "description": "Existing file for the selected book",
             },
+            **{status: problem_openapi(status) for status in (401, 403, 404, 409, 413, 422, 500)},
         },
     )
     def upload_book_file(
@@ -95,9 +124,11 @@ def files_router(
         current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
         book_id: Annotated[UUID, Form(alias="bookId")],
         file: Annotated[UploadFile, File()],
+        reuse_existing: Annotated[bool, Query(alias="reuseExisting")] = False,
     ) -> BookFile:
         files_service.enforce_request_size(request.headers.get("content-length"))
-        created = service.upload(book_id, file)
+        created, is_new = service.upload(book_id, file, reuse_existing=reuse_existing)
+        response.status_code = 201 if is_new else 200
         response.headers["Cache-Control"] = "no-store"
         response.headers["Location"] = f"/api/v1/files/{created.id}/content"
         return created
@@ -109,12 +140,13 @@ def files_router(
         responses=file_responses,
     )
     def get_book_file_content(
-        request: Request,
         book_file_id: Annotated[UUID, Path(alias="bookFileId")],
         current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
+        range_header: Annotated[str | None, Header(alias="Range")] = None,
+        if_range: Annotated[str | None, Header(alias="If-Range")] = None,
     ) -> StreamingResponse:
         try:
-            item = service.content(book_file_id, request.headers.get("range"))
+            item = service.content(book_file_id, range_header, if_range)
         except RangeNotSatisfiable as error:
             raise HTTPException(
                 status_code=416,
@@ -124,8 +156,11 @@ def files_router(
             "Accept-Ranges": "bytes",
             "Content-Disposition": f'attachment; filename="{item.filename}"',
             "Content-Length": str(item.length),
-            "ETag": f'"{item.etag}"',
+            "ETag": item.etag,
+            "Cache-Control": "private, no-store",
         }
+        if item.sha256 is not None:
+            headers["X-Content-SHA256"] = item.sha256
         if item.partial:
             headers["Content-Range"] = (
                 f"bytes {item.start}-{item.start + item.length - 1}/{item.total_size}"
@@ -150,10 +185,7 @@ def files_router(
         response_class=Response,
         responses={
             204: {"headers": no_store},
-            **{
-                status: problem_openapi(status)
-                for status in (401, 403, 404, 409, 500)
-            },
+            **{status: problem_openapi(status) for status in (401, 403, 404, 409, 500)},
         },
     )
     def delete_book_file(

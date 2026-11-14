@@ -20,6 +20,7 @@ class StorageObject(Base):
     __tablename__ = "storage_objects"
     __table_args__ = (
         UniqueConstraint("root_id", "relative_path"),
+        Index("ix_storage_objects_sha256", "sha256"),
         CheckConstraint("size_bytes >= 0", name="size_bytes"),
     )
 

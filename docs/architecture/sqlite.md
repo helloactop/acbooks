@@ -22,7 +22,7 @@
 | 实体 | `locations(id, parent_id, name)` | 房间→书架→层等层级位置 |
 | 实体 | `book_copies(id, book_id, location_id, acquired_at, note)` | 一书可有多册实体副本；位置可为空 |
 | 存储 | `storage_roots(id, name, root_path, mode)` | NAS 挂载目录/应用管理目录；`mode=managed/external` |
-| 存储 | `storage_objects(id, root_id, relative_path, size_bytes, sha256, file_status, mtime_ms)` | 物理文件索引；唯一 `(root_id, relative_path)` |
+| 存储 | `storage_objects(id, root_id, relative_path, size_bytes, sha256, file_status, mtime_ms)` | 物理文件索引；唯一 `(root_id, relative_path)`；SHA-256 有非唯一查找索引 |
 | 存储 | `book_files(id, book_id, storage_object_id, format)` | 一书多文件；单个存储对象默认只归属一条书籍 |
 | 阅读 | `reading_sessions(id, book_id, book_file_id?, device_id?, started_at, ended_at?, active_seconds, source)` | 每次阅读；实体书手动记录时 `book_file_id=NULL` |
 | 阅读 | `reading_positions(id, book_file_id, locator_json, percent, revision, updated_at)` | 每个文件一个当前阅读位置；`book_file_id` 唯一 |

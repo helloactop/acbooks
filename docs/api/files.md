@@ -12,8 +12,8 @@ book_files` 模型；一本书可关联多个文件。实体副本与书目接�
 
 | 操作 | 鉴权 |
 | --- | --- |
-| 文件列表 / 内容下载 | 有效 Web 会话 Cookie（`WebSession`） |
-| 上传 / 删除 | 有效 Web 会话 Cookie + `X-CSRF-Token` + 可信 `Origin`/`Referer` |
+| 文件列表 / 哈希匹配 / 内容下载 | Web 会话 Cookie 或原生客户端 Bearer Token |
+| 上传 / 删除 | 原生客户端 Bearer Token，或 Web Cookie + CSRF + 可信来源 |
 
 写响应 `Cache-Control: no-store`；上传 `201` 返回 `Location`。未认证 `401 UNAUTHORIZED`，
 CSRF/来源失败 `403 FORBIDDEN`。
@@ -31,7 +31,7 @@ CSRF/来源失败 `403 FORBIDDEN`。
   读取（1 MiB），防止 ZIP 炸弹与资源耗尽。
 - 上传在 HTTP 接收层先按 `Content-Length` 早拒超大请求（上限 2 GiB 加少量开销），
   流式写入时再次按累计字节限额，双重防护。
-- 同一本书已存在相同 SHA-256 的文件时拒绝重复上传。
+- 同书同 SHA-256 默认拒绝重复上传。显式传入 `reuseExisting=true` 时可复用当前已索引为可用的关联，若只有缺失记录则允许创建可用文件。
 - `external` 根的文件只读：下载允许，删除拒绝；不修改 NAS 原始文件。
 
 ## 3. 端点
@@ -43,29 +43,38 @@ CSRF/来源失败 `403 FORBIDDEN`。
 - `BookFile`：`id`、`format`（`epub`/`pdf`）、`fileStatus`（`present`/`missing`）、`sizeBytes`。
 - 书目不存在返回 `404 BOOK_NOT_FOUND`。
 
-### 3.2 上传
+### 3.2 SHA-256 匹配
+
+`GET /api/v1/files/matches?sha256=<64 位十六进制>&bookId=<可选 UUID>`
+
+- 响应为 `{items, nextOffset}`。每条包含 `BookFile` 字段、`bookId` 和 `sha256`。支持 `limit`（默认 20，最大 100）和 `offset`，按文件 ID 排序。无匹配返回空列表。
+- 匹配以最近完成的索引为准，包含可用和缺失记录。哈希相同的文件可对应不同书目，由客户端选择关联。[Android 接入](android-client.md)
+
+### 3.3 上传
 
 `POST /api/v1/uploads`（`multipart/form-data`，字段 `bookId` + `file`）→ `201 BookFile`
 
 - 流式写入临时文件并计算 SHA-256、大小与实际格式；超出上限 `413 FILE_TOO_LARGE`；
   非 PDF/EPUB `422 FILE_FORMAT_UNSUPPORTED`；书目不存在 `404 BOOK_NOT_FOUND`；
   同书同内容 `409 FILE_DUPLICATE`。
-- 成功后设置 `Location: /api/v1/files/{bookFileId}/content`。
+- 使用 `?reuseExisting=true` 时，同书存在可用的同内容文件返回 `200 BookFile`。服务端以实际上传字节计算哈希，并在写事务中再次检查并发重复。
+- 200 与 201 均设置 `Location: /api/v1/files/{bookFileId}/content`。
 - 重复发布不覆盖；临时文件与失败发布在异常时清理。
 
-### 3.3 下载
+### 3.4 下载
 
 `GET /api/v1/files/{bookFileId}/content` → `200` 流式内容
 
 - 响应头：`Accept-Ranges: bytes`、`Content-Length`、`Content-Disposition: attachment;
-  filename="{bookId}.{format}"`、`ETag`（`sha256` 或 `size-mtime`）。
+  filename="{bookId}.{format}"`、`ETag`。文件大小和修改时间与索引一致且索引有哈希时，返回以哈希为值的强 ETag 和整文件的 `X-Content-SHA256`。其余情况返回弱 ETag，省略哈希头。
+- 提供 `If-Range` 时仅接受与当前强 ETag 完全一致的值；其他值（包括日期和弱 ETag）返回完整的 200。
 - 支持单段 `Range`，命中返回 `206 Partial Content` 与 `Content-Range`；非法/越界
   `416` 并带 `Content-Range: bytes */{size}`。
 - 文件内容类型为 `application/pdf` / `application/epub+zip`，不启用 gzip，避免破坏
   `Range`/`Content-Length`。
 - 文件记录或物理文件缺失、或路径越出根目录返回 `404 FILE_NOT_FOUND`。
 
-### 3.4 删除
+### 3.5 删除
 
 `DELETE /api/v1/files/{bookFileId}?purge=<bool>` → `204`
 
@@ -89,7 +98,7 @@ CSRF/来源失败 `403 FORBIDDEN`。
 
 | 状态 | code | 场景 |
 | --- | --- | --- |
-| 401 | `UNAUTHORIZED` | 缺少或过期 Web 会话 |
+| 401 | `UNAUTHORIZED` | 缺少有效 Web 会话或原生客户端凭据 |
 | 403 | `FORBIDDEN` | CSRF、来源或传输校验失败 |
 | 404 | `BOOK_NOT_FOUND` | 书目不存在 |
 | 404 | `FILE_NOT_FOUND` | 文件记录缺失、物理文件缺失或路径越界 |
@@ -103,6 +112,6 @@ CSRF/来源失败 `403 FORBIDDEN`。
 
 ## 6. OpenAPI 与客户端类型
 
-操作 ID：`listBookFiles`、`uploadBookFile`、`getBookFileContent`、`deleteBookFile`。
+操作 ID：`listBookFiles`、`matchBookFiles`、`uploadBookFile`、`getBookFileContent`、`deleteBookFile`。
 TypeScript 类型由 `openapi-typescript` 写入 `packages/acbooks-api-client/schema.d.ts`，
 不得手改（见 [Books API §6](books.md#6-openapi-与客户端类型)）。

@@ -55,6 +55,7 @@ pnpm e2e
 | pytest | 书库整理：同名 EPUB/PDF 扫描后待关联、候选依据、角色隔离、重新关联保留进度、合并预览过期、注入触发器失败后的完整回滚、实体副本和阅读迁移、NAS 原文件逐字节保留 |
 | pytest | 阅读 API：手动和自动会话、书签和笔记 CRUD、并发重复提交、非法时长、进度冲突与重试、书籍与文件归属、CSRF、OpenAPI 错误契约 |
 | pytest | 多端同步：快照与增量追赶、批量操作和冲突回执、并发幂等、文件关联与位置删除、级联墓碑和事务回滚 |
+| pytest | Android 文件接入：Bearer 认证、SHA-256 候选分页、并发重复上传复用、If-Range 续传和版本降级、下载哈希校验、双凭据阅读位置同步 |
 | pytest | 阅读统计：重叠去重、跨天、夏令时、全部历史、跨年区间和包含零时长会话的分页 |
 | ESLint | Web 与共享 UI 的 TypeScript/React 代码、Hooks 规则和导入问题 |
 | tsc | Web 与共享 UI 的 TypeScript strict 类型检查 |

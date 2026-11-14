@@ -18,6 +18,7 @@ from app.db.models.storage import BookFile, StorageObject
 from app.db.session import create_session_factory
 from app.modules.books.schemas import BookFile as BookFileDTO
 from app.modules.files import repository
+from app.modules.files.schemas import FileMatch, FileMatchPage
 from app.modules.metadata.service import MetadataService
 
 logger = logging.getLogger("uvicorn.error")
@@ -37,6 +38,11 @@ MAX_EPUB_METADATA_BYTES = 1024 * 1024
 MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + 1024 * 1024
 
 
+class ReuseFile(Exception):
+    def __init__(self, file: BookFileDTO) -> None:
+        self.file = file
+
+
 class RangeNotSatisfiable(Exception):
     def __init__(self, size: int) -> None:
         self.size = size
@@ -51,6 +57,7 @@ class Content:
     total_size: int
     partial: bool
     etag: str
+    sha256: str | None
     media_type: str
     filename: str
 
@@ -180,7 +187,24 @@ class FilesService:
                 raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
             return [self._dto(record) for record in repository.list_book_files(session, key)]
 
-    def upload(self, book_id: UUID, upload: UploadFile) -> BookFileDTO:
+    def match(self, sha256: str, book_id: UUID | None, limit: int, offset: int) -> FileMatchPage:
+        with self.read_sessions() as session:
+            rows = repository.match_sha(
+                session, sha256, str(book_id) if book_id else None, limit + 1, offset
+            )
+            return FileMatchPage(
+                items=[
+                    FileMatch(
+                        **self._dto(row).model_dump(), book_id=UUID(row.book_id), sha256=sha256
+                    )
+                    for row in rows[:limit]
+                ],
+                next_offset=offset + limit if len(rows) > limit else None,
+            )
+
+    def upload(
+        self, book_id: UUID, upload: UploadFile, *, reuse_existing: bool = False
+    ) -> tuple[BookFileDTO, bool]:
         root = self._root()
         key = str(book_id)
         with self.read_sessions() as session:
@@ -214,7 +238,16 @@ class FilesService:
             sha256 = digest.hexdigest()
 
             with self.read_sessions() as session:
-                if repository.book_has_sha(session, key, sha256):
+                if duplicate := repository.match_sha(
+                    session,
+                    sha256,
+                    key,
+                    1,
+                    0,
+                    present_only=reuse_existing,
+                ):
+                    if reuse_existing:
+                        return self._dto(duplicate[0]), False
                     raise BusinessError(BusinessErrorCode.FILE_DUPLICATE)
 
             relative_path = f"{key}/{uuid4().hex}.{file_format}"
@@ -247,8 +280,17 @@ class FilesService:
                 book = repository.get_book(session, key)
                 if book is None:
                     raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
-                if repository.book_has_sha(session, key, sha256):
-                    raise BusinessError(BusinessErrorCode.FILE_DUPLICATE)
+                if duplicate := repository.match_sha(
+                    session,
+                    sha256,
+                    key,
+                    1,
+                    0,
+                    present_only=reuse_existing,
+                ):
+                    if not reuse_existing:
+                        raise BusinessError(BusinessErrorCode.FILE_DUPLICATE)
+                    raise ReuseFile(self._dto(duplicate[0]))
                 storage_object = StorageObject(
                     id=str(uuid4()),
                     root_id=root_row.id,
@@ -276,7 +318,11 @@ class FilesService:
                     size_bytes=size,
                 )
             keep_cover = "cover" in fields
-            return result
+            return result, True
+        except ReuseFile as existing:
+            if published and final_path is not None:
+                final_path.unlink(missing_ok=True)
+            return existing.file, False
         except BaseException:
             if published and final_path is not None:
                 final_path.unlink(missing_ok=True)
@@ -286,7 +332,12 @@ class FilesService:
             if cover is not None and not keep_cover:
                 cover.unlink(missing_ok=True)
 
-    def content(self, file_id: UUID, range_header: str | None) -> Content:
+    def content(
+        self,
+        file_id: UUID,
+        range_header: str | None,
+        if_range: str | None = None,
+    ) -> Content:
         with self.read_sessions() as session:
             record = repository.get_file(session, str(file_id))
         if record is None:
@@ -300,8 +351,14 @@ class FilesService:
             raise BusinessError(BusinessErrorCode.FILE_NOT_FOUND)
         size = stat_result.st_size
         media_type = MEDIA_TYPES.get(record.format, "application/octet-stream")
-        etag = record.sha256 or f"{size}-{int(stat_result.st_mtime)}"
-        parsed = _parse_range(range_header, size)
+        digest = (
+            record.sha256
+            if (size == record.size_bytes and int(stat_result.st_mtime * 1000) == record.mtime_ms)
+            else None
+        )
+        etag = f'"{digest}"' if digest else f'W/"{size}-{stat_result.st_mtime_ns}"'
+        range_allowed = if_range is None or (digest is not None and if_range == etag)
+        parsed = _parse_range(range_header if range_allowed else None, size)
         if parsed is None:
             start, length, partial = 0, size, False
         else:
@@ -314,6 +371,7 @@ class FilesService:
             total_size=size,
             partial=partial,
             etag=etag,
+            sha256=digest,
             media_type=media_type,
             filename=f"{record.book_id}.{record.format}",
         )

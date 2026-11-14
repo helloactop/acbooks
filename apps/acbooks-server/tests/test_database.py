@@ -619,6 +619,7 @@ def test_batch_migration_must_preserve_status_triggers(tmp_path: Path, table: st
     config.set_main_option("script_location", str(scripts))
     # Exercise an independent batch migration on the pre-sync schema.
     (scripts / "versions/0007_sync.py").unlink()
+    (scripts / "versions/0008_file_hash.py").unlink()
     command.upgrade(config, "0003")
     migration = scripts / "versions/0006_test_batch.py"
     migration.write_text(

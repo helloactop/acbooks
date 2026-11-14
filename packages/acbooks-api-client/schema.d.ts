@@ -611,6 +611,23 @@ export interface paths {
         patch: operations["setMetadataSettings"];
         trace?: never;
     };
+    "/api/v1/files/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Match Book Files */
+        get: operations["matchBookFiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/books/{bookId}/files": {
         parameters: {
             query?: never;
@@ -1757,6 +1774,37 @@ export interface components {
             target: components["schemas"]["MergeBook"];
             /** Reasons */
             reasons: ("isbn" | "external_id" | "title" | "author" | "sha256")[];
+        };
+        /** FileMatch */
+        FileMatch: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Format */
+            format: string;
+            /**
+             * Filestatus
+             * @enum {string}
+             */
+            fileStatus: "present" | "missing";
+            /** Sizebytes */
+            sizeBytes: number;
+            /**
+             * Bookid
+             * Format: uuid
+             */
+            bookId: string;
+            /** Sha256 */
+            sha256: string;
+        };
+        /** FileMatchPage */
+        FileMatchPage: {
+            /** Items */
+            items: components["schemas"]["FileMatch"][];
+            /** Nextoffset */
+            nextOffset: number | null;
         };
         /** FileReassociation */
         FileReassociation: {
@@ -7975,6 +8023,120 @@ export interface operations {
             };
         };
     };
+    matchBookFiles: {
+        parameters: {
+            query: {
+                sha256: string;
+                bookId?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileMatchPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     listBookFiles: {
         parameters: {
             query?: never;
@@ -8075,7 +8237,9 @@ export interface operations {
     };
     uploadBookFile: {
         parameters: {
-            query?: never;
+            query?: {
+                reuseExisting?: boolean;
+            };
             header?: {
                 "X-CSRF-Token"?: string | null;
             };
@@ -8088,6 +8252,17 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Existing file for the selected book */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookFile"];
+                };
+            };
             /** @description Successful Response */
             201: {
                 headers: {
@@ -8145,6 +8320,28 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8236,7 +8433,10 @@ export interface operations {
     getBookFileContent: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                Range?: string | null;
+                "If-Range"?: string | null;
+            };
             path: {
                 bookFileId: string;
             };
@@ -8247,6 +8447,10 @@ export interface operations {
             /** @description File content */
             200: {
                 headers: {
+                    "Accept-Ranges"?: "bytes";
+                    "Content-Length"?: number;
+                    ETag?: string;
+                    "X-Content-SHA256"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -8256,6 +8460,11 @@ export interface operations {
             /** @description Partial content */
             206: {
                 headers: {
+                    "Accept-Ranges"?: "bytes";
+                    "Content-Length"?: number;
+                    ETag?: string;
+                    "X-Content-SHA256"?: string;
+                    "Content-Range"?: string;
                     [name: string]: unknown;
                 };
                 content: {

@@ -23,24 +23,10 @@ def ensure_managed_root(session: Session, root_path: str) -> StorageRoot:
         .limit(1)
     ).first()
     if root is None:
-        root = StorageRoot(
-            id=str(uuid4()), name="library", root_path=root_path, mode="managed"
-        )
+        root = StorageRoot(id=str(uuid4()), name="library", root_path=root_path, mode="managed")
         session.add(root)
         session.flush()
     return root
-
-
-def book_has_sha(session: Session, book_id: str, sha256: str) -> bool:
-    return (
-        session.scalar(
-            select(BookFile.id)
-            .join(StorageObject, StorageObject.id == BookFile.storage_object_id)
-            .where(BookFile.book_id == book_id, StorageObject.sha256 == sha256)
-            .limit(1)
-        )
-        is not None
-    )
 
 
 def add_storage_object(session: Session, storage_object: StorageObject) -> None:
@@ -62,6 +48,7 @@ class FileRecord:
     size_bytes: int
     storage_object_id: str
     sha256: str | None
+    mtime_ms: int
     root_mode: str
     root_path: str
     relative_path: str
@@ -77,9 +64,10 @@ def _records(rows: Sequence[Any]) -> list[FileRecord]:
             size_bytes=row[4],
             storage_object_id=row[5],
             sha256=row[6],
-            root_mode=row[7],
-            root_path=row[8],
-            relative_path=row[9],
+            mtime_ms=row[7],
+            root_mode=row[8],
+            root_path=row[9],
+            relative_path=row[10],
         )
         for row in rows
     ]
@@ -95,6 +83,7 @@ def _select_records() -> Any:
             StorageObject.size_bytes,
             StorageObject.id,
             StorageObject.sha256,
+            StorageObject.mtime_ms,
             StorageRoot.mode,
             StorageRoot.root_path,
             StorageObject.relative_path,
@@ -111,6 +100,24 @@ def list_book_files(session: Session, book_id: str) -> list[FileRecord]:
     return _records(rows)
 
 
+def match_sha(
+    session: Session,
+    sha256: str,
+    book_id: str | None,
+    limit: int,
+    offset: int,
+    *,
+    present_only: bool = False,
+) -> list[FileRecord]:
+    query = _select_records().where(StorageObject.sha256 == sha256)
+    if book_id is not None:
+        query = query.where(BookFile.book_id == book_id)
+    if present_only:
+        query = query.where(StorageObject.file_status == "present")
+    query = query.order_by(BookFile.id).offset(offset).limit(limit)
+    return _records(session.execute(query).all())
+
+
 def get_file(session: Session, file_id: str) -> FileRecord | None:
     row = session.execute(_select_records().where(BookFile.id == file_id)).first()
     if row is None:
@@ -118,20 +125,14 @@ def get_file(session: Session, file_id: str) -> FileRecord | None:
     return _records([row])[0]
 
 
-def delete_file_rows(
-    session: Session, file_id: str, storage_object_id: str
-) -> None:
+def delete_file_rows(session: Session, file_id: str, storage_object_id: str) -> None:
     # reading_positions restrict book_files, so remove the position first.
-    session.execute(
-        delete(ReadingPosition).where(ReadingPosition.book_file_id == file_id)
-    )
+    session.execute(delete(ReadingPosition).where(ReadingPosition.book_file_id == file_id))
     session.execute(delete(BookFile).where(BookFile.id == file_id))
     session.execute(delete(StorageObject).where(StorageObject.id == storage_object_id))
 
 
 def unlink_book_file(session: Session, file_id: str) -> None:
     # Detach the book-file association but keep the storage object and file.
-    session.execute(
-        delete(ReadingPosition).where(ReadingPosition.book_file_id == file_id)
-    )
+    session.execute(delete(ReadingPosition).where(ReadingPosition.book_file_id == file_id))
     session.execute(delete(BookFile).where(BookFile.id == file_id))
