@@ -81,7 +81,9 @@
 
 ## 5. 图标
 
-- **R-ICON-1** Web / Windows 统一使用 `lucide-react`（已在 `packages/acbooks-ui/package.json`）；Android 使用同语义的 Lucide 资源。**禁止**混用其他图标库、Emoji、Unicode 符号和手绘 SVG。图标本地打包、按需具名导入，禁止 CDN。
+本节的尺寸、描边、Web 可访问属性与 Lucide 映射适用于 Web / Windows。Android 的图标样式、尺寸及可访问性遵循 [Android 设计系统](../ui/android-ui.md#图标)。
+
+- **R-ICON-1** Web / Windows 统一使用 `lucide-react`（已在 `packages/acbooks-ui/package.json`）；Android 使用同语义的 Fluent UI System Icons，由 [Android 设计系统](../ui/android-ui.md#图标) 统一封装。**禁止**混用其他图标库、Emoji、Unicode 符号和手绘 SVG。图标本地打包、按需具名导入，禁止 CDN。
 - **R-ICON-2** 线性、圆端点，`strokeWidth=2`、`fill=none`、`currentColor`。普通 18、导航 20、辅助 16、面包屑分隔 12–16、空状态 32–48；`Button` / `IconButton` 内子图标默认 18、不收缩，图文间距 8。图标大小不等于点击区域。
 - **R-ICON-3** 颜色继承语义文字令牌：普通 `foreground`、次要 `muted-foreground`、强调 `accent-text`、危险 `destructive-text`；危险确认随按钮前景。不为普通图标画实心强调色底板。
 - **R-ICON-4** **文字已表达含义时不加图标**。图标用于纯图标按钮，或文字不足以快速辨识且确有扫视收益的操作；同一操作区保持一致。
@@ -458,7 +460,7 @@
 - [ ] 颜色使用语义令牌；圆角、字号和尺寸复用共享令牌。本规范的表格数值是令牌定义依据，不能在各页面散落复制；已有值尚未令牌化时，在对应组件调整范围内集中定义，不附带全局重构。占位封面调色板遵循 R-G-3 的例外。
 - [ ] 同一操作区只有一个 `soft`；删除入口是 `danger`，只有确认框里是 `danger-confirm`。
 - [ ] 下拉框能看出管什么；二到四选一优先用分段控件，例外符合 R-SEL-2。
-- [ ] 图标只用 Lucide，尺寸/语义一致；纯图标控件有双语可访问名称和合格命中区。
+- [ ] Web / Windows 使用 Lucide，Android 使用 Fluent UI System Icons，各端尺寸和语义统一；纯图标控件有双语可访问名称和合格命中区。
 - [ ] 中英文词条同步，`pnpm i18n:check` 通过；长英文不溢出；切换语言不丢状态。
 - [ ] 浅色、深色下对比度合格（Soft 文字/边框、Default/Outline、分段选中边框、输入框、禁用态）；状态不只靠颜色。
 - [ ] 桌面和移动都无横向溢出；触控目标 ≥ 44px；键盘可操作、焦点可见；减弱动态。

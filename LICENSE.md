@@ -31,6 +31,30 @@ MIT（Expat）、ISC 和 Apache-2.0 均兼容 GPL 第 3 版。[GNU 许可证兼�
 | Lucide | `lucide-react@1.72.0` | [lucide-icons/lucide](https://github.com/lucide-icons/lucide) | ISC，Feather 派生图标为 MIT | Web 与共享 UI 的导航、日历和操作图标 |
 | Feather | 随 `lucide-react@1.72.0` 分发 | [feathericons/feather](https://github.com/feathericons/feather) | MIT | Lucide 中的派生图标，包括左右箭头等 |
 
+## Android 开源依赖
+
+acbooks 源码采用 [GPL-3.0-only](LICENSE)。以下为 Android 工程当前直接使用的第三方依赖和构建工具。Apache-2.0 与 GPLv3 兼容。JUnit 4 及其测试依赖仅用于运行测试，不进入应用 APK。
+
+| 依赖 | 版本 | 许可证 |
+| --- | --- | --- |
+| [Gradle Wrapper](https://github.com/gradle/gradle/blob/v8.14.3/LICENSE) | 8.14.3 | Apache-2.0 |
+| [Android Gradle Plugin](https://android.googlesource.com/platform/tools/base/) | 8.13.2 | Apache-2.0 |
+| [Kotlin、Compose 编译插件](https://github.com/JetBrains/kotlin/blob/v2.3.10/license/LICENSE.txt) | 2.3.10 | Apache-2.0 |
+| [KSP](https://github.com/google/ksp/blob/2.3.10/LICENSE) | 2.3.10 | Apache-2.0 |
+| [Dagger Hilt](https://github.com/google/dagger/blob/dagger-2.58/LICENSE.txt) | 2.58 | Apache-2.0 |
+| [AndroidX Activity、AppCompat、Lifecycle](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 1.11.0 / 1.7.1 / 2.9.4 | Apache-2.0 |
+| [Jetpack Compose、Material 3](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | BOM 2026.02.00（Compose UI 1.10.3、Material 3 1.4.0） | Apache-2.0 |
+| [AndroidLiquidGlass / Backdrop](https://github.com/Kyant0/AndroidLiquidGlass) | 1.0.6 | Apache-2.0 |
+| [Shapes](https://github.com/Kyant0/Shapes) | 1.2.0 | Apache-2.0 |
+| [Fluent UI System Icons](https://github.com/niyajali/fluentui-system-icons) | 1.0.1 | [MIT](#fluent-ui-system-icons) |
+| [Navigation Compose、Room、DataStore](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 2.9.5 / 2.8.4 / 1.1.7 | Apache-2.0 |
+| [AndroidX Test](https://github.com/android/android-test/blob/main/LICENSE) | JUnit 扩展 1.2.1 / Runner 1.6.2 | Apache-2.0 |
+| [JUnit 4](https://github.com/junit-team/junit4/blob/r4.13.2/LICENSE-junit.txt) | 4.13.2 | EPL-1.0 |
+
+[Version Catalog](apps/acbooks-android/gradle/libs.versions.toml) 是直接依赖版本的来源。
+
+组件封装参考 [Lumi Books](https://github.com/huangder/Lumi_Books) 和 [prism_ui](https://github.com/chen08209/prism_ui) 的设计与交互。Android 控件图标的描边加粗实现参考 Lumi Books 的 [ControlIcon.kt](https://github.com/huangder/Lumi_Books/blob/HEAD/app/src/main/java/com/huangder/lumibooks/ui/icons/ControlIcon.kt)，该项目按 GPL-3.0 发布。
+
 ## 第三方版权与许可声明
 
 ### shadcn-calendar-heatmap
@@ -139,6 +163,32 @@ airplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circl
 The MIT License (MIT) (for the icons listed above)
 
 Copyright (c) 2013-present Cole Bemis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+~~~~
+
+### Fluent UI System Icons
+
+~~~~text
+MIT License
+
+Copyright (c) 2020 Microsoft Corporation
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

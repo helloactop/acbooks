@@ -19,4 +19,6 @@ Run `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build` for checks.
 See the [Web README](apps/acbooks-web/README.md) and
 [shared UI README](packages/acbooks-ui/README.md) for details.
 
+For the Android project, see the [build and run guide](docs/development/android.md).
+
 The project is licensed under GPL-3.0-only. [Full license text](LICENSE)

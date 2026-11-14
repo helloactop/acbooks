@@ -13,7 +13,7 @@ acbooks 是一款面向个人的自托管图书馆应用，优先面向 NAS 部�
 | `apps/acbooks-server/` | FastAPI 服务端，源码放在 `app/`，测试放在 `tests/` |
 | `apps/acbooks-web/` | React、TypeScript 和 Vite Web 客户端 |
 | `apps/acbooks-desktop/` | Tauri Windows 客户端 |
-| `apps/acbooks-android/` | Kotlin 和 Jetpack Compose Android 客户端 |
+| `apps/acbooks-android/` | Kotlin 和 Jetpack Compose Android 客户端，[构建与运行](docs/development/android.md) |
 | `packages/acbooks-ui/` | Web 和 Windows 共享 UI |
 | `packages/acbooks-api-client/` | 从服务端 OpenAPI 生成的客户端 |
 | `docs/` | 架构、开发、API、测试和部署文档 |
