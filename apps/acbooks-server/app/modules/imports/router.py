@@ -12,7 +12,7 @@ from app.db.models.jobs import BackgroundJob
 from app.db.models.storage import StorageRoot
 from app.db.session import create_session_factory
 from app.modules.auth.dependencies import AuthDependencies
-from app.modules.auth.service import WebSession
+from app.modules.auth.service import AuthIdentity
 from app.modules.imports.schemas import (
     JobStatus,
     PendingFilePreview,
@@ -49,7 +49,7 @@ def imports_router(
     def start_storage_scan(
         root_id: Annotated[UUID, Path(alias="rootId")],
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
         deep: Annotated[bool, Query()] = False,
     ) -> ScanAccepted:
         with read_sessions() as session:
@@ -80,7 +80,7 @@ def imports_router(
     def get_job(
         job_id: Annotated[UUID, Path(alias="jobId")],
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
     ) -> JobStatus:
         with read_sessions() as session:
             row = session.get(BackgroundJob, str(job_id))
@@ -109,7 +109,7 @@ def imports_router(
     def list_unlinked(
         root_id: Annotated[UUID, Path(alias="rootId")],
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
         limit: Annotated[int, Query(ge=1, le=100)] = 20,
         offset: Annotated[int, Query(ge=0)] = 0,
     ) -> PendingFiles:
@@ -124,7 +124,7 @@ def imports_router(
     def preview_unlinked(
         object_id: Annotated[UUID, Path(alias="objectId")],
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
     ) -> PendingFilePreview:
         response.headers["Cache-Control"] = "no-store"
         return service.preview(str(object_id))
@@ -138,7 +138,7 @@ def imports_router(
         object_id: Annotated[UUID, Path(alias="objectId")],
         request: ResolveFile,
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> ResolvedFile:
         response.headers["Cache-Control"] = "no-store"
         return service.resolve(str(object_id), str(request.book_id) if request.book_id else None)

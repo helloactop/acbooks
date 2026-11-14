@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     public_origin: str = "http://127.0.0.1:8000"
     web_dist_path: Path | None = None
     web_session_ttl_seconds: int = Field(default=604800, ge=1, le=604800)
+    device_token_ttl_seconds: int = Field(default=2592000, ge=1, le=2592000)
+    application_token_ttl_seconds: int = Field(default=7776000, ge=1, le=7776000)
 
     @field_validator("public_origin")
     @classmethod

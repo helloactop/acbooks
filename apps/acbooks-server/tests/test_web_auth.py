@@ -317,9 +317,9 @@ def test_local_http_development_uses_unprefixed_cookie(auth_paths: tuple[Path, P
 def test_web_auth_openapi(browser: TestClient) -> None:
     paths = browser.get("/openapi.json").json()["paths"]
     assert paths[LOGIN]["post"]["operationId"] == "login"
-    assert paths[ME]["get"]["security"] == [{"WebSession": []}]
+    assert paths[ME]["get"]["security"] == [{"WebSession": []}, {"DeviceBearer": []}]
     logout = paths[LOGOUT]["post"]
-    assert logout["security"] == [{"WebSession": []}]
-    assert logout["parameters"][0]["required"]
+    assert logout["security"] == [{"WebSession": []}, {"DeviceBearer": []}]
+    assert not logout["parameters"][0]["required"]
     assert logout["parameters"][0]["name"] == "X-CSRF-Token"
     assert "content" not in logout["responses"]["204"]

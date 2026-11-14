@@ -1,20 +1,27 @@
 import logging
-from typing import Annotated
+from typing import Annotated, Literal
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 
 from app.api.errors import problem_openapi
 from app.core.errors import BusinessError
-from app.modules.auth.dependencies import AuthDependencies
+from app.modules.auth.dependencies import AuthDependencies, secure_transport
 from app.modules.auth.schemas import (
     AccountResponse,
     CsrfResponse,
+    DeviceLoginRequest,
+    DeviceLoginResponse,
+    IssuedToken,
     LoginRequest,
     LoginResponse,
+    PasswordChange,
     SetupRequest,
     SetupStatus,
+    TokenCreate,
+    TokenPage,
 )
-from app.modules.auth.service import SetupService, WebAuthService, WebSession
+from app.modules.auth.service import AuthIdentity, SetupService, WebAuthService
 
 logger = logging.getLogger("uvicorn.error")
 no_store = {"Cache-Control": {"schema": {"type": "string", "const": "no-store"}}}
@@ -26,6 +33,16 @@ def auth_router(
 ) -> APIRouter:
     router = APIRouter(tags=["auth"])
     secure = dependencies.secure
+    Read = Annotated[AuthIdentity, Depends(dependencies.require_session)]
+    Write = Annotated[AuthIdentity, Depends(dependencies.require_write)]
+
+    def ended_session(current: AuthIdentity) -> Response:
+        response = Response(status_code=204, headers={"Cache-Control": "no-store"})
+        if not current.bearer:
+            response.delete_cookie(
+                dependencies.session_cookie, httponly=True, secure=secure, samesite="strict"
+            )
+        return response
 
     @router.get(
         "/setup/status",
@@ -62,10 +79,7 @@ def auth_router(
                     "Location": {"schema": {"type": "string", "format": "uri-reference"}},
                 }
             },
-            **{
-                status: problem_openapi(status)
-                for status in (403, 409, 422, 429, 500)
-            },
+            **{status: problem_openapi(status) for status in (403, 409, 422, 429, 500)},
         },
     )
     def initialize(
@@ -101,10 +115,7 @@ def auth_router(
         response_model=LoginResponse,
         responses={
             200: {"headers": cookie_headers},
-            **{
-                status: problem_openapi(status)
-                for status in (401, 403, 422, 429, 500)
-            },
+            **{status: problem_openapi(status) for status in (401, 403, 422, 429, 500)},
         },
     )
     def login(
@@ -117,9 +128,7 @@ def auth_router(
         previous = auth.authenticate(request.cookies.get(dependencies.session_cookie))
         dependencies.check_csrf(request, token, previous, "login")
         try:
-            identity, raw = auth.login(
-                body.username, body.password.get_secret_value(), previous
-            )
+            identity, raw = auth.login(body.username, body.password.get_secret_value(), previous)
         except BusinessError as error:
             logger.info("request_id=%s operation=login result=%s", request_id, error.code)
             raise
@@ -154,7 +163,7 @@ def auth_router(
     )
     def get_current_account(
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
     ) -> AccountResponse:
         response.headers["Cache-Control"] = "no-store"
         return AccountResponse(id=current.account_id, username=current.username)
@@ -168,40 +177,88 @@ def auth_router(
             204: {"headers": cookie_headers},
             **{status: problem_openapi(status) for status in (401, 403, 500)},
         },
-        openapi_extra={
-            "parameters": [
-                {
-                    "name": "X-CSRF-Token",
-                    "in": "header",
-                    "required": True,
-                    "schema": {"type": "string"},
-                }
-            ]
-        },
     )
-    def logout(
-        request: Request,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
-    ) -> Response:
-        dependencies.check_csrf(
-            request,
-            request.headers.get(dependencies.csrf_header_name),
-            current,
-            "logout",
-        )
+    def logout(request: Request, current: Write) -> Response:
         if not auth.logout(current):
             raise HTTPException(401)
-        response = Response(status_code=204, headers={"Cache-Control": "no-store"})
-        response.delete_cookie(
-            dependencies.session_cookie,
-            httponly=True,
-            secure=secure,
-            samesite="strict",
+        logger.info("request_id=%s operation=logout result=revoked", request.state.request_id)
+        return ended_session(current)
+
+    @router.post(
+        "/auth/device-login",
+        operation_id="deviceLogin",
+        responses={status: problem_openapi(status) for status in (401, 403, 422, 429, 500)},
+    )
+    def device_login(
+        body: DeviceLoginRequest, request: Request, response: Response
+    ) -> DeviceLoginResponse:
+        if not secure_transport(request, secure) or "cookie" in request.headers:
+            raise HTTPException(403)
+        response.headers["Cache-Control"] = "no-store"
+        try:
+            result = auth.device_login(
+                body.username, body.password.get_secret_value(), body.device_name
+            )
+        except BusinessError as error:
+            logger.info(
+                "request_id=%s operation=device_login result=%s",
+                request.state.request_id,
+                error.code,
+            )
+            raise
+        logger.info("request_id=%s operation=device_login result=issued", request.state.request_id)
+        return result
+
+    @router.patch(
+        "/auth/password",
+        status_code=204,
+        operation_id="changePassword",
+        responses={status: problem_openapi(status) for status in (401, 403, 422, 429, 500)},
+    )
+    def change_password(body: PasswordChange, current: Write, request: Request) -> Response:
+        auth.change_password(
+            current, body.current_password.get_secret_value(), body.new_password.get_secret_value()
         )
         logger.info(
-            "request_id=%s operation=logout result=revoked",
-            request.state.request_id,
+            "request_id=%s operation=change_password result=revoked_all", request.state.request_id
         )
-        return response
+        return ended_session(current)
+
+    @router.get(
+        "/auth/tokens",
+        operation_id="listAuthTokens",
+        responses={status: problem_openapi(status) for status in (401, 403, 422, 500)},
+    )
+    def list_tokens(
+        current: Read,
+        response: Response,
+        kind: Literal["application", "device"] | None = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+        offset: Annotated[int, Query(ge=0, le=1_000_000)] = 0,
+    ) -> TokenPage:
+        response.headers["Cache-Control"] = "no-store"
+        return auth.tokens(current, kind, limit, offset)
+
+    @router.post(
+        "/auth/tokens",
+        status_code=201,
+        operation_id="createAuthToken",
+        responses={status: problem_openapi(status) for status in (401, 403, 422, 500)},
+    )
+    def create_token(body: TokenCreate, current: Write, response: Response) -> IssuedToken:
+        result = auth.issue_application_token(current, body.label)
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Location"] = f"/api/v1/auth/tokens/{result.id}"
+        return result
+
+    @router.delete(
+        "/auth/tokens/{tokenId}",
+        status_code=204,
+        operation_id="revokeAuthToken",
+        responses={status: problem_openapi(status) for status in (401, 403, 404, 422, 500)},
+    )
+    def revoke_token(token_id: Annotated[UUID, Path(alias="tokenId")], current: Write) -> Response:
+        auth.revoke(current, token_id)
+        return Response(status_code=204, headers={"Cache-Control": "no-store"})
 
     return router

@@ -8,6 +8,7 @@ import enLocations from "./locales/en/locations.json";
 import enPreview from "./locales/en/preview.json";
 import enStorage from "./locales/en/storage.json";
 import enStats from "./locales/en/stats.json";
+import enSecurity from "./locales/en/security.json";
 import zhCNApp from "./locales/zh-CN/app.json";
 import zhCNAuth from "./locales/zh-CN/auth.json";
 import zhCNDashboard from "./locales/zh-CN/dashboard.json";
@@ -16,6 +17,7 @@ import zhCNLocations from "./locales/zh-CN/locations.json";
 import zhCNPreview from "./locales/zh-CN/preview.json";
 import zhCNStorage from "./locales/zh-CN/storage.json";
 import zhCNStats from "./locales/zh-CN/stats.json";
+import zhCNSecurity from "./locales/zh-CN/security.json";
 
 export const appResources = {
   en: {
@@ -27,6 +29,7 @@ export const appResources = {
     preview: enPreview,
     storage: enStorage,
     stats: enStats,
+    security: enSecurity,
   },
   "zh-CN": {
     app: zhCNApp,
@@ -37,5 +40,6 @@ export const appResources = {
     preview: zhCNPreview,
     storage: zhCNStorage,
     stats: zhCNStats,
+    security: zhCNSecurity,
   },
 } satisfies TranslationResources;

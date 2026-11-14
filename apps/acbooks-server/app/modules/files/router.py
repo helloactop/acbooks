@@ -19,7 +19,7 @@ from fastapi.responses import StreamingResponse
 
 from app.api.errors import problem_openapi
 from app.modules.auth.dependencies import AuthDependencies
-from app.modules.auth.service import WebSession
+from app.modules.auth.service import AuthIdentity
 from app.modules.books.schemas import BookFile
 from app.modules.files import service as files_service
 from app.modules.files.service import FilesService, RangeNotSatisfiable
@@ -71,7 +71,7 @@ def files_router(
     def list_book_files(
         book_id: Annotated[UUID, Path(alias="bookId")],
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
     ) -> list[BookFile]:
         response.headers["Cache-Control"] = "no-store"
         return service.list_files(book_id)
@@ -92,7 +92,7 @@ def files_router(
     def upload_book_file(
         request: Request,
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
         book_id: Annotated[UUID, Form(alias="bookId")],
         file: Annotated[UploadFile, File()],
     ) -> BookFile:
@@ -111,7 +111,7 @@ def files_router(
     def get_book_file_content(
         request: Request,
         book_file_id: Annotated[UUID, Path(alias="bookFileId")],
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
     ) -> StreamingResponse:
         try:
             item = service.content(book_file_id, request.headers.get("range"))
@@ -158,7 +158,7 @@ def files_router(
     )
     def delete_book_file(
         book_file_id: Annotated[UUID, Path(alias="bookFileId")],
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
         purge: Annotated[bool, Query()] = True,
     ) -> Response:
         service.delete(book_file_id, purge)

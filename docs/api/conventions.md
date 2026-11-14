@@ -133,6 +133,10 @@ API 进程重启后，现有会话继续有效，客户端通过 `GET /api/v1/au
 - 按 `kind`、`scope`、过期与撤销状态鉴权；客户端通过安全存储保存 Bearer；**不得在 URL 查询串、Cookie 以外的日志、异常或 OpenAPI 示例中放真实令牌**。
 - `GET /auth/tokens` 中的 `kind=device` 代表原生登录后签发的凭据；删除它可以使相应设备立即退出登录。这不改变阅读同步的 `devices` 表。
 
+原生登录要求 HTTPS 或受控本机 HTTP，拒绝携带 Cookie 的登录请求。受保护的 REST 接口接受 Web Cookie 或设备 Bearer。若同时提交两种认证，或显式提交无效 Authorization，返回 401。Cookie 写请求仍须校验 CSRF 和来源。只读应用凭据仅供协议适配器使用，不能访问 REST 管理接口。
+
+凭据列表支持 `kind=device|application` 过滤，返回 `items`、`total`、`limit`、`offset`。签发响应仅返回一次凭据原文。改密成功返回 204，原子撤销当前账号所有 Cookie 会话、设备令牌及应用凭据。设备及应用凭据默认有效期分别为 30 天和 90 天，可通过 `ACBOOKS_DEVICE_TOKEN_TTL_SECONDS` 和 `ACBOOKS_APPLICATION_TOKEN_TTL_SECONDS` 缩短。
+
 ### 4.3 统一安全响应
 
 - 登录名统一规范化查找，不区分“用户不存在”和“密码错误”；`401 INVALID_CREDENTIALS`、`403 SETUP_CODE_INVALID`、`409 SETUP_ALREADY_INITIALIZED`、`429 RATE_LIMITED` 均遵循本文件 §3 的 **`application/problem+json`** 格式，必要时携带 `Retry-After`。

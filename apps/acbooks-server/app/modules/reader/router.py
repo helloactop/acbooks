@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from app.api.errors import problem_openapi
 from app.db.models.reading import Annotation, Bookmark, ReadingSession
 from app.modules.auth.dependencies import AuthDependencies
-from app.modules.auth.service import WebSession
+from app.modules.auth.service import AuthIdentity
 from app.modules.reader.schemas import (
     AnnotationCreate,
     AnnotationRead,
@@ -45,8 +45,8 @@ def reader_router(service: ReaderService, dependencies: AuthDependencies) -> API
         responses={status: problem_openapi(status) for status in (401, 403, 404, 422, 500)},
     )
     books = APIRouter(prefix="/books/{bookId}")
-    Read = Annotated[WebSession, Depends(dependencies.require_session)]
-    Write = Annotated[WebSession, Depends(dependencies.require_write)]
+    Read = Annotated[AuthIdentity, Depends(dependencies.require_session)]
+    Write = Annotated[AuthIdentity, Depends(dependencies.require_write)]
 
     @books.get("/reading-sessions", operation_id="listReadingSessions")
     def list_sessions(

@@ -5,12 +5,12 @@ from secrets import token_urlsafe
 from typing import Annotated
 from urllib.parse import urlsplit
 
-from fastapi import Depends, HTTPException, Request, Response
-from fastapi.security import APIKeyCookie, APIKeyHeader
+from fastapi import Depends, Header, HTTPException, Request, Response
+from fastapi.security import APIKeyCookie, APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 
 from app.modules.auth.csrf import CHALLENGE_TTL, CsrfScope, CsrfTokens
 from app.modules.auth.schemas import CsrfResponse
-from app.modules.auth.service import WebAuthService, WebSession
+from app.modules.auth.service import AuthIdentity, WebAuthService
 
 logger = logging.getLogger("uvicorn.error")
 CSRF_HEADER_NAME = "X-CSRF-Token"
@@ -60,32 +60,42 @@ class AuthDependencies:
             name=self.session_cookie, scheme_name="WebSession", auto_error=False
         )
         self.csrf_header = APIKeyHeader(name=self.csrf_header_name, auto_error=False)
+        self.bearer_auth = HTTPBearer(auto_error=False, scheme_name="DeviceBearer")
         self.require_session = self._session_dependency()
         self.require_write = self._write_dependency()
 
-    def _session_dependency(self) -> Callable[..., WebSession]:
+    def _session_dependency(self) -> Callable[..., AuthIdentity]:
         def require_session(
             request: Request,
             raw: Annotated[str | None, Depends(self.cookie_auth)],
-        ) -> WebSession:
+            bearer: Annotated[HTTPAuthorizationCredentials | None, Depends(self.bearer_auth)],
+        ) -> AuthIdentity:
             if not secure_transport(request, self.secure):
                 raise HTTPException(403)
-            current = self.auth.authenticate(raw)
+            if "authorization" in request.headers:
+                if (
+                    self.session_cookie in request.cookies
+                    or len(request.headers.getlist("authorization")) != 1
+                    or bearer is None
+                ):
+                    raise HTTPException(401)
+                current = self.auth.authenticate_device(bearer.credentials)
+            else:
+                current = self.auth.authenticate(raw)
             if current is None:
                 raise HTTPException(401)
             return current
 
         return require_session
 
-    def _write_dependency(self) -> Callable[..., WebSession]:
+    def _write_dependency(self) -> Callable[..., AuthIdentity]:
         def require_write(
             request: Request,
-            current: Annotated[WebSession, Depends(self.require_session)],
-            token: Annotated[str | None, Depends(self.csrf_header)],
-        ) -> WebSession:
-            self.check_csrf(
-                request, token, current, f"{request.method} {request.url.path}"
-            )
+            current: Annotated[AuthIdentity, Depends(self.require_session)],
+            token: Annotated[str | None, Header(alias=CSRF_HEADER_NAME)] = None,
+        ) -> AuthIdentity:
+            if not current.bearer:
+                self.check_csrf(request, token, current, f"{request.method} {request.url.path}")
             return current
 
         return require_write
@@ -94,14 +104,12 @@ class AuthDependencies:
         self,
         request: Request,
         token: str | None,
-        current: WebSession | None,
+        current: AuthIdentity | None,
         operation: str,
     ) -> None:
         scope: CsrfScope = "session" if current is not None else "preauth"
         binding = (
-            current.id
-            if current is not None
-            else request.cookies.get(self.challenge_cookie, "")
+            current.id if current is not None else request.cookies.get(self.challenge_cookie, "")
         )
         if (
             not secure_transport(request, self.secure)

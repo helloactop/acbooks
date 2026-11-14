@@ -7,6 +7,9 @@ import {
   ListChecks,
   BookOpen,
   ChartBar,
+  KeyRound,
+  Laptop,
+  Shield,
   SunMoon,
   UserRound,
   type LucideIcon,
@@ -42,7 +45,9 @@ export const APP_NAV_GROUPS: readonly {
   },
 ];
 
-export type SettingsSection = "account" | "appearance" | "language" | "metadata";
+export type SettingsSection =
+  | "account" | "appearance" | "language" | "metadata"
+  | "password" | "devices" | "credentials";
 
 export interface SettingsNavItem {
   descriptionKey: string;
@@ -86,17 +91,22 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
       },
     ],
   },
+  {
+    labelKey: "settings.security",
+    items: [
+      { section: "password", icon: Shield, labelKey: "settings.password", descriptionKey: "settings.passwordDescription" },
+      { section: "devices", icon: Laptop, labelKey: "settings.devices", descriptionKey: "settings.devicesDescription" },
+      { section: "credentials", icon: KeyRound, labelKey: "settings.credentials", descriptionKey: "settings.credentialsDescription" },
+    ],
+  },
 ];
 
 export function settingsSectionFromSearch(
   search: string,
 ): SettingsSection | null {
   const value = new URLSearchParams(search).get("section");
-  return value === "account" ||
-    value === "appearance" ||
-    value === "language" || value === "metadata"
-    ? value
-    : null;
+  return SETTINGS_NAV_GROUPS.flatMap(group => group.items)
+    .find(item => item.section === value)?.section ?? null;
 }
 
 export function isNavItemActive(item: NavItem, pathname: string): boolean {

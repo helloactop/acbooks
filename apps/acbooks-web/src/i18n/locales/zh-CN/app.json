@@ -60,6 +60,13 @@
     "requestId": "请求 ID：{{requestId}}"
   },
   "settings": {
+    "security": "安全",
+    "password": "修改密码",
+    "passwordDescription": "更新管理员账号密码。",
+    "devices": "登录设备",
+    "devicesDescription": "查看并撤销原生客户端的登录凭据。",
+    "credentials": "应用凭据",
+    "credentialsDescription": "管理 OPDS 和 WebDAV 只读凭据。",
     "metadata": "元数据",
     "metadataDescription": "管理自动补全及允许补全的字段。",
     "backToSettings": "返回设置",

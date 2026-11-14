@@ -1,4 +1,4 @@
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.db.models.auth import AuthAccount, AuthSession, AuthToken
@@ -56,9 +56,7 @@ def prune_inactive_credentials(session: Session, now: int) -> None:
         )
     )
     session.execute(
-        delete(AuthToken).where(
-            or_(AuthToken.revoked_at.is_not(None), AuthToken.expires_at <= now)
-        )
+        delete(AuthToken).where(or_(AuthToken.revoked_at.is_not(None), AuthToken.expires_at <= now))
     )
 
 
@@ -81,3 +79,67 @@ def add_account(
             updated_at=timestamp,
         )
     )
+
+
+def find_active_token(
+    session: Session, token_hash: str, now: int, *, kind: str, scope: str
+) -> tuple[str, str, str] | None:
+    row = session.execute(
+        select(AuthToken.id, AuthAccount.id, AuthAccount.username)
+        .join(AuthAccount, AuthAccount.id == AuthToken.account_id)
+        .where(
+            AuthToken.token_hash == token_hash,
+            AuthToken.kind == kind,
+            AuthToken.scope == scope,
+            AuthToken.revoked_at.is_(None),
+            AuthToken.expires_at > now,
+        )
+    ).one_or_none()
+    return (row[0], row[1], row[2]) if row is not None else None
+
+
+def active_credential(session: Session, key: str, account_id: str, bearer: bool, now: int) -> bool:
+    current: AuthToken | AuthSession | None = (
+        session.get(AuthToken, key) if bearer else session.get(AuthSession, key)
+    )
+    return (
+        current is not None
+        and current.account_id == account_id
+        and current.revoked_at is None
+        and current.expires_at > now
+        and (
+            not isinstance(current, AuthToken)
+            or (current.kind == "device" and current.scope == "full")
+        )
+    )
+
+
+def revoke_token(session: Session, key: str, account_id: str, now: int) -> bool:
+    row = session.get(AuthToken, key)
+    if row is None or row.account_id != account_id:
+        return False
+    if row.revoked_at is None:
+        row.revoked_at = now
+    return True
+
+
+def revoke_all(session: Session, account_id: str, now: int) -> None:
+    for model in (AuthSession, AuthToken):
+        session.execute(
+            update(model)
+            .where(model.account_id == account_id, model.revoked_at.is_(None))
+            .values(revoked_at=now)
+        )
+
+
+def list_tokens(
+    session: Session, account_id: str, kind: str | None, limit: int, offset: int
+) -> tuple[list[AuthToken], int]:
+    query = select(AuthToken).where(AuthToken.account_id == account_id)
+    if kind is not None:
+        query = query.where(AuthToken.kind == kind)
+    total = session.scalar(select(func.count()).select_from(query.subquery())) or 0
+    rows = session.scalars(
+        query.order_by(AuthToken.created_at.desc(), AuthToken.id).offset(offset).limit(limit)
+    )
+    return list(rows), total

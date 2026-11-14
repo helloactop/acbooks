@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 
 from app.api.errors import problem_openapi
 from app.modules.auth.dependencies import AuthDependencies
-from app.modules.auth.service import WebSession
+from app.modules.auth.service import AuthIdentity
 from app.modules.books.filtering import BookFilterOptionSource
 from app.modules.books.schemas import (
     BatchResult,
@@ -51,7 +51,7 @@ def books_router(
     )
     def list_books(
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
         q: Annotated[str | None, Query(max_length=200)] = None,
         reading_status: Annotated[
             ReadingStatus | None, Query(alias="readingStatus")
@@ -101,7 +101,7 @@ def books_router(
     def create_book(
         payload: BookCreate,
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> BookDetail:
         detail = service.create_book(payload)
         response.headers["Cache-Control"] = "no-store"
@@ -122,7 +122,7 @@ def books_router(
     )
     def get_filter_schema(
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
     ) -> BookFilterSchema:
         response.headers["Cache-Control"] = "no-store"
         return service.get_filter_schema()
@@ -141,7 +141,7 @@ def books_router(
     )
     def get_filter_options(
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
         source: Annotated[BookFilterOptionSource, Query()],
         query: Annotated[str, Query(max_length=100)] = "",
         limit: Annotated[int, Query(ge=1, le=50)] = 20,
@@ -166,7 +166,7 @@ def books_router(
     def batch_update_books(
         payload: BookBatchUpdate,
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> BatchResult:
         response.headers["Cache-Control"] = "no-store"
         return service.batch_update(payload)
@@ -186,7 +186,7 @@ def books_router(
     def batch_delete_books(
         payload: BookBatchDelete,
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> BatchResult:
         response.headers["Cache-Control"] = "no-store"
         return service.batch_delete(payload)
@@ -206,7 +206,7 @@ def books_router(
     def get_book(
         book_id: Annotated[UUID, Path(alias="bookId")],
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
     ) -> BookDetail:
         response.headers["Cache-Control"] = "no-store"
         return service.get_book(book_id)
@@ -227,7 +227,7 @@ def books_router(
         book_id: Annotated[UUID, Path(alias="bookId")],
         payload: BookUpdate,
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> BookDetail:
         response.headers["Cache-Control"] = "no-store"
         return service.update_book(book_id, payload)
@@ -247,7 +247,7 @@ def books_router(
     )
     def delete_book(
         book_id: Annotated[UUID, Path(alias="bookId")],
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> Response:
         service.delete_book(book_id)
         return Response(status_code=204, headers={"Cache-Control": "no-store"})
@@ -266,7 +266,7 @@ def books_router(
     )
     def get_book_cover(
         book_id: Annotated[UUID, Path(alias="bookId")],
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
     ) -> FileResponse:
         path, media_type = service.get_cover(book_id)
         return FileResponse(
@@ -290,7 +290,7 @@ def books_router(
     def upload_book_cover(
         book_id: Annotated[UUID, Path(alias="bookId")],
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
         file: Annotated[UploadFile, File()],
     ) -> BookDetail:
         content = file.file.read(MAX_COVER_BYTES + 1)
@@ -312,7 +312,7 @@ def books_router(
     def delete_book_cover(
         book_id: Annotated[UUID, Path(alias="bookId")],
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> BookDetail:
         response.headers["Cache-Control"] = "no-store"
         return service.delete_cover(book_id)

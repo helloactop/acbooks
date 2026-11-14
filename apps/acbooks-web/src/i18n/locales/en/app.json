@@ -60,6 +60,13 @@
     "requestId": "Request ID: {{requestId}}"
   },
   "settings": {
+    "security": "Security",
+    "password": "Change password",
+    "passwordDescription": "Update the administrator password.",
+    "devices": "Signed-in devices",
+    "devicesDescription": "Review and revoke native client access.",
+    "credentials": "Application credentials",
+    "credentialsDescription": "Manage read-only OPDS and WebDAV credentials.",
     "metadata": "Metadata",
     "metadataDescription": "Manage automatic filling and allowed fields.",
     "backToSettings": "Back to settings",

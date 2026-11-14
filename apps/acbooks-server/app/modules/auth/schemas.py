@@ -1,8 +1,10 @@
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 from unicodedata import category, normalize
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
+
+from app.modules.books.schemas import LaxApiModel
 
 
 class LoginRequest(BaseModel):
@@ -59,3 +61,70 @@ class CsrfResponse(BaseModel):
 
 class LoginResponse(BaseModel):
     account: AccountResponse
+
+
+def clean_label(value: str) -> str:
+    label = value.strip()
+    if not label or any(category(char).startswith("C") for char in label):
+        raise ValueError("Invalid credential label.")
+    return label
+
+
+class DeviceLoginRequest(LoginRequest):
+    device_name: Annotated[str, Field(alias="deviceName", min_length=1, max_length=128)] = "Device"
+
+    _clean_name = field_validator("device_name")(clean_label)
+
+
+class PasswordChange(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+    current_password: Annotated[
+        SecretStr, Field(alias="currentPassword", min_length=1, max_length=1024)
+    ]
+    new_password: Annotated[SecretStr, Field(alias="newPassword", min_length=12, max_length=1024)]
+
+    @model_validator(mode="after")
+    def validate_passwords(self) -> Self:
+        LoginRequest.validate_password_encoding(self.current_password)
+        password = LoginRequest.validate_password_encoding(self.new_password).get_secret_value()
+        if not password.strip():
+            raise ValueError("Password cannot be blank.")
+        return self
+
+
+class TokenCreate(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+    label: Annotated[str, Field(min_length=1, max_length=128)]
+    scope: Literal["read"]
+
+    _clean_label = field_validator("label")(clean_label)
+
+
+class TokenResponse(LaxApiModel):
+    id: UUID
+    kind: Literal["device", "application"]
+    scope: Literal["full", "read"]
+    label: str
+    created_at: int
+    expires_at: int
+    revoked_at: int | None
+
+
+class DeviceLoginResponse(LaxApiModel):
+    access_token: str
+    token_type: Literal["Bearer"] = "Bearer"
+    token_id: UUID
+    expires_at: int
+
+
+class IssuedToken(LaxApiModel):
+    id: UUID
+    token: str
+    expires_at: int
+
+
+class TokenPage(LaxApiModel):
+    items: list[TokenResponse]
+    total: int
+    limit: int
+    offset: int

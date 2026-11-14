@@ -164,6 +164,8 @@ def test_business_error_contract(code: BusinessErrorCode) -> None:
         BusinessErrorCode.INVALID_READING_RECORD: ("INVALID_READING_RECORD", 422),
         BusinessErrorCode.REVISION_CONFLICT: ("REVISION_CONFLICT", 409),
         BusinessErrorCode.INVALID_CREDENTIALS: ("INVALID_CREDENTIALS", 401),
+        BusinessErrorCode.AUTHENTICATION_REQUIRED: ("UNAUTHORIZED", 401),
+        BusinessErrorCode.TOKEN_NOT_FOUND: ("TOKEN_NOT_FOUND", 404),
         BusinessErrorCode.SETUP_CODE_INVALID: ("SETUP_CODE_INVALID", 403),
         BusinessErrorCode.SETUP_ALREADY_INITIALIZED: ("SETUP_ALREADY_INITIALIZED", 409),
         BusinessErrorCode.RATE_LIMITED: ("RATE_LIMITED", 429),

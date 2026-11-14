@@ -82,7 +82,12 @@ def create_app(
             "application/octet-stream",
         ),
     )
-    auth = WebAuthService(engine, settings.web_session_ttl_seconds)
+    auth = WebAuthService(
+        engine,
+        settings.web_session_ttl_seconds,
+        settings.device_token_ttl_seconds,
+        settings.application_token_ttl_seconds,
+    )
     dependencies = AuthDependencies(
         auth, settings.public_origin, CsrfTokens()
     )

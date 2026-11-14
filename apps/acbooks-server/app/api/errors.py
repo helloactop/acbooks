@@ -17,10 +17,16 @@ logger = logging.getLogger("uvicorn.error")
 _BUSINESS_PROBLEMS = {
     BusinessErrorCode.READING_RECORD_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Reading record not found."),
     BusinessErrorCode.INVALID_READING_RECORD: (
-        HTTPStatus.UNPROCESSABLE_ENTITY, "Invalid reading record.",
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        "Invalid reading record.",
     ),
     BusinessErrorCode.REVISION_CONFLICT: (HTTPStatus.CONFLICT, "Reading position has changed."),
     BusinessErrorCode.INVALID_CREDENTIALS: (HTTPStatus.UNAUTHORIZED, "Invalid credentials."),
+    BusinessErrorCode.AUTHENTICATION_REQUIRED: (
+        HTTPStatus.UNAUTHORIZED,
+        "Authentication required.",
+    ),
+    BusinessErrorCode.TOKEN_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Credential not found."),
     BusinessErrorCode.SETUP_CODE_INVALID: (HTTPStatus.FORBIDDEN, "Invalid setup code."),
     BusinessErrorCode.SETUP_ALREADY_INITIALIZED: (
         HTTPStatus.CONFLICT,
@@ -53,7 +59,8 @@ _BUSINESS_PROBLEMS = {
     ),
     BusinessErrorCode.METADATA_STALE: (HTTPStatus.CONFLICT, "Book ISBN changed."),
     BusinessErrorCode.METADATA_UNAVAILABLE: (
-        HTTPStatus.BAD_GATEWAY, "Metadata source unavailable.",
+        HTTPStatus.BAD_GATEWAY,
+        "Metadata source unavailable.",
     ),
     BusinessErrorCode.IMPORT_FILE_CHANGED: (HTTPStatus.CONFLICT, "File changed. Scan again."),
     BusinessErrorCode.FILE_NOT_FOUND: (HTTPStatus.NOT_FOUND, "File not found."),
@@ -90,13 +97,16 @@ _BUSINESS_PROBLEMS = {
         "Storage root still indexes files.",
     ),
     BusinessErrorCode.ORGANIZATION_ENTRY_NOT_FOUND: (
-        HTTPStatus.NOT_FOUND, "Organization entry not found.",
+        HTTPStatus.NOT_FOUND,
+        "Organization entry not found.",
     ),
     BusinessErrorCode.ORGANIZATION_CONFLICT: (
-        HTTPStatus.CONFLICT, "Choose a different entry or name.",
+        HTTPStatus.CONFLICT,
+        "Choose a different entry or name.",
     ),
     BusinessErrorCode.ORGANIZATION_STALE: (
-        HTTPStatus.CONFLICT, "Book organization data changed. Refresh and try again.",
+        HTTPStatus.CONFLICT,
+        "Book organization data changed. Refresh and try again.",
     ),
     BusinessErrorCode.JOB_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Job not found."),
 }

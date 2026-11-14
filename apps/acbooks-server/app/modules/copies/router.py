@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Path, Response
 
 from app.api.errors import problem_openapi
 from app.modules.auth.dependencies import AuthDependencies
-from app.modules.auth.service import WebSession
+from app.modules.auth.service import AuthIdentity
 from app.modules.books.schemas import BookCopy, BookCopyCreate
 from app.modules.copies.schemas import (
     BookCopyUpdate,
@@ -39,7 +39,7 @@ def copies_router(
     )
     def list_locations(
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
     ) -> list[LocationNode]:
         response.headers["Cache-Control"] = "no-store"
         return service.list_locations()
@@ -61,7 +61,7 @@ def copies_router(
     def create_location(
         payload: LocationCreate,
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> LocationNode:
         node = service.create_location(payload)
         response.headers["Cache-Control"] = "no-store"
@@ -85,7 +85,7 @@ def copies_router(
         location_id: Annotated[UUID, Path(alias="locationId")],
         payload: LocationUpdate,
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> LocationNode:
         response.headers["Cache-Control"] = "no-store"
         return service.update_location(location_id, payload)
@@ -106,7 +106,7 @@ def copies_router(
     )
     def delete_location(
         location_id: Annotated[UUID, Path(alias="locationId")],
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> Response:
         service.delete_location(location_id)
         return Response(status_code=204, headers={"Cache-Control": "no-store"})
@@ -124,7 +124,7 @@ def copies_router(
     def list_book_copies(
         book_id: Annotated[UUID, Path(alias="bookId")],
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
     ) -> list[BookCopy]:
         response.headers["Cache-Control"] = "no-store"
         return service.list_copies(book_id)
@@ -147,7 +147,7 @@ def copies_router(
         book_id: Annotated[UUID, Path(alias="bookId")],
         payload: BookCopyCreate,
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> BookCopy:
         copy = service.create_copy(book_id, payload)
         response.headers["Cache-Control"] = "no-store"
@@ -172,7 +172,7 @@ def copies_router(
         copy_id: Annotated[UUID, Path(alias="copyId")],
         payload: BookCopyUpdate,
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> BookCopy:
         response.headers["Cache-Control"] = "no-store"
         return service.update_copy(book_id, copy_id, payload)
@@ -191,7 +191,7 @@ def copies_router(
     def delete_book_copy(
         book_id: Annotated[UUID, Path(alias="bookId")],
         copy_id: Annotated[UUID, Path(alias="copyId")],
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> Response:
         service.delete_copy(book_id, copy_id)
         return Response(status_code=204, headers={"Cache-Control": "no-store"})

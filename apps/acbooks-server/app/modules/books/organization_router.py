@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, Response
 
 from app.api.errors import problem_openapi
 from app.modules.auth.dependencies import AuthDependencies
-from app.modules.auth.service import WebSession
+from app.modules.auth.service import AuthIdentity
 from app.modules.books.organization_schemas import (
     BookMergePair,
     BookMergePreview,
@@ -32,8 +32,8 @@ def organization_router(
         tags=["organization"],
         responses={status: problem_openapi(status) for status in (401, 403, 404, 409, 422, 500)},
     )
-    Read = Annotated[WebSession, Depends(dependencies.require_session)]
-    Write = Annotated[WebSession, Depends(dependencies.require_write)]
+    Read = Annotated[AuthIdentity, Depends(dependencies.require_session)]
+    Write = Annotated[AuthIdentity, Depends(dependencies.require_write)]
 
     @router.get("/duplicates", operation_id="listDuplicateBooks")
     def duplicates(

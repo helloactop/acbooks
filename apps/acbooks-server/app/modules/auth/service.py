@@ -18,16 +18,23 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from app.core.errors import BusinessError, BusinessErrorCode
+from app.db.models.auth import AuthAccount, AuthToken
 from app.db.session import create_session_factory
 from app.modules.auth.repository import (
     account_exists,
+    active_credential,
     add_account,
     add_session,
     find_account,
     find_active_session,
+    find_active_token,
+    list_tokens,
     prune_inactive_credentials,
+    revoke_all,
     revoke_session,
+    revoke_token,
 )
+from app.modules.auth.schemas import DeviceLoginResponse, IssuedToken, TokenPage, TokenResponse
 from app.modules.auth.setup_code import read_setup_code
 
 logger = logging.getLogger("uvicorn.error")
@@ -127,22 +134,33 @@ class SetupService:
 
 
 @dataclass(frozen=True)
-class WebSession:
+class AuthIdentity:
     id: str
     account_id: UUID
     username: str
+    bearer: bool = False
+    expires_at: int | None = None
+    scope: str = "full"
+
+
+def now_ms() -> int:
+    return time_ns() // 1_000_000
 
 
 class WebAuthService:
-    def __init__(self, engine: Engine, session_ttl: int) -> None:
+    def __init__(
+        self, engine: Engine, session_ttl: int, device_ttl: int, application_ttl: int
+    ) -> None:
         self.read_sessions = create_session_factory(engine)
         self.write_sessions = create_session_factory(
             engine.execution_options(sqlite_begin_immediate=True)
         )
         self.session_ttl = session_ttl
+        self.device_ttl = device_ttl
+        self.application_ttl = application_ttl
         self.limit = AttemptLimit(max_attempts=10)
 
-    def authenticate(self, token: str | None) -> WebSession | None:
+    def authenticate(self, token: str | None) -> AuthIdentity | None:
         if token is None or not SESSION_TOKEN_PATTERN.fullmatch(token):
             return None
         with self.read_sessions() as session:
@@ -152,11 +170,16 @@ class WebAuthService:
         if record is None:
             return None
         session_id, account_id, username = record
-        return WebSession(session_id, UUID(account_id), username)
+        return AuthIdentity(session_id, UUID(account_id), username)
 
     def login(
-        self, username: str, password: str, previous: WebSession | None
-    ) -> tuple[WebSession, str]:
+        self,
+        username: str,
+        password: str,
+        previous: AuthIdentity | None,
+        *,
+        device_label: str | None = None,
+    ) -> tuple[AuthIdentity, str]:
         # Bound concurrent Argon2 memory use and reject excess requests without waiting.
         if not self.limit.lock.acquire(blocking=False):
             raise BusinessError(BusinessErrorCode.RATE_LIMITED, retry_after=1)
@@ -190,22 +213,139 @@ class WebAuthService:
                 now = time_ns() // 1_000_000
                 if previous is not None:
                     revoke_session(session, previous.id, now)
-                add_session(
-                    session,
-                    session_id,
-                    current.id,
-                    token_hash,
-                    now,
-                    now + self.session_ttl * 1000,
-                )
+                ttl = self.session_ttl if device_label is None else self.device_ttl
+                expires = now + ttl * 1000
+                if device_label is None:
+                    add_session(session, session_id, current.id, token_hash, now, expires)
+                else:
+                    session.add(
+                        AuthToken(
+                            id=session_id,
+                            account_id=current.id,
+                            token_hash=token_hash,
+                            kind="device",
+                            scope="full",
+                            label=device_label,
+                            created_at=now,
+                            expires_at=expires,
+                        )
+                    )
                 prune_inactive_credentials(session, now)
-                identity = WebSession(session_id, UUID(current.id), current.username)
+                identity = AuthIdentity(
+                    session_id,
+                    UUID(current.id),
+                    current.username,
+                    bearer=device_label is not None,
+                    expires_at=expires,
+                )
             self.limit.reset_backoff()
             return identity, token
         finally:
             self.limit.lock.release()
 
-    def logout(self, current: WebSession) -> bool:
+    def logout(self, current: AuthIdentity) -> bool:
         with self.write_sessions.begin() as session:
             session.connection()
-            return revoke_session(session, current.id, time_ns() // 1_000_000)
+            now = now_ms()
+            if current.bearer:
+                self._require_active(session, current, now)
+                return revoke_token(session, current.id, str(current.account_id), now)
+            return revoke_session(session, current.id, now)
+
+    def authenticate_device(self, token: str | None) -> AuthIdentity | None:
+        return self._authenticate_token(token, kind="device", scope="full")
+
+    def authenticate_application(self, token: str | None) -> AuthIdentity | None:
+        return self._authenticate_token(token, kind="application", scope="read")
+
+    def _authenticate_token(
+        self, token: str | None, *, kind: str, scope: str
+    ) -> AuthIdentity | None:
+        if token is None or not SESSION_TOKEN_PATTERN.fullmatch(token):
+            return None
+        with self.read_sessions() as session:
+            record = find_active_token(
+                session, sha256(token.encode()).hexdigest(), now_ms(), kind=kind, scope=scope
+            )
+        if record is None:
+            return None
+        key, account, username = record
+        return AuthIdentity(key, UUID(account), username, bearer=True, scope=scope)
+
+    def device_login(self, username: str, password: str, label: str) -> DeviceLoginResponse:
+        identity, raw = self.login(username, password, None, device_label=label)
+        assert identity.expires_at is not None
+        return DeviceLoginResponse(
+            access_token=raw, token_id=UUID(identity.id), expires_at=identity.expires_at
+        )
+
+    def _require_active(self, session: Session, current: AuthIdentity, now: int) -> None:
+        if not active_credential(session, current.id, str(current.account_id), current.bearer, now):
+            raise BusinessError(BusinessErrorCode.AUTHENTICATION_REQUIRED)
+
+    def change_password(self, current: AuthIdentity, old: str, new: str) -> None:
+        if not self.limit.lock.acquire(blocking=False):
+            raise BusinessError(BusinessErrorCode.RATE_LIMITED, retry_after=1)
+        try:
+            self.limit.admit()
+            account_id = str(current.account_id)
+            with self.read_sessions() as session:
+                self._require_active(session, current, now_ms())
+                account = session.get(AuthAccount, account_id)
+                assert account is not None
+                previous_hash = account.password_hash
+            try:
+                password_hasher.verify(previous_hash, old)
+            except VerifyMismatchError:
+                self.limit.failed(monotonic())
+                raise BusinessError(BusinessErrorCode.INVALID_CREDENTIALS) from None
+            password_hash = password_hasher.hash(new)
+            with self.write_sessions.begin() as session:
+                now = now_ms()
+                self._require_active(session, current, now)
+                account = session.get(AuthAccount, account_id)
+                assert account is not None
+                if account.password_hash != previous_hash:
+                    raise BusinessError(BusinessErrorCode.AUTHENTICATION_REQUIRED)
+                account.password_hash = password_hash
+                account.password_changed_at = now
+                account.updated_at = now
+                revoke_all(session, account_id, now)
+            self.limit.reset_backoff()
+        finally:
+            self.limit.lock.release()
+
+    def tokens(self, current: AuthIdentity, kind: str | None, limit: int, offset: int) -> TokenPage:
+        with self.read_sessions() as session:
+            self._require_active(session, current, now_ms())
+            rows, total = list_tokens(session, str(current.account_id), kind, limit, offset)
+            items = [TokenResponse.model_validate(row, from_attributes=True) for row in rows]
+        return TokenPage(items=items, total=total, limit=limit, offset=offset)
+
+    def issue_application_token(self, current: AuthIdentity, label: str) -> IssuedToken:
+        raw = token_urlsafe(32)
+        key = uuid4()
+        with self.write_sessions.begin() as session:
+            now = now_ms()
+            self._require_active(session, current, now)
+            expires = now + self.application_ttl * 1000
+            session.add(
+                AuthToken(
+                    id=str(key),
+                    account_id=str(current.account_id),
+                    token_hash=sha256(raw.encode()).hexdigest(),
+                    kind="application",
+                    scope="read",
+                    label=label,
+                    created_at=now,
+                    expires_at=expires,
+                )
+            )
+        return IssuedToken(id=key, token=raw, expires_at=expires)
+
+    def revoke(self, current: AuthIdentity, token_id: UUID) -> None:
+        with self.write_sessions.begin() as session:
+            now = now_ms()
+            self._require_active(session, current, now)
+            if not revoke_token(session, str(token_id), str(current.account_id), now):
+                raise BusinessError(BusinessErrorCode.TOKEN_NOT_FOUND)

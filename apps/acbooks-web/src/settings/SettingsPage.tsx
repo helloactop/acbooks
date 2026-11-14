@@ -14,6 +14,7 @@ import { settingsHref } from "../layout/routes";
 import { PageContainer } from "../layout/PageContainer";
 import { useDocumentTitle } from "../layout/use-document-title";
 import { MetadataSettings } from "./MetadataSettings";
+import { CredentialSettings, PasswordSettings } from "./SecuritySettings";
 import { SettingsGroup, SettingsRow } from "./SettingsGroup";
 
 export function SettingsPage() {
@@ -38,6 +39,9 @@ export function SettingsPage() {
 
   const renderSection = (item: SettingsNavItem) => {
     if (item.section === "metadata") return <MetadataSettings />;
+    if (item.section === "password") return <PasswordSettings />;
+    if (item.section === "devices") return <CredentialSettings key="devices" kind="device" />;
+    if (item.section === "credentials") return <CredentialSettings key="credentials" kind="application" />;
 
     if (item.section === "account") {
       return (

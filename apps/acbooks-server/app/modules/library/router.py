@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Path, Response
 
 from app.api.errors import problem_openapi
 from app.modules.auth.dependencies import AuthDependencies
-from app.modules.auth.service import WebSession
+from app.modules.auth.service import AuthIdentity
 from app.modules.library.schemas import StorageRootCreate, StorageRootNode
 from app.modules.library.service import LibraryService
 
@@ -32,7 +32,7 @@ def library_router(
     )
     def list_storage_roots(
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_session)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
     ) -> list[StorageRootNode]:
         response.headers["Cache-Control"] = "no-store"
         return service.list_roots()
@@ -53,7 +53,7 @@ def library_router(
     def create_storage_root(
         payload: StorageRootCreate,
         response: Response,
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> StorageRootNode:
         node = service.create_root(payload)
         response.headers["Cache-Control"] = "no-store"
@@ -75,7 +75,7 @@ def library_router(
     )
     def delete_storage_root(
         root_id: Annotated[UUID, Path(alias="rootId")],
-        current: Annotated[WebSession, Depends(dependencies.require_write)],
+        current: Annotated[AuthIdentity, Depends(dependencies.require_write)],
     ) -> Response:
         service.delete_root(root_id)
         return Response(status_code=204, headers={"Cache-Control": "no-store"})
