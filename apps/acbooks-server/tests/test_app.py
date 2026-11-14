@@ -160,6 +160,8 @@ def test_problem_responses(
 @pytest.mark.parametrize("code", list(BusinessErrorCode))
 def test_business_error_contract(code: BusinessErrorCode) -> None:
     expected_code, status = {
+        BusinessErrorCode.READING_RECORD_NOT_FOUND: ("READING_RECORD_NOT_FOUND", 404),
+        BusinessErrorCode.INVALID_READING_RECORD: ("INVALID_READING_RECORD", 422),
         BusinessErrorCode.REVISION_CONFLICT: ("REVISION_CONFLICT", 409),
         BusinessErrorCode.INVALID_CREDENTIALS: ("INVALID_CREDENTIALS", 401),
         BusinessErrorCode.SETUP_CODE_INVALID: ("SETUP_CODE_INVALID", 403),

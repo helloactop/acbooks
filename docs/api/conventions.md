@@ -147,6 +147,8 @@ API 进程重启后，现有会话继续有效，客户端通过 `GET /api/v1/au
 - 阅读会话可指定 `bookId`、可选 `bookFileId`（实体书手工记录允许为空）、`deviceId`、`startedAt`、`endedAt`、`activeSeconds`、`source`；有效时长与重叠处理遵循 `sqlite.md`。
 - 阅读位置按 `bookFileId` 存取，使用**不透明 locator**、`revision` 与 `mutationId`；不能根据百分比猜测精确位置。统计接口仅从 `reading_sessions` 计算，不向 `books` 反写累计时长。
 
+已实现的阅读端点与提交、版本语义见 [阅读数据 API](reader.md)。
+
 ## 6. 离线同步约定
 
 - 同步使用设备 ID、全局递增变更序列及唯一 `mutationId`；客户端保存**最后成功确认**的游标。

@@ -15,6 +15,10 @@ from app.core.errors import BusinessError, BusinessErrorCode
 logger = logging.getLogger("uvicorn.error")
 
 _BUSINESS_PROBLEMS = {
+    BusinessErrorCode.READING_RECORD_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Reading record not found."),
+    BusinessErrorCode.INVALID_READING_RECORD: (
+        HTTPStatus.UNPROCESSABLE_ENTITY, "Invalid reading record.",
+    ),
     BusinessErrorCode.REVISION_CONFLICT: (HTTPStatus.CONFLICT, "Reading position has changed."),
     BusinessErrorCode.INVALID_CREDENTIALS: (HTTPStatus.UNAUTHORIZED, "Invalid credentials."),
     BusinessErrorCode.SETUP_CODE_INVALID: (HTTPStatus.FORBIDDEN, "Invalid setup code."),
