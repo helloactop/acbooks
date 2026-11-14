@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 from fastapi import UploadFile
 from sqlalchemy import Engine
+from sqlalchemy.orm import Session
 
 from app.core.errors import BusinessError, BusinessErrorCode
 from app.db.models.storage import BookFile, StorageObject
@@ -156,7 +157,10 @@ def enforce_request_size(content_length: str | None) -> None:
 
 class FilesService:
     def __init__(
-        self, engine: Engine, library_dir: Path, metadata: MetadataService | None = None,
+        self,
+        engine: Engine,
+        library_dir: Path,
+        metadata: MetadataService | None = None,
     ) -> None:
         self.metadata = metadata
         self.read_sessions = create_session_factory(engine)
@@ -174,10 +178,7 @@ class FilesService:
         with self.read_sessions() as session:
             if repository.get_book(session, key) is None:
                 raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
-            return [
-                self._dto(record)
-                for record in repository.list_book_files(session, key)
-            ]
+            return [self._dto(record) for record in repository.list_book_files(session, key)]
 
     def upload(self, book_id: UUID, upload: UploadFile) -> BookFileDTO:
         root = self._root()
@@ -186,9 +187,7 @@ class FilesService:
             if repository.get_book(session, key) is None:
                 raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
 
-        descriptor, temp_name = tempfile.mkstemp(
-            prefix=".upload-", suffix=".tmp", dir=root
-        )
+        descriptor, temp_name = tempfile.mkstemp(prefix=".upload-", suffix=".tmp", dir=root)
         temp = Path(temp_name)
         digest = hashlib.sha256()
         size = 0
@@ -329,16 +328,12 @@ class FilesService:
             if purge:
                 if record.root_mode != "managed":
                     raise BusinessError(BusinessErrorCode.FILE_EXTERNAL_PROTECTED)
-                path = _resolve_within(
-                    Path(record.root_path), record.relative_path
-                )
-                repository.delete_file_rows(
-                    session, key, record.storage_object_id
-                )
+                path = _resolve_within(Path(record.root_path), record.relative_path)
+                repository.delete_file_rows(session, key, record.storage_object_id)
             else:
                 # Detach the book-file association but keep the storage object
                 # and original file so a later scan can re-index it.
-                repository.unlink_book_file(session, key)
+                self.unlink(session, key, check_exists=False)
         if purge and path is not None:
             try:
                 path.unlink(missing_ok=True)
@@ -349,12 +344,16 @@ class FilesService:
                 )
 
     @staticmethod
+    def unlink(session: Session, key: str, *, check_exists: bool = True) -> None:
+        if check_exists and repository.get_file(session, key) is None:
+            raise BusinessError(BusinessErrorCode.FILE_NOT_FOUND)
+        repository.unlink_book_file(session, key)
+
+    @staticmethod
     def _dto(record: repository.FileRecord) -> BookFileDTO:
         return BookFileDTO(
             id=UUID(record.id),
             format=record.format,
-            file_status=cast(
-                Literal["present", "missing"], record.file_status
-            ),
+            file_status=cast(Literal["present", "missing"], record.file_status),
             size_bytes=record.size_bytes,
         )

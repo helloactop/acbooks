@@ -925,6 +925,57 @@ export interface paths {
         patch: operations["updateAnnotation"];
         trace?: never;
     };
+    "/api/v1/sync/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Snapshot */
+        get: operations["getSyncSnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sync/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Changes */
+        get: operations["getSyncChanges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sync/mutations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mutations */
+        post: operations["submitSyncMutations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stats/overview": {
         parameters: {
             query?: never;
@@ -1488,6 +1539,11 @@ export interface components {
             /** Label */
             label?: string | null;
         };
+        /**
+         * BusinessErrorCode
+         * @enum {string}
+         */
+        BusinessErrorCode: "READING_RECORD_NOT_FOUND" | "INVALID_READING_RECORD" | "REVISION_CONFLICT" | "INVALID_CREDENTIALS" | "UNAUTHORIZED" | "TOKEN_NOT_FOUND" | "SETUP_CODE_INVALID" | "SETUP_ALREADY_INITIALIZED" | "RATE_LIMITED" | "BOOK_NOT_FOUND" | "COVER_NOT_FOUND" | "INVALID_BOOK_FILTER" | "INVALID_COVER" | "BATCH_LIMIT_EXCEEDED" | "COPY_NOT_FOUND" | "LOCATION_NOT_FOUND" | "LOCATION_HAS_CHILDREN" | "LOCATION_CYCLE" | "FILE_NOT_FOUND" | "FILE_FORMAT_UNSUPPORTED" | "FILE_TOO_LARGE" | "FILE_DUPLICATE" | "FILE_EXTERNAL_PROTECTED" | "STORAGE_ROOT_NOT_FOUND" | "STORAGE_ROOT_INVALID" | "STORAGE_ROOT_OVERLAP" | "STORAGE_ROOT_IN_USE" | "METADATA_STALE" | "METADATA_UNAVAILABLE" | "IMPORT_FILE_CHANGED" | "ORGANIZATION_ENTRY_NOT_FOUND" | "ORGANIZATION_CONFLICT" | "ORGANIZATION_STALE" | "JOB_NOT_FOUND";
         /** Candidate */
         Candidate: {
             /** Title */
@@ -1514,6 +1570,73 @@ export interface components {
             sourceKey?: string | null;
             /** Coverid */
             coverId?: number | null;
+        };
+        /** CreateBook */
+        CreateBook: {
+            /**
+             * Mutationid
+             * Format: uuid
+             */
+            mutationId: string;
+            /**
+             * Entityid
+             * Format: uuid
+             */
+            entityId: string;
+            /** Baserevision */
+            baseRevision: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "book.create";
+            data: components["schemas"]["BookCreate"];
+        };
+        /** CreateSession */
+        CreateSession: {
+            /**
+             * Mutationid
+             * Format: uuid
+             */
+            mutationId: string;
+            /**
+             * Entityid
+             * Format: uuid
+             */
+            entityId: string;
+            /** Baserevision */
+            baseRevision: number;
+            /**
+             * Bookid
+             * Format: uuid
+             */
+            bookId: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "reading_session.create";
+            data: components["schemas"]["CreateSessionData"];
+        };
+        /** CreateSessionData */
+        CreateSessionData: {
+            /** Startedat */
+            startedAt: number;
+            /** Endedat */
+            endedAt?: number | null;
+            /**
+             * Activeseconds
+             * @default 0
+             */
+            activeSeconds: number;
+            /** Bookfileid */
+            bookFileId?: string | null;
+            /**
+             * Source
+             * @default manual
+             * @enum {string}
+             */
+            source: "automatic" | "manual";
         };
         /** CsrfResponse */
         CsrfResponse: {
@@ -1542,6 +1665,51 @@ export interface components {
             /** Sessioncount */
             sessionCount: number;
             books: components["schemas"]["ReadingPage_DailyReadingBook_"];
+        };
+        /** DeleteCatalogItem */
+        DeleteCatalogItem: {
+            /**
+             * Mutationid
+             * Format: uuid
+             */
+            mutationId: string;
+            /**
+             * Entityid
+             * Format: uuid
+             */
+            entityId: string;
+            /** Baserevision */
+            baseRevision: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "book.delete" | "book_file.delete" | "reading_position.delete";
+        };
+        /** DeleteReadingRecord */
+        DeleteReadingRecord: {
+            /**
+             * Mutationid
+             * Format: uuid
+             */
+            mutationId: string;
+            /**
+             * Entityid
+             * Format: uuid
+             */
+            entityId: string;
+            /** Baserevision */
+            baseRevision: number;
+            /**
+             * Bookid
+             * Format: uuid
+             */
+            bookId: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "annotation.delete" | "bookmark.delete" | "reading_session.delete";
         };
         /** DeviceLoginRequest */
         DeviceLoginRequest: {
@@ -1745,6 +1913,43 @@ export interface components {
             autoFill: boolean;
             /** Fields */
             fields?: ("title" | "authors" | "translators" | "series" | "description" | "isbn" | "cover")[];
+        };
+        /** MoveFile */
+        MoveFile: {
+            /**
+             * Mutationid
+             * Format: uuid
+             */
+            mutationId: string;
+            /**
+             * Entityid
+             * Format: uuid
+             */
+            entityId: string;
+            /** Baserevision */
+            baseRevision: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "book_file.move";
+            data: components["schemas"]["FileReassociation"];
+        };
+        /** MutationReceipt */
+        MutationReceipt: {
+            /**
+             * Mutationid
+             * Format: uuid
+             */
+            mutationId: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "accepted" | "conflict" | "rejected" | "duplicate";
+            /** Code */
+            code?: components["schemas"]["BusinessErrorCode"] | ("MUTATION_ID_REUSED" | "VALIDATION_ERROR") | null;
+            current?: components["schemas"]["SyncRecord"] | null;
         };
         /** OrganizationBook */
         OrganizationBook: {
@@ -2060,6 +2265,36 @@ export interface components {
             /** Fileid */
             fileId: string;
         };
+        /** SavePosition */
+        SavePosition: {
+            /**
+             * Mutationid
+             * Format: uuid
+             */
+            mutationId: string;
+            /**
+             * Entityid
+             * Format: uuid
+             */
+            entityId: string;
+            /** Baserevision */
+            baseRevision: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "reading_position.save";
+            data: components["schemas"]["SavePositionData"];
+        };
+        /** SavePositionData */
+        SavePositionData: {
+            /** Locator */
+            locator: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            /** Percent */
+            percent?: number | null;
+        };
         /** ScanAccepted */
         ScanAccepted: {
             /**
@@ -2191,6 +2426,78 @@ export interface components {
             /** Filecount */
             fileCount: number;
         };
+        /** SyncBatch */
+        SyncBatch: {
+            /**
+             * Deviceid
+             * Format: uuid
+             */
+            deviceId: string;
+            /** Mutations */
+            mutations: (components["schemas"]["CreateBook"] | components["schemas"]["UpdateBook"] | components["schemas"]["MoveFile"] | components["schemas"]["SavePosition"] | components["schemas"]["CreateSession"] | components["schemas"]["UpdateSession"] | components["schemas"]["WriteBookmark"] | components["schemas"]["WriteAnnotation"] | components["schemas"]["DeleteCatalogItem"] | components["schemas"]["DeleteReadingRecord"])[];
+        };
+        /** SyncBatchResult */
+        SyncBatchResult: {
+            /** Receipts */
+            receipts: components["schemas"]["MutationReceipt"][];
+        };
+        /** SyncBookFile */
+        SyncBookFile: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Format */
+            format: string;
+            /**
+             * Filestatus
+             * @enum {string}
+             */
+            fileStatus: "present" | "missing";
+            /** Sizebytes */
+            sizeBytes: number;
+            /**
+             * Bookid
+             * Format: uuid
+             */
+            bookId: string;
+            /** Sha256 */
+            sha256: string | null;
+        };
+        /** SyncPage */
+        SyncPage: {
+            /** Items */
+            items: components["schemas"]["SyncRecord"][];
+            /** Nextcursor */
+            nextCursor: number;
+            /** Through */
+            through: number;
+            /** Hasmore */
+            hasMore: boolean;
+        };
+        /** SyncRecord */
+        SyncRecord: {
+            /**
+             * Entitytype
+             * @enum {string}
+             */
+            entityType: "book" | "book_file" | "reading_position" | "reading_session" | "bookmark" | "annotation";
+            /**
+             * Entityid
+             * Format: uuid
+             */
+            entityId: string;
+            /** Revision */
+            revision: number;
+            /**
+             * Operation
+             * @enum {string}
+             */
+            operation: "upsert" | "delete";
+            /** Data */
+            data: components["schemas"]["BookDetail"] | components["schemas"]["SyncBookFile"] | components["schemas"]["PositionRead"] | components["schemas"]["SessionRead"] | components["schemas"]["BookmarkRead"] | components["schemas"]["AnnotationRead"] | null;
+        };
         /** TimelineSession */
         TimelineSession: {
             /**
@@ -2270,6 +2577,53 @@ export interface components {
             /** Revokedat */
             revokedAt: number | null;
         };
+        /** UpdateBook */
+        UpdateBook: {
+            /**
+             * Mutationid
+             * Format: uuid
+             */
+            mutationId: string;
+            /**
+             * Entityid
+             * Format: uuid
+             */
+            entityId: string;
+            /** Baserevision */
+            baseRevision: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "book.update";
+            data: components["schemas"]["BookUpdate"];
+        };
+        /** UpdateSession */
+        UpdateSession: {
+            /**
+             * Mutationid
+             * Format: uuid
+             */
+            mutationId: string;
+            /**
+             * Entityid
+             * Format: uuid
+             */
+            entityId: string;
+            /** Baserevision */
+            baseRevision: number;
+            /**
+             * Bookid
+             * Format: uuid
+             */
+            bookId: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "reading_session.update";
+            data: components["schemas"]["SessionUpdate"];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -2282,6 +2636,58 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WriteAnnotation */
+        WriteAnnotation: {
+            /**
+             * Mutationid
+             * Format: uuid
+             */
+            mutationId: string;
+            /**
+             * Entityid
+             * Format: uuid
+             */
+            entityId: string;
+            /** Baserevision */
+            baseRevision: number;
+            /**
+             * Bookid
+             * Format: uuid
+             */
+            bookId: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "annotation.create" | "annotation.update";
+            data: components["schemas"]["AnnotationUpdate"];
+        };
+        /** WriteBookmark */
+        WriteBookmark: {
+            /**
+             * Mutationid
+             * Format: uuid
+             */
+            mutationId: string;
+            /**
+             * Entityid
+             * Format: uuid
+             */
+            entityId: string;
+            /** Baserevision */
+            baseRevision: number;
+            /**
+             * Bookid
+             * Format: uuid
+             */
+            bookId: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "bookmark.create" | "bookmark.update";
+            data: components["schemas"]["BookmarkUpdate"];
         };
     };
     responses: never;
@@ -10916,6 +11322,344 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    getSyncSnapshot: {
+        parameters: {
+            query?: {
+                after?: number;
+                through?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    getSyncChanges: {
+        parameters: {
+            query?: {
+                after?: number;
+                through?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    submitSyncMutations: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncBatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncBatchResult"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

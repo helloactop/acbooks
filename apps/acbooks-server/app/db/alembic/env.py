@@ -37,6 +37,28 @@ def verify_integrity_triggers(connection: Connection) -> None:
             (f"validate_reading_sessions_active_duration_{event}", "reading_sessions")
             for event in ("insert", "update")
         )
+    if "0007_sync" in applied:
+        required.update(
+            (f"sync_{table}_{event}", table)
+            for table in (
+                "books",
+                "book_files",
+                "reading_positions",
+                "reading_sessions",
+                "bookmarks",
+                "annotations",
+                "book_contributors",
+                "book_identifiers",
+                "book_tags",
+                "shelf_books",
+                "book_copies",
+            )
+            for event in ("insert", "update", "delete")
+        )
+        required.update(
+            (f"sync_{table}_update", table)
+            for table in ("contributors", "tags", "shelves", "storage_objects", "locations")
+        )
     if required:
         actual = {
             (name, table)

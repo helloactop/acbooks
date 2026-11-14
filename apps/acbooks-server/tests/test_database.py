@@ -173,7 +173,8 @@ def test_book_orm_supports_copies_and_multiple_files(database: Engine) -> None:
         "INSERT INTO book_files VALUES ('file2', 'book', 'object', 'epub')",
         "INSERT INTO reading_sessions (id, book_id, started_at, ended_at, active_seconds, source)"
         " VALUES ('bad', 'book', 10, 9, 0, 'manual')",
-        "INSERT INTO sync_mutations VALUES ('mutation2', 'device', 'key', 1)",
+        "INSERT INTO sync_mutations (id, device_id, mutation_id, created_at)"
+        " VALUES ('mutation2', 'device', 'key', 1)",
         "INSERT INTO auth_accounts VALUES ('account2', 2, 'b', 'b', 'hash', 1, 1, 1)",
         "INSERT INTO auth_sessions (id, account_id, session_token_hash, created_at, expires_at)"
         " VALUES ('session', 'account', 'digest', 10, 10)",
@@ -192,7 +193,8 @@ def test_database_constraints(database: Engine, sql: str) -> None:
             " VALUES ('object', 'root', 'book.epub', 1, 1)",
             "INSERT INTO book_files VALUES ('file', 'book', 'object', 'epub')",
             "INSERT INTO devices (id, name) VALUES ('device', 'Reader')",
-            "INSERT INTO sync_mutations VALUES ('mutation', 'device', 'key', 1)",
+            "INSERT INTO sync_mutations (id, device_id, mutation_id, created_at)"
+            " VALUES ('mutation', 'device', 'key', 1)",
             "INSERT INTO auth_accounts VALUES ('account', 1, 'a', 'a', 'hash', 1, 1, 1)",
         ):
             connection.exec_driver_sql(seed)
@@ -615,6 +617,8 @@ def test_batch_migration_must_preserve_status_triggers(tmp_path: Path, table: st
         SERVER_ROOT / "app/db/alembic", scripts, ignore=shutil.ignore_patterns("__pycache__")
     )
     config.set_main_option("script_location", str(scripts))
+    # Exercise an independent batch migration on the pre-sync schema.
+    (scripts / "versions/0007_sync.py").unlink()
     command.upgrade(config, "0003")
     migration = scripts / "versions/0006_test_batch.py"
     migration.write_text(

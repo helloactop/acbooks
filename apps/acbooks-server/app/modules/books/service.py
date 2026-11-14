@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import tempfile
+from contextlib import nullcontext
 from io import BytesIO
 from pathlib import Path
 from threading import Lock
@@ -11,6 +12,7 @@ from uuid import UUID, uuid4
 
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy import Engine
+from sqlalchemy.orm import Session
 
 from app.core.errors import BusinessError, BusinessErrorCode
 from app.db.models.books import Book
@@ -70,10 +72,7 @@ def _cover_suffix(content: bytes) -> str | None:
             if suffix is None:
                 return None
             width, height = image.size
-            if not (
-                1 <= width <= MAX_COVER_DIMENSION
-                and 1 <= height <= MAX_COVER_DIMENSION
-            ):
+            if not (1 <= width <= MAX_COVER_DIMENSION and 1 <= height <= MAX_COVER_DIMENSION):
                 return None
             # Decode the pixels so truncated or corrupt content is rejected.
             image.load()
@@ -88,9 +87,7 @@ def _cover_suffix(content: bytes) -> str | None:
         return None
 
 
-def _merged_names(
-    current: list[str], add: list[str], remove: list[str]
-) -> list[str]:
+def _merged_names(current: list[str], add: list[str], remove: list[str]) -> list[str]:
     removed = {name.casefold() for name in remove}
     merged = [name for name in current if name.casefold() not in removed]
     seen = {name.casefold() for name in merged}
@@ -110,9 +107,7 @@ def _batch_names(current: list[str], add: list[str], remove: list[str], field: s
 
 
 class BooksService:
-    def __init__(
-        self, engine: Engine, covers_dir: Path, copies: CopiesService
-    ) -> None:
+    def __init__(self, engine: Engine, covers_dir: Path, copies: CopiesService) -> None:
         self.read_sessions = create_session_factory(engine)
         self.write_sessions = create_session_factory(
             engine.execution_options(sqlite_begin_immediate=True)
@@ -140,10 +135,7 @@ class BooksService:
             copy_count=len(record.copies),
             file_count=len(record.files),
             formats=sorted({file.format for file in record.files}),
-            has_cover=bool(
-                record.book.cover_path is not None
-                and record.book.cover_path.strip()
-            ),
+            has_cover=bool(record.book.cover_path is not None and record.book.cover_path.strip()),
             cover_updated_at=record.book.cover_updated_at,
             created_at=record.book.created_at,
             updated_at=record.book.updated_at,
@@ -156,17 +148,12 @@ class BooksService:
             description=record.book.description,
             series=record.book.series,
             identifiers=[
-                BookIdentifier(scheme=scheme, value=value)
-                for scheme, value in record.identifiers
+                BookIdentifier(scheme=scheme, value=value) for scheme, value in record.identifiers
             ],
             copies=[
                 BookCopy(
                     id=UUID(copy.id),
-                    location_id=(
-                        UUID(copy.location_id)
-                        if copy.location_id is not None
-                        else None
-                    ),
+                    location_id=(UUID(copy.location_id) if copy.location_id is not None else None),
                     location_name=copy.location_name,
                     acquired_at=copy.acquired_at,
                     note=copy.note,
@@ -300,11 +287,19 @@ class BooksService:
             record = repository.load_records(session, [book])[0]
             return self._detail(record)
 
-    def create_book(self, payload: BookCreate) -> BookDetail:
+    def create_book(
+        self,
+        payload: BookCreate,
+        *,
+        transaction: Session | None = None,
+        entity_id: UUID | None = None,
+    ) -> BookDetail:
         now = time_ns() // 1_000_000
-        book_id = str(uuid4())
+        book_id = str(entity_id or uuid4())
 
-        with self.write_sessions.begin() as session:
+        with (
+            nullcontext(transaction) if transaction is not None else self.write_sessions.begin()
+        ) as session:
             book = Book(
                 id=book_id,
                 title=payload.title,
@@ -319,12 +314,8 @@ class BooksService:
                 mask for key, mask in FIELDS.items() if key in payload.model_fields_set
             )
             repository.add_book(session, book)
-            repository.replace_contributors(
-                session, book_id, "author", payload.authors
-            )
-            repository.replace_contributors(
-                session, book_id, "translator", payload.translators
-            )
+            repository.replace_contributors(session, book_id, "author", payload.authors)
+            repository.replace_contributors(session, book_id, "translator", payload.translators)
             repository.replace_identifiers(session, book_id, payload.isbn)
             repository.replace_tags(session, book_id, payload.tags)
             repository.replace_shelves(session, book_id, payload.shelves)
@@ -334,12 +325,16 @@ class BooksService:
             record = repository.load_records(session, [book])[0]
             return self._detail(record)
 
-    def update_book(self, book_id: UUID, payload: BookUpdate) -> BookDetail:
+    def update_book(
+        self, book_id: UUID, payload: BookUpdate, *, transaction: Session | None = None
+    ) -> BookDetail:
         fields = payload.model_fields_set
         now = time_ns() // 1_000_000
         key = str(book_id)
 
-        with self.write_sessions.begin() as session:
+        with (
+            nullcontext(transaction) if transaction is not None else self.write_sessions.begin()
+        ) as session:
             book = repository.get_book(session, key)
             if book is None:
                 raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
@@ -361,14 +356,10 @@ class BooksService:
 
             if "authors" in fields:
                 assert payload.authors is not None
-                repository.replace_contributors(
-                    session, key, "author", payload.authors
-                )
+                repository.replace_contributors(session, key, "author", payload.authors)
             if "translators" in fields:
                 assert payload.translators is not None
-                repository.replace_contributors(
-                    session, key, "translator", payload.translators
-                )
+                repository.replace_contributors(session, key, "translator", payload.translators)
             if "isbn" in fields:
                 repository.replace_identifiers(session, key, payload.isbn)
             if "tags" in fields:
@@ -398,9 +389,7 @@ class BooksService:
                     repository.replace_tags(
                         session,
                         book.id,
-                        _batch_names(
-                            record.tags, payload.add_tags, payload.remove_tags, "tags"
-                        ),
+                        _batch_names(record.tags, payload.add_tags, payload.remove_tags, "tags"),
                     )
                 if payload.add_shelves or payload.remove_shelves:
                     repository.replace_shelves(
@@ -428,12 +417,27 @@ class BooksService:
                 for book in books
                 if book.cover_path is not None and book.cover_path.strip()
             ]
-            repository.delete_books(session, ids)
+            self.delete_records(session, ids)
         with COVER_LOCK:
             self._remove_cover_files(covers)
             for book_id in ids:
                 self._remove_all_covers(book_id)
         return BatchResult(deleted=len(ids))
+
+    @staticmethod
+    def delete_records(session: Session, ids: list[str]) -> None:
+        if len(repository.get_books(session, ids)) != len(ids):
+            raise BusinessError(BusinessErrorCode.BOOK_NOT_FOUND)
+        repository.delete_books(session, ids)
+
+    def sync_details(self, session: Session, ids: list[str]) -> list[BookDetail]:
+        return [
+            self._detail(record)
+            for record in repository.load_records(
+                session,
+                repository.get_books(session, ids),
+            )
+        ]
 
     def delete_book(self, book_id: UUID) -> None:
         self.batch_delete(BookBatchDelete(book_ids=[book_id]))
@@ -447,9 +451,7 @@ class BooksService:
             return None
         return candidate
 
-    def _remove_cover_files(
-        self, names: list[str], *, keep: str | None = None
-    ) -> None:
+    def _remove_cover_files(self, names: list[str], *, keep: str | None = None) -> None:
         for name in names:
             path = self._cover_file(name)
             if path is None or path.name == keep:
@@ -462,12 +464,8 @@ class BooksService:
                     type(error).__qualname__,
                 )
 
-    def _remove_all_covers(
-        self, book_id: UUID | str, keep: str | None = None
-    ) -> None:
-        self._remove_cover_files(
-            [f"{book_id}.{suffix}" for suffix in COVER_MEDIA_TYPES], keep=keep
-        )
+    def _remove_all_covers(self, book_id: UUID | str, keep: str | None = None) -> None:
+        self._remove_cover_files([f"{book_id}.{suffix}" for suffix in COVER_MEDIA_TYPES], keep=keep)
 
     def save_cover(self, book_id: UUID, content: bytes) -> BookDetail:
         with COVER_LOCK:

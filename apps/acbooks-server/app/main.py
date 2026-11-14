@@ -37,6 +37,8 @@ from app.modules.reader.router import reader_router
 from app.modules.reader.service import ReaderService
 from app.modules.stats.router import stats_router
 from app.modules.stats.service import StatsService
+from app.modules.sync.router import sync_router
+from app.modules.sync.service import SyncService
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -88,9 +90,7 @@ def create_app(
         settings.device_token_ttl_seconds,
         settings.application_token_ttl_seconds,
     )
-    dependencies = AuthDependencies(
-        auth, settings.public_origin, CsrfTokens()
-    )
+    dependencies = AuthDependencies(auth, settings.public_origin, CsrfTokens())
     app.include_router(health_router(engine), prefix="/api/v1")
     app.include_router(
         auth_router(
@@ -100,14 +100,11 @@ def create_app(
         ),
         prefix="/api/v1",
     )
-    app.include_router(
-        organization_router(BookOrganizationService(engine), dependencies), prefix="/api/v1"
-    )
+    organization = BookOrganizationService(engine)
+    app.include_router(organization_router(organization, dependencies), prefix="/api/v1")
     copies = CopiesService(engine)
-    app.include_router(
-        books_router(BooksService(engine, covers, copies), dependencies),
-        prefix="/api/v1",
-    )
+    books = BooksService(engine, covers, copies)
+    app.include_router(books_router(books, dependencies), prefix="/api/v1")
     app.include_router(copies_router(copies, dependencies), prefix="/api/v1")
     metadata = MetadataService(engine, covers)
     app.include_router(metadata_router(engine, metadata, dependencies), prefix="/api/v1")
@@ -123,11 +120,14 @@ def create_app(
             data_root / "backups",
         ],
     )
-    app.include_router(
-        library_router(library_service, dependencies), prefix="/api/v1"
-    )
+    app.include_router(library_router(library_service, dependencies), prefix="/api/v1")
     app.include_router(imports_router(engine, dependencies, covers), prefix="/api/v1")
-    app.include_router(reader_router(ReaderService(engine), dependencies), prefix="/api/v1")
+    reader = ReaderService(engine)
+    app.include_router(reader_router(reader, dependencies), prefix="/api/v1")
+    app.include_router(
+        sync_router(SyncService(engine, books, reader, organization), dependencies),
+        prefix="/api/v1",
+    )
     app.include_router(stats_router(StatsService(engine), dependencies), prefix="/api/v1")
     if web_dist is not None:
         app.mount("/", SPAStaticFiles(directory=web_dist, html=True), name="web")

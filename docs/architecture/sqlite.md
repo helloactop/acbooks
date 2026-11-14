@@ -28,8 +28,8 @@
 | 阅读 | `reading_positions(id, book_file_id, locator_json, percent, revision, updated_at)` | 每个文件一个当前阅读位置；`book_file_id` 唯一 |
 | 阅读 | `bookmarks`、`annotations` | 关联书籍；文件定位信息可为空（实体书笔记） |
 | 同步 | `devices(id, name, last_seen_at)` | 设备身份 |
-| 同步 | `sync_changes(seq, entity_type, entity_id, operation, changed_at)` | 递增 `seq`，供增量拉取 |
-| 同步 | `sync_mutations(id, device_id, mutation_id, created_at)` | 唯一 `(device_id, mutation_id)`，防重复提交 |
+| 同步 | `sync_changes(seq, entity_type, entity_id, operation, changed_at)` | 递增 `seq`，用于增量游标、实体版本和删除墓碑 |
+| 同步 | `sync_mutations(id, device_id, mutation_id, created_at, request_hash?, receipt_json?)` | 唯一 `(device_id, mutation_id)`，用于幂等重放与内容冲突检查 |
 | 任务 | `background_jobs(id, type, status, payload_json, created_at, updated_at)` | 扫描、导入、解析、整理任务 |
 | 认证 | `auth_accounts(id, singleton_slot, username, username_normalized, password_hash, password_changed_at, created_at, updated_at)` | 唯一管理员账号；`singleton_slot=1` 且唯一，不能创建第二账号 |
 | 认证 | `auth_sessions(id, account_id, session_token_hash, created_at, expires_at, revoked_at?, last_seen_at?)` | Web Cookie 会话；服务端可撤销，原文 session token 绝不存库 |
@@ -190,6 +190,7 @@ class ReadingSession(Base):
 - `reading_sessions` 是阅读次数、有效时长、日历热力图、时间线、阅读间隔的**事实来源**；统计从会话计算，不在 `books` 重复累加总时长。
 - 阅读间隔 = 本次 `started_at` − 上次 `ended_at`；活跃时长只统计前台实际阅读，暂停和后台不计时，重叠会话按统计规则去重。
 - 阅读进度按 `book_file_id` 保存；保存变更使用设备 ID、唯一 `mutation_id` 和 `revision`，保证重试幂等并定义冲突策略。
+- 同步触发器在当前数据库事务中记录书库与阅读数据变化、级联操作及扫描文件变化。迁移 `0007_sync` 为存量对象补写索引，以文件 ID 作为阅读位置同步键。同步批次逐条使用短写事务；同步日志、资源变化与幂等回执一起提交。
 - OPDS 只提供发现与下载；WebDAV 提供授权文件访问；阅读进度、笔记和统计由专用 REST 同步 API 管理，不通过 OPDS/WebDAV 同步。
 
 ## 6. 必须测试

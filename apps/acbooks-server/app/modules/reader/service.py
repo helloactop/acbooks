@@ -1,4 +1,5 @@
 import json
+from contextlib import nullcontext
 from time import time_ns
 from typing import TypeVar, overload
 from uuid import UUID, uuid4
@@ -34,12 +35,6 @@ from app.modules.reader.schemas import (
 
 Mark = TypeVar("Mark", Bookmark, Annotation)
 Record = TypeVar("Record", ReadingSession, Bookmark, Annotation)
-ENTITY_TYPES = {
-    ReadingSession: "reading_session",
-    ReadingPosition: "reading_position",
-    Bookmark: "bookmark",
-    Annotation: "annotation",
-}
 
 
 class PositionConflict(Exception):
@@ -76,20 +71,11 @@ def _mutation(session: Session, payload: Mutation, now: int) -> bool:
     )
 
 
-def _change(
-    session: Session,
-    row: ReadingSession | Bookmark | Annotation | ReadingPosition,
-    operation: str,
-    now: int,
-) -> None:
-    repository.log_change(session, ENTITY_TYPES[type(row)], row.id, operation, now)
-
-
-def _session(row: ReadingSession) -> SessionRead:
+def read_session(row: ReadingSession) -> SessionRead:
     return SessionRead.model_validate(row, from_attributes=True)
 
 
-def _position(row: ReadingPosition) -> PositionRead:
+def read_position(row: ReadingPosition) -> PositionRead:
     return PositionRead(
         book_file_id=UUID(row.book_file_id),
         locator=json.loads(row.locator_json),
@@ -138,7 +124,7 @@ class ReaderService:
                 offset,
             )
             return ReadingPage[SessionRead](
-                items=[_session(row) for row in rows],
+                items=[read_session(row) for row in rows],
                 total=total,
                 limit=limit,
                 offset=offset,
@@ -148,16 +134,19 @@ class ReaderService:
         self,
         book_id: UUID,
         payload: SessionCreate,
+        *,
+        transaction: Session | None = None,
+        item_id: UUID | None = None,
     ) -> ReadingAccepted[SessionRead] | ReadingDuplicate:
         now = _now()
-        with self.write.begin() as session:
-            if not _mutation(session, payload, now):
+        with nullcontext(transaction) if transaction is not None else self.write.begin() as session:
+            if transaction is None and not _mutation(session, payload, now):
                 return ReadingDuplicate()
             _require_book(session, book_id)
             if payload.book_file_id is not None:
                 _require_file(session, payload.book_file_id, book_id)
             row = ReadingSession(
-                id=str(uuid4()),
+                id=str(item_id or uuid4()),
                 book_id=str(book_id),
                 device_id=str(payload.device_id),
                 book_file_id=str(payload.book_file_id)
@@ -169,11 +158,17 @@ class ReaderService:
                 source=payload.source,
             )
             session.add(row)
-            _change(session, row, "upsert", now)
-            return ReadingAccepted[SessionRead](item=_session(row))
+            return ReadingAccepted[SessionRead](item=read_session(row))
 
-    def update_session(self, book_id: UUID, item_id: UUID, payload: SessionUpdate) -> SessionRead:
-        with self.write.begin() as session:
+    def update_session(
+        self,
+        book_id: UUID,
+        item_id: UUID,
+        payload: SessionUpdate,
+        *,
+        transaction: Session | None = None,
+    ) -> SessionRead:
+        with nullcontext(transaction) if transaction is not None else self.write.begin() as session:
             row = _record(session, ReadingSession, book_id, item_id)
             fields = {
                 "started_at": row.started_at,
@@ -191,29 +186,39 @@ class ReaderService:
             row.started_at = next_fields.started_at
             row.ended_at = next_fields.ended_at
             row.active_seconds = next_fields.active_seconds
-            _change(session, row, "upsert", _now())
-            return _session(row)
+            return read_session(row)
 
-    def get_position(self, file_id: UUID) -> PositionRead | None:
-        with self.read() as session:
+    def get_position(
+        self, file_id: UUID, *, transaction: Session | None = None
+    ) -> PositionRead | None:
+        with (nullcontext(transaction) if transaction is not None else self.read()) as session:
             _require_file(session, file_id)
             row = repository.get_position(session, str(file_id))
-            return _position(row) if row is not None else None
+            return read_position(row) if row is not None else None
+
+    @staticmethod
+    def delete_position(transaction: Session, file_id: UUID) -> None:
+        row = repository.get_position(transaction, str(file_id))
+        if row is None:
+            raise BusinessError(BusinessErrorCode.READING_RECORD_NOT_FOUND)
+        transaction.delete(row)
 
     def save_position(
         self,
         file_id: UUID,
         payload: PositionWrite,
+        *,
+        transaction: Session | None = None,
     ) -> ReadingAccepted[PositionRead] | ReadingDuplicate:
         now = _now()
-        with self.write.begin() as session:
-            if not _mutation(session, payload, now):
+        with nullcontext(transaction) if transaction is not None else self.write.begin() as session:
+            if transaction is None and not _mutation(session, payload, now):
                 return ReadingDuplicate()
             _require_file(session, file_id)
             row = repository.get_position(session, str(file_id))
             current_revision = row.revision if row is not None else 0
             if current_revision != payload.revision:
-                raise PositionConflict(_position(row) if row is not None else None)
+                raise PositionConflict(read_position(row) if row is not None else None)
             if row is None:
                 row = ReadingPosition(id=str(uuid4()), book_file_id=str(file_id))
                 session.add(row)
@@ -221,8 +226,7 @@ class ReaderService:
             row.percent = payload.percent
             row.revision = current_revision + 1
             row.updated_at = now
-            _change(session, row, "upsert", now)
-            return ReadingAccepted[PositionRead](item=_position(row))
+            return ReadingAccepted[PositionRead](item=read_position(row))
 
     def list_marks(
         self, model: type[Mark], book_id: UUID, limit: int, offset: int
@@ -243,16 +247,20 @@ class ReaderService:
         model: type[Mark],
         book_id: UUID,
         payload: BookmarkCreate | AnnotationCreate,
+        *,
+        transaction: Session | None = None,
+        item_id: UUID | None = None,
     ) -> Mark | None:
         now = _now()
-        with self.write.begin() as session:
-            if not _mutation(session, payload, now):
+        with nullcontext(transaction) if transaction is not None else self.write.begin() as session:
+            if transaction is None and not _mutation(session, payload, now):
                 return None
             _require_book(session, book_id)
-            row = model(id=str(uuid4()), book_id=str(book_id), created_at=now, updated_at=now)
+            row = model(
+                id=str(item_id or uuid4()), book_id=str(book_id), created_at=now, updated_at=now
+            )
             self._apply_mark(session, row, book_id, payload)
             session.add(row)
-            _change(session, row, "upsert", now)
             session.flush()
             session.expunge(row)
             return row
@@ -263,14 +271,15 @@ class ReaderService:
         book_id: UUID,
         item_id: UUID,
         payload: BookmarkUpdate | AnnotationUpdate,
+        *,
+        transaction: Session | None = None,
     ) -> Mark:
-        with self.write.begin() as session:
+        with nullcontext(transaction) if transaction is not None else self.write.begin() as session:
             row = _record(session, model, book_id, item_id)
             if not payload.model_fields_set:
                 raise BusinessError(BusinessErrorCode.INVALID_READING_RECORD)
             self._apply_mark(session, row, book_id, payload)
             row.updated_at = max(row.updated_at + 1, _now())
-            _change(session, row, "upsert", row.updated_at)
             session.flush()
             session.expunge(row)
             return row
@@ -302,8 +311,14 @@ class ReaderService:
             if not ((row.quote or "").strip() or (row.note or "").strip()):
                 raise BusinessError(BusinessErrorCode.INVALID_READING_RECORD)
 
-    def delete(self, model: type[Record], book_id: UUID, item_id: UUID) -> None:
-        with self.write.begin() as session:
+    def delete(
+        self,
+        model: type[Record],
+        book_id: UUID,
+        item_id: UUID,
+        *,
+        transaction: Session | None = None,
+    ) -> None:
+        with nullcontext(transaction) if transaction is not None else self.write.begin() as session:
             row = _record(session, model, book_id, item_id)
-            _change(session, row, "delete", _now())
             session.delete(row)

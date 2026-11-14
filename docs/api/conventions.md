@@ -26,7 +26,7 @@
 | 阅读位置 | `GET/PUT /api/v1/reading-positions/{bookFileId}` |
 | 笔记划线 | `GET/POST /api/v1/books/{bookId}/annotations` |
 | 统计 | `GET /api/v1/stats/overview`、`GET /api/v1/books/{bookId}/stats` |
-| 增量同步 | `GET /api/v1/sync/changes`、`POST /api/v1/sync/mutations` |
+| 多端同步 | `GET /api/v1/sync/snapshot`、`GET /api/v1/sync/changes`、`POST /api/v1/sync/mutations`，见 [同步 API](sync.md) |
 | 首次初始化 | `GET /api/v1/setup/status`、`POST /api/v1/setup` |
 | Web 登录 | `GET /api/v1/auth/csrf`、`POST /api/v1/auth/login`、`POST /api/v1/auth/logout`、`GET /api/v1/auth/me` |
 | 原生端登录 | `POST /api/v1/auth/device-login`；设备使用同一管理员账号密码，返回可撤销 Bearer |

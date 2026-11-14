@@ -5,7 +5,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from app.db.models.reading import Annotation, Bookmark, ReadingPosition, ReadingSession
-from app.db.models.sync import Device, SyncChange, SyncMutation
+from app.db.models.sync import Device, SyncMutation
 
 Record = TypeVar("Record", ReadingSession, Bookmark, Annotation)
 
@@ -48,16 +48,3 @@ def record_mutation(session: Session, device_id: str, mutation_id: str, now: int
         )
     )
     return True
-
-
-def log_change(
-    session: Session, entity_type: str, entity_id: str, operation: str, now: int
-) -> None:
-    session.add(
-        SyncChange(
-            entity_type=entity_type,
-            entity_id=entity_id,
-            operation=operation,
-            changed_at=now,
-        )
-    )

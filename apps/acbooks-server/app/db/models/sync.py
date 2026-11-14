@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Integer, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, Integer, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -14,7 +14,10 @@ class Device(Base):
 
 class SyncChange(Base):
     __tablename__ = "sync_changes"
-    __table_args__ = {"sqlite_autoincrement": True}
+    __table_args__ = (
+        Index("ix_sync_changes_entity", "entity_type", "entity_id", "seq"),
+        {"sqlite_autoincrement": True},
+    )
 
     seq: Mapped[int] = mapped_column(Integer, primary_key=True)
     entity_type: Mapped[str] = mapped_column(Text)
@@ -31,3 +34,5 @@ class SyncMutation(Base):
     device_id: Mapped[str] = mapped_column(ForeignKey("devices.id", ondelete="RESTRICT"))
     mutation_id: Mapped[str] = mapped_column(Text)
     created_at: Mapped[int] = mapped_column(Integer)
+    request_hash: Mapped[str | None] = mapped_column(Text)
+    receipt_json: Mapped[str | None] = mapped_column(Text)

@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from hashlib import sha256
 from time import time_ns
 from typing import cast
@@ -286,8 +287,16 @@ class BookOrganizationService:
                     return
             session.execute(delete(table).where(table.c.id == source))
 
-    def reassociate(self, file_id: UUID, payload: FileReassociation) -> None:
-        with self.write_sessions.begin() as session:
+    def reassociate(
+        self,
+        file_id: UUID,
+        payload: FileReassociation,
+        *,
+        transaction: Session | None = None,
+    ) -> None:
+        with (
+            nullcontext(transaction) if transaction is not None else self.write_sessions.begin()
+        ) as session:
             file = session.get(BookFile, str(file_id))
             if file is None:
                 raise BusinessError(BusinessErrorCode.FILE_NOT_FOUND)

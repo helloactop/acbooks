@@ -70,7 +70,13 @@ def test_manual_session_crud_and_concurrent_duplicate(
     try:
         with Session(engine) as session:
             assert session.scalar(select(func.count()).select_from(SyncMutation)) == 1
-            assert session.scalars(select(SyncChange.operation).order_by(SyncChange.seq)).all() == [
+            assert session.scalars(
+                select(SyncChange.operation)
+                .where(
+                    SyncChange.entity_type == "reading_session", SyncChange.entity_id == row["id"]
+                )
+                .order_by(SyncChange.seq)
+            ).all() == [
                 "upsert",
                 "upsert",
                 "delete",
