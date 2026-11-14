@@ -59,7 +59,9 @@ def management(
     covers = tmp_path / "covers"
     command.upgrade(migration_config(database), "head")
     provision_installation(database, code_path)
-    with make_client((database, code_path), covers_dir=covers) as client:
+    with make_client(
+        (database, code_path), covers_dir=covers, library_dir=tmp_path / "library"
+    ) as client:
         setup = client.post(SETUP, json=payload(code_path), headers=challenge(client))
         assert setup.status_code == 201
         assert (
