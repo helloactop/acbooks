@@ -35,6 +35,8 @@ from app.modules.metadata.router import metadata_router
 from app.modules.metadata.service import MetadataService
 from app.modules.reader.router import reader_router
 from app.modules.reader.service import ReaderService
+from app.modules.stats.router import stats_router
+from app.modules.stats.service import StatsService
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -121,6 +123,7 @@ def create_app(
     )
     app.include_router(imports_router(engine, dependencies, covers), prefix="/api/v1")
     app.include_router(reader_router(ReaderService(engine), dependencies), prefix="/api/v1")
+    app.include_router(stats_router(StatsService(engine), dependencies), prefix="/api/v1")
     if web_dist is not None:
         app.mount("/", SPAStaticFiles(directory=web_dist, html=True), name="web")
 

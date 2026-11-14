@@ -15,9 +15,12 @@
   },
   "dependencies": {
     "@acbooks/ui": "workspace:*",
+    "@nivo/bar": "0.99.0",
+    "@nivo/line": "0.99.0",
     "i18next": "^27.1.1",
     "lucide-react": "^1.72.0",
     "react": "^19.3.1",
+    "react-activity-calendar": "3.2.0",
     "react-dom": "^19.3.1",
     "react-i18next": "^18.0.1",
     "react-router-dom": "^7.18.5"

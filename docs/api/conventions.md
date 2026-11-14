@@ -148,6 +148,7 @@ API 进程重启后，现有会话继续有效，客户端通过 `GET /api/v1/au
 - 阅读位置按 `bookFileId` 存取，使用**不透明 locator**、`revision` 与 `mutationId`；不能根据百分比猜测精确位置。统计接口仅从 `reading_sessions` 计算，不向 `books` 反写累计时长。
 
 已实现的阅读端点与提交、版本语义见 [阅读数据 API](reader.md)。
+统计范围、聚合口径和时间线契约见 [阅读统计 API](reading-stats.md)。
 
 ## 6. 离线同步约定
 

@@ -1,6 +1,6 @@
 import { Button, Spinner, buttonVariants } from "@acbooks/ui";
 import { ArrowLeft } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -34,12 +34,16 @@ import { libraryErrorMessage, libraryRequestId } from "./errors";
 import { LibraryAlert } from "./LibraryAlert";
 import { Modal } from "./Modal";
 
+const ReadingStatsPanel = lazy(() => import("../stats/ReadingStatsPanel"));
+
 export interface BookDetailPageProps {
   bookId: string;
 }
 
 export function BookDetailPage({ bookId }: BookDetailPageProps) {
   const { t } = useTranslation("library");
+  const { t: tStats } = useTranslation("stats");
+  const [statsOpen, setStatsOpen] = useState(false);
   const { expireSession } = useAppShell();
   const navigate = useNavigate();
   const coverInput = useRef<HTMLInputElement>(null);
@@ -384,6 +388,27 @@ export function BookDetailPage({ bookId }: BookDetailPageProps) {
               onSessionExpired={expireSession}
             />
           </div>
+          {detail !== null && (
+            <section className="border-t border-border pt-4">
+              <Button
+                aria-expanded={statsOpen}
+                onClick={() => setStatsOpen(open => !open)}
+                variant="outline"
+              >
+                {tStats("title")}
+              </Button>
+              {statsOpen && (
+                <div className="mt-4">
+                  <Suspense fallback={<Spinner />}>
+                    <ReadingStatsPanel
+                      bookId={bookId}
+                      revision={JSON.stringify([detail.updatedAt, detail.files.map(file => file.id)])}
+                    />
+                  </Suspense>
+                </div>
+              )}
+            </section>
+          )}
         </>
       ) : null}
 

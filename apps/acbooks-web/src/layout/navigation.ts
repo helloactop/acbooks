@@ -6,6 +6,7 @@ import {
   MapPin,
   ListChecks,
   BookOpen,
+  ChartBar,
   SunMoon,
   UserRound,
   type LucideIcon,
@@ -28,6 +29,7 @@ export const APP_NAV_GROUPS: readonly {
     items: [
       { href: homeHref(), icon: House, labelKey: "nav.home" },
       { href: libraryHref(), icon: LibraryBig, labelKey: "nav.library" },
+      { href: "/stats", icon: ChartBar, labelKey: "nav.stats" },
     ],
   },
   {

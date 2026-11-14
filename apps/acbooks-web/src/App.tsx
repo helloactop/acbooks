@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes, useParams } from "react-router-dom";
 
 import { AuthPage } from "./auth/AuthPage";
@@ -11,6 +12,8 @@ import { StoragePage } from "./storage/StoragePage";
 import { NotFoundPage } from "./NotFoundPage";
 import { PreviewPage } from "./preview/PreviewPage";
 import { SettingsPage } from "./settings/SettingsPage";
+
+const ReadingStatsPage = lazy(() => import("./stats/ReadingStatsPage"));
 
 function BookDetailRoute() {
   const { bookId } = useParams();
@@ -29,6 +32,7 @@ export default function App() {
       <Route element={<AuthenticatedLayout />}>
         <Route element={<DashboardPage />} path="home" />
         <Route element={<LibraryPage />} path="library" />
+        <Route element={<Suspense><ReadingStatsPage /></Suspense>} path="stats" />
         <Route element={<BookDetailRoute />} path="library/books/:bookId" />
         <Route element={<OrganizationPage />} path="organization" />
         <Route element={<LocationsPage />} path="locations" />

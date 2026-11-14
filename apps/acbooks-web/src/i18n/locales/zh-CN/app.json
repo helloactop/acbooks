@@ -1,6 +1,7 @@
 {
   "brand": "acbooks",
   "nav": {
+    "stats": "阅读统计",
     "organization": "书库整理",
     "contentGroup": "浏览",
     "managementGroup": "管理",
