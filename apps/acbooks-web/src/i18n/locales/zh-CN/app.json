@@ -1,6 +1,7 @@
 {
   "brand": "acbooks",
   "nav": {
+    "organization": "书库整理",
     "contentGroup": "浏览",
     "managementGroup": "管理",
     "main": "主导航",

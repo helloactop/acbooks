@@ -298,7 +298,9 @@ class ScanService:
                 )
                 session.add(obj)
                 session.flush()
-                if repository.candidates(session, payload.title, payload.isbn, sha256):
+                if repository.candidates(
+                    session, payload.title, payload.isbn, sha256, root_id=root_id, relative_path=rel
+                ):
                     return "pending"
                 self._add_book(session, book_id, payload, cover, metadata.title is None)
                 session.add(
@@ -358,7 +360,10 @@ class ScanService:
         file_format, metadata, _ = self._inspect_pending(obj, root)
         payload = metadata.book(obj.relative_path)
         with self.read_sessions() as session:
-            candidates = repository.candidates(session, payload.title, payload.isbn, obj.sha256)
+            candidates = repository.candidates(
+                session, payload.title, payload.isbn, obj.sha256,
+                root_id=obj.root_id, relative_path=obj.relative_path,
+            )
         return PendingFilePreview(
             id=obj.id,
             relative_path=obj.relative_path,

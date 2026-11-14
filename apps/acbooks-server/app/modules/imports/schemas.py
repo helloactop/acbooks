@@ -22,7 +22,7 @@ class JobStatus(ApiModel):
     error_code: str | None = None
 
 
-MatchReason = Literal["title", "isbn", "sha256"]
+MatchReason = Literal["title", "isbn", "sha256", "filename"]
 
 
 class ImportCandidate(ApiModel):

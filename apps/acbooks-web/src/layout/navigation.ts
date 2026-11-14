@@ -4,6 +4,7 @@ import {
   Languages,
   LibraryBig,
   MapPin,
+  ListChecks,
   BookOpen,
   SunMoon,
   UserRound,
@@ -32,6 +33,7 @@ export const APP_NAV_GROUPS: readonly {
   {
     labelKey: "nav.managementGroup",
     items: [
+      { href: "/organization", icon: ListChecks, labelKey: "nav.organization" },
       { href: locationsHref(), icon: MapPin, labelKey: "nav.locations" },
       { href: storageHref(), icon: HardDrive, labelKey: "nav.storage" },
     ],

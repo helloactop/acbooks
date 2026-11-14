@@ -402,5 +402,65 @@
       "missing": "书目不存在",
       "failed": "失败"
     }
+  },
+  "organization": {
+    "title": "书库整理",
+    "mergeBooks": "合并书籍",
+    "stale": "书库已更新，请重新预览后再试。",
+    "conflict": "请选择其他名称或目标。",
+    "emptyValue": "空",
+    "hasCover": "书籍封面",
+    "source": "来源书目",
+    "target": "保留书目",
+    "swap": "交换书目",
+    "impact": "将迁移 {{files}} 个电子文件、{{copies}} 册实体副本和 {{reading}} 条阅读记录。",
+    "mergeWarning": "迁移完成后，来源书目将移除。NAS 原文件保留在原路径。",
+    "previewHint": "合并前请预览两条书目，并选择要保留的元数据。",
+    "preview": "预览合并",
+    "reassociate": "重新关联",
+    "reassociateHint": "请选择接收此文件及其阅读记录的书目。",
+    "searchBook": "搜索书名、作者或 ISBN",
+    "search": "搜索",
+    "noResults": "没有结果",
+    "name": "名称",
+    "rename": "重命名",
+    "merge": "合并",
+    "delete": "删除",
+    "deleteHint": "将从 {{count}} 本书中移除此条目，书目本身会保留。",
+    "entryMergeHint": "请选择保留的条目。当前条目关联的书籍将归到所选条目。",
+    "noTargets": "没有其他可合并的条目",
+    "retry": "重试",
+    "duplicatesHint": "可检查候选，也可直接在书库选中两本书合并。",
+    "openLibrary": "打开书库",
+    "mergeSuccess": "书籍已合并。",
+    "openBook": "查看合并后的书籍",
+    "bookCount": "关联书籍 {{count}} 本",
+    "viewBooks": "查看书籍",
+    "actions": "操作",
+    "entryMissing": "该条目已不存在，请刷新后重试。",
+    "sections": {
+      "duplicates": "重复书籍",
+      "tag": "标签",
+      "shelf": "书架",
+      "author": "作者",
+      "translator": "译者"
+    },
+    "fields": {
+      "title": "书名",
+      "description": "简介",
+      "series": "系列",
+      "reading_status": "阅读状态",
+      "cover": "封面",
+      "authors": "作者",
+      "translators": "译者",
+      "isbn": "ISBN"
+    },
+    "reasons": {
+      "title": "书名相同",
+      "isbn": "ISBN 相同",
+      "external_id": "外部 ID 相同",
+      "author": "作者相同",
+      "sha256": "SHA-256 相同"
+    }
   }
 }

@@ -1,3 +1,5 @@
+from pathlib import PurePosixPath
+
 from sqlalchemy import ColumnElement, false, func, select
 from sqlalchemy.orm import Session
 
@@ -61,8 +63,27 @@ def candidates(
     title: str,
     isbn: str | None,
     sha256: str | None,
+    *,
+    root_id: str,
+    relative_path: str,
 ) -> list[ImportCandidate]:
-    same_title = Book.title.collate("NOCASE") == title
+    same_title = func.acbooks_casefold(Book.title) == title.casefold()
+    path = PurePosixPath(relative_path)
+    sibling_paths = [
+        str(path.with_suffix(extension)).casefold()
+        for extension in (".epub", ".pdf")
+        if extension != path.suffix.lower()
+    ]
+    same_filename = (
+        select(BookFile.id)
+        .join(StorageObject, StorageObject.id == BookFile.storage_object_id)
+        .where(
+            BookFile.book_id == Book.id,
+            StorageObject.root_id == root_id,
+            func.acbooks_casefold(StorageObject.relative_path).in_(sibling_paths),
+        )
+        .exists()
+    )
     same_isbn = (
         select(BookIdentifier.id)
         .where(
@@ -82,13 +103,13 @@ def candidates(
         .exists()
     )
     rows = session.execute(
-        select(Book.id, Book.title, same_title, same_isbn, same_hash)
-        .where(same_title | same_isbn | same_hash)
-        .order_by(same_hash.desc(), same_isbn.desc(), Book.title, Book.id)
+        select(Book.id, Book.title, same_title, same_isbn, same_hash, same_filename)
+        .where(same_title | same_isbn | same_hash | same_filename)
+        .order_by(same_hash.desc(), same_isbn.desc(), same_filename.desc(), Book.title, Book.id)
         .limit(20)
     )
     result = []
-    for book_id, name, title_match, isbn_match, hash_match in rows:
+    for book_id, name, title_match, isbn_match, hash_match, filename_match in rows:
         reasons: list[MatchReason] = []
         if title_match:
             reasons.append("title")
@@ -96,5 +117,7 @@ def candidates(
             reasons.append("isbn")
         if hash_match:
             reasons.append("sha256")
+        if filename_match:
+            reasons.append("filename")
         result.append(ImportCandidate(book_id=book_id, title=name, reasons=reasons))
     return result

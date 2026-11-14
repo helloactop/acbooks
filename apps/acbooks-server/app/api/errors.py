@@ -85,6 +85,15 @@ _BUSINESS_PROBLEMS = {
         HTTPStatus.CONFLICT,
         "Storage root still indexes files.",
     ),
+    BusinessErrorCode.ORGANIZATION_ENTRY_NOT_FOUND: (
+        HTTPStatus.NOT_FOUND, "Organization entry not found.",
+    ),
+    BusinessErrorCode.ORGANIZATION_CONFLICT: (
+        HTTPStatus.CONFLICT, "Choose a different entry or name.",
+    ),
+    BusinessErrorCode.ORGANIZATION_STALE: (
+        HTTPStatus.CONFLICT, "Book organization data changed. Refresh and try again.",
+    ),
     BusinessErrorCode.JOB_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Job not found."),
 }
 

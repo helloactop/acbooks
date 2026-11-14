@@ -45,6 +45,7 @@
     "changed": "The file changed. Scan the folder and try again.",
     "error": "Could not process the file. Try again.",
     "reason": {
+      "filename": "Same filename in this folder",
       "title": "Same title",
       "isbn": "Same ISBN",
       "sha256": "Same file hash"

@@ -8,11 +8,12 @@ import {
 import { BookOpen, Search, X } from "lucide-react";
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 import { toApiError, type ApiError } from "../api/client";
 import { useAppShell } from "../layout/app-shell-context";
 import { PageHeader } from "../layout/PageHeader";
-import { rememberDetailReturn } from "../layout/routes";
+import { bookDetailHref, rememberDetailReturn } from "../layout/routes";
 import { rememberReturnScroll } from "../layout/scroll-restoration";
 import { PageContainer } from "../layout/PageContainer";
 import { useDocumentTitle } from "../layout/use-document-title";
@@ -21,6 +22,8 @@ import { BatchEditDialog } from "./BatchEditDialog";
 import { BookCard } from "./BookCard";
 import { BookFormDialog } from "./BookFormDialog";
 import { BookList } from "./BookList";
+import { BookMergeDialog } from "./BookMergeDialog";
+import type { MergePair } from "./organization-api";
 import { batchDeleteBooks } from "./books-api";
 import { DeleteBooksDialog } from "./DeleteBooksDialog";
 import { ActiveFilterSummary } from "./ActiveFilterSummary";
@@ -75,6 +78,8 @@ export function LibraryPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [uploadIssues, setUploadIssues] = useState<string[]>([]);
+  const navigate = useNavigate();
+  const [mergePair, setMergePair] = useState<MergePair>();
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
     new Set(),
@@ -338,6 +343,8 @@ export function LibraryPage() {
 
   return (
     <PageContainer className="flex-1">
+      {mergePair && <BookMergeDialog pair={mergePair} onClose={() => setMergePair(undefined)}
+        onMerged={(id) => { openBook(); void navigate(bookDetailHref(id)); }} />}
       <PageHeader
         actions={
           <>
@@ -470,6 +477,10 @@ export function LibraryPage() {
           onEdit={() => {
             setBatchTargetIds(Array.from(selectedIds));
             setBatchEditOpen(true);
+          }}
+          onMerge={() => {
+            const [targetBookId, sourceBookId] = selectedIds;
+            if (targetBookId && sourceBookId) setMergePair({ sourceBookId, targetBookId });
           }}
           onMetadata={() => {
             setBatchTargetIds(Array.from(selectedIds));

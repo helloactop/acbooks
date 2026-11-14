@@ -52,6 +52,7 @@ pnpm e2e
 | pytest | Copies/Locations：位置层级 CRUD 与防循环、有子级拒绝删除与副本 SET NULL、副本 CRUD 与越界校验、内联副本原子性、location 子树筛选、locations 选项源与筛选 schema、鉴权与错误码 |
 | pytest | Files：流式上传 PDF/EPUB 与 SHA-256、真实格式校验、超大与重复拒绝、默认 managed 根、全文/Range/206/416/ETag 下载、路径越界拒绝、managed 删除并清阅读位置、external 只读拒绝、鉴权/CSRF、索引失败清理已发布文件、上传中断/磁盘满/发布失败清理、恶意文件名、符号链接越界、external 下载、幂等与并发删除、PDF/EPUB 结构校验与 ZIP 解压/条目/元数据上限、HTTP 接收层大小限制、下载拒绝非普通文件、解除关联（purge=false）与永久删除（purge=true）区分 |
 | pytest | Storage roots & scan：注册绝对/存在/可读校验、重叠与受保护目录拒绝、占用删除拒绝；增量幂等不重复建书、多级遍历与隐藏/临时/符号链接跳过、格式校验与跳过、深度重算哈希、仅完整成功标缺失（根掉线不改状态）、任务入队去重/原子领取/恢复与结果回传 |
+| pytest | 书库整理：同名 EPUB/PDF 扫描后待关联、候选依据、角色隔离、重新关联保留进度、合并预览过期、注入触发器失败后的完整回滚、实体副本和阅读迁移、NAS 原文件逐字节保留 |
 | ESLint | Web 与共享 UI 的 TypeScript/React 代码、Hooks 规则和导入问题 |
 | tsc | Web 与共享 UI 的 TypeScript strict 类型检查 |
 | i18n:check | 共享与 Web 翻译资源的语言目录、命名空间、键集合和插值参数一致性 |

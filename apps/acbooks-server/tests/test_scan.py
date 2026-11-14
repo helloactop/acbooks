@@ -507,3 +507,61 @@ def test_metadata_settings_and_worker_protect_manual_fields(
         assert registry.run_job(engine, claimed)["items"][0]["status"] == "unchanged"
     finally:
         engine.dispose()
+
+
+def test_scan_same_filename_with_different_embedded_titles(
+    env: tuple[TestClient, Path, Path],
+) -> None:
+    client, database, tmp_path = env
+    nas = make_nas(tmp_path.parent)
+    epub = nas / "三体.epub"
+    pdf = nas / "三体.pdf"
+    with ZipFile(epub, "w") as archive:
+        archive.writestr("mimetype", "application/epub+zip")
+        archive.writestr(
+            "META-INF/container.xml",
+            '<container><rootfiles><rootfile full-path="package.opf"/></rootfiles></container>',
+        )
+        archive.writestr(
+            "package.opf",
+            '<package xmlns:dc="http://purl.org/dc/elements/1.1/"><metadata>'
+            "<dc:title>三体</dc:title></metadata></package>",
+        )
+    writer = PdfWriter()
+    writer.add_blank_page(100, 100)
+    writer.add_metadata({"/Title": "三体（珍藏版）"})
+    writer.write(pdf)
+    originals = {path: path.read_bytes() for path in (epub, pdf)}
+    root_id = create_root(client, nas).json()["id"]
+    engine = create_sqlite_engine(database)
+    try:
+        scan = ScanService(engine)
+        result = scan.run(root_id, False)
+        assert result["created"] == result["pending"] == 1
+        with Session(engine) as session:
+            book = session.scalars(select(Book)).one()
+            book_id, title = book.id, book.title
+            first_file_id = session.scalars(select(BookFile.id)).one()
+        pending = client.get(f"{ROOTS}/{root_id}/unlinked-files").json()["items"]
+        url = f"/api/v1/unlinked-files/{pending[0]['id']}"
+        preview = client.get(url).json()
+        assert preview["title"] != title
+        assert preview["candidates"] == [
+            {"bookId": book_id, "title": title, "reasons": ["filename"]}
+        ]
+        resolved = client.post(
+            f"{url}/resolve", json={"bookId": book_id}, headers=challenge(client)
+        )
+        assert resolved.status_code == 200, resolved.text
+        detail = client.get(f"/api/v1/books/{book_id}").json()
+        assert detail["title"] == title
+        assert set(detail["formats"]) == {"pdf", "epub"}
+        assert {file["id"] for file in detail["files"]} == {
+            first_file_id,
+            resolved.json()["fileId"],
+        }
+        assert scan.run(root_id, True)["created"] == 0
+        for path, contents in originals.items():
+            assert path.read_bytes() == contents
+    finally:
+        engine.dispose()

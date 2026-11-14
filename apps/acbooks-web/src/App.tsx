@@ -4,6 +4,7 @@ import { AuthPage } from "./auth/AuthPage";
 import { DashboardPage } from "./dashboard/DashboardPage";
 import { AuthenticatedLayout } from "./layout/AuthenticatedLayout";
 import { BookDetailPage } from "./library/BookDetailPage";
+import { OrganizationPage } from "./library/OrganizationPage";
 import { LibraryPage } from "./library/LibraryPage";
 import { LocationsPage } from "./locations/LocationsPage";
 import { StoragePage } from "./storage/StoragePage";
@@ -29,6 +30,7 @@ export default function App() {
         <Route element={<DashboardPage />} path="home" />
         <Route element={<LibraryPage />} path="library" />
         <Route element={<BookDetailRoute />} path="library/books/:bookId" />
+        <Route element={<OrganizationPage />} path="organization" />
         <Route element={<LocationsPage />} path="locations" />
         <Route element={<StoragePage />} path="storage" />
         <Route element={<SettingsPage />} path="settings" />

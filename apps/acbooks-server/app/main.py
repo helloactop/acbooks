@@ -20,6 +20,8 @@ from app.modules.auth.dependencies import AuthDependencies
 from app.modules.auth.router import auth_router
 from app.modules.auth.service import SetupService, WebAuthService
 from app.modules.auth.setup_code import SETUP_CODE_PATH
+from app.modules.books.organization_router import organization_router
+from app.modules.books.organization_service import BookOrganizationService
 from app.modules.books.router import books_router
 from app.modules.books.service import BooksService
 from app.modules.copies.router import copies_router
@@ -88,6 +90,9 @@ def create_app(
             dependencies,
         ),
         prefix="/api/v1",
+    )
+    app.include_router(
+        organization_router(BookOrganizationService(engine), dependencies), prefix="/api/v1"
     )
     copies = CopiesService(engine)
     app.include_router(

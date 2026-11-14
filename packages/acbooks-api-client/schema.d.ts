@@ -140,6 +140,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organization/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Duplicates */
+        get: operations["listDuplicateBooks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/books/merge-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview */
+        post: operations["previewBookMerge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/books/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merge */
+        post: operations["mergeBooks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/files/{file_id}/book": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Reassociate */
+        patch: operations["reassociateBookFile"];
+        trace?: never;
+    };
+    "/api/v1/organization/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Entries */
+        get: operations["listOrganizationEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/{kind}/{entry_id}/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Books */
+        get: operations["listOrganizationBooks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/{kind}/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove */
+        delete: operations["deleteOrganizationEntry"];
+        options?: never;
+        head?: never;
+        /** Rename */
+        patch: operations["renameOrganizationEntry"];
+        trace?: never;
+    };
+    "/api/v1/organization/{kind}/{entry_id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merge Entries */
+        post: operations["mergeOrganizationEntries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/books": {
         parameters: {
             query?: never;
@@ -852,6 +989,51 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** BookMergePair */
+        BookMergePair: {
+            /**
+             * Sourcebookid
+             * Format: uuid
+             */
+            sourceBookId: string;
+            /**
+             * Targetbookid
+             * Format: uuid
+             */
+            targetBookId: string;
+        };
+        /** BookMergePreview */
+        BookMergePreview: {
+            source: components["schemas"]["MergeBook"];
+            target: components["schemas"]["MergeBook"];
+            /** Conflicts */
+            conflicts: components["schemas"]["MergeConflict"][];
+            /** Filecount */
+            fileCount: number;
+            /** Copycount */
+            copyCount: number;
+            /** Readingcount */
+            readingCount: number;
+            /** Revision */
+            revision: string;
+        };
+        /** BookMergeRequest */
+        BookMergeRequest: {
+            /**
+             * Sourcebookid
+             * Format: uuid
+             */
+            sourceBookId: string;
+            /**
+             * Targetbookid
+             * Format: uuid
+             */
+            targetBookId: string;
+            /** Revision */
+            revision: string;
+            /** Usesource */
+            useSource?: ("title" | "description" | "series" | "reading_status" | "cover" | "authors" | "translators" | "isbn")[];
+        };
         /** BookPage */
         BookPage: {
             /** Items */
@@ -955,6 +1137,33 @@ export interface components {
             /** Csrftoken */
             csrfToken: string;
         };
+        /** DuplicatePage */
+        DuplicatePage: {
+            /** Items */
+            items: components["schemas"]["DuplicatePair"][];
+            /** Total */
+            total: number;
+        };
+        /** DuplicatePair */
+        DuplicatePair: {
+            source: components["schemas"]["MergeBook"];
+            target: components["schemas"]["MergeBook"];
+            /** Reasons */
+            reasons: ("isbn" | "external_id" | "title" | "author" | "sha256")[];
+        };
+        /** FileReassociation */
+        FileReassociation: {
+            /**
+             * Sourcebookid
+             * Format: uuid
+             */
+            sourceBookId: string;
+            /**
+             * Targetbookid
+             * Format: uuid
+             */
+            targetBookId: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -975,7 +1184,7 @@ export interface components {
             /** Title */
             title: string;
             /** Reasons */
-            reasons: ("title" | "isbn" | "sha256")[];
+            reasons: ("title" | "isbn" | "sha256" | "filename")[];
         };
         /** JobStatus */
         JobStatus: {
@@ -1044,6 +1253,32 @@ export interface components {
         LoginResponse: {
             account: components["schemas"]["AccountResponse"];
         };
+        /** MergeBook */
+        MergeBook: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Authors */
+            authors: string[];
+            /** Translators */
+            translators: string[];
+        };
+        /** MergeConflict */
+        MergeConflict: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "title" | "description" | "series" | "reading_status" | "cover" | "authors" | "translators" | "isbn";
+            /** Source */
+            source: string | string[] | null;
+            /** Target */
+            target: string | string[] | null;
+        };
         /** MetadataJob */
         MetadataJob: {
             /** Jobid */
@@ -1058,6 +1293,55 @@ export interface components {
             autoFill: boolean;
             /** Fields */
             fields?: ("title" | "authors" | "translators" | "series" | "description" | "isbn" | "cover")[];
+        };
+        /** OrganizationBook */
+        OrganizationBook: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /** OrganizationBookPage */
+        OrganizationBookPage: {
+            /** Items */
+            items: components["schemas"]["OrganizationBook"][];
+            /** Total */
+            total: number;
+        };
+        /** OrganizationEntry */
+        OrganizationEntry: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Bookcount */
+            bookCount: number;
+        };
+        /** OrganizationName */
+        OrganizationName: {
+            /** Name */
+            name: string;
+        };
+        /** OrganizationPage */
+        OrganizationPage: {
+            /** Items */
+            items: components["schemas"]["OrganizationEntry"][];
+            /** Total */
+            total: number;
+        };
+        /** OrganizationTarget */
+        OrganizationTarget: {
+            /**
+             * Targetid
+             * Format: uuid
+             */
+            targetId: string;
         };
         /** PendingFile */
         PendingFile: {
@@ -1812,6 +2096,1409 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    listDuplicateBooks: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicatePage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    previewBookMerge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookMergePair"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookMergePreview"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    mergeBooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookMergeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    reassociateBookFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FileReassociation"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    listOrganizationEntries: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                kind: "tag" | "shelf" | "author" | "translator";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    listOrganizationBooks: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                kind: "tag" | "shelf" | "author" | "translator";
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationBookPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    deleteOrganizationEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "tag" | "shelf" | "author" | "translator";
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    renameOrganizationEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "tag" | "shelf" | "author" | "translator";
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganizationName"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    mergeOrganizationEntries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "tag" | "shelf" | "author" | "translator";
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganizationTarget"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

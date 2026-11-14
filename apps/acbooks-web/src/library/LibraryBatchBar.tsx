@@ -8,6 +8,7 @@ export interface LibraryBatchBarProps {
   onClear: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  onMerge: () => void;
   onMetadata: () => void;
   onSelectAll: () => void;
 }
@@ -19,6 +20,7 @@ export function LibraryBatchBar({
   onClear,
   onDelete,
   onEdit,
+  onMerge,
   onMetadata,
   onSelectAll,
 }: LibraryBatchBarProps) {
@@ -44,6 +46,9 @@ export function LibraryBatchBar({
         >
           {t("selection.edit")}
         </Button>
+        {count === 2 && <Button disabled={disabled} onClick={onMerge} size="sm" variant="outline">
+          {t("organization.mergeBooks")}
+        </Button>}
         <Button disabled={disabled || count === 0} onClick={onMetadata} size="sm" variant="outline">
           {t("metadata.batch")}
         </Button>

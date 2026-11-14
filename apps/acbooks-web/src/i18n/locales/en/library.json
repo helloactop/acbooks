@@ -402,5 +402,65 @@
       "missing": "Book missing",
       "failed": "Failed"
     }
+  },
+  "organization": {
+    "title": "Library cleanup",
+    "mergeBooks": "Merge books",
+    "stale": "The library changed. Refresh the preview and try again.",
+    "conflict": "Choose a different name or target.",
+    "emptyValue": "Empty",
+    "hasCover": "Book cover",
+    "source": "Source book",
+    "target": "Book to keep",
+    "swap": "Swap books",
+    "impact": "To move: {{files}} files, {{copies}} physical copies and {{reading}} reading records.",
+    "mergeWarning": "The source book entry will be removed after its data is moved. NAS files stay at their original paths.",
+    "previewHint": "Preview the books and choose which metadata to keep before merging.",
+    "preview": "Preview merge",
+    "reassociate": "Reassign file",
+    "reassociateHint": "Choose the book that should own this file and its reading records.",
+    "searchBook": "Search by title, author or ISBN",
+    "search": "Search",
+    "noResults": "No results",
+    "name": "Name",
+    "rename": "Rename",
+    "merge": "Merge",
+    "delete": "Delete",
+    "deleteHint": "Remove this entry from {{count}} books. The books are kept.",
+    "entryMergeHint": "Choose the entry to keep. Books linked to this entry will be assigned to the selected entry.",
+    "noTargets": "No other entries available",
+    "retry": "Retry",
+    "duplicatesHint": "Review suggested pairs, or select two books in the library to merge them.",
+    "openLibrary": "Open library",
+    "mergeSuccess": "Books merged.",
+    "openBook": "Open merged book",
+    "bookCount": "Books: {{count}}",
+    "viewBooks": "View books",
+    "actions": "Actions",
+    "entryMissing": "This entry no longer exists. Refresh and try again.",
+    "sections": {
+      "duplicates": "Duplicates",
+      "tag": "Tags",
+      "shelf": "Shelves",
+      "author": "Authors",
+      "translator": "Translators"
+    },
+    "fields": {
+      "title": "Title",
+      "description": "Description",
+      "series": "Series",
+      "reading_status": "Reading status",
+      "cover": "Cover",
+      "authors": "Authors",
+      "translators": "Translators",
+      "isbn": "ISBN"
+    },
+    "reasons": {
+      "title": "Same title",
+      "isbn": "Same ISBN",
+      "external_id": "Same external ID",
+      "author": "Shared author",
+      "sha256": "Same SHA-256"
+    }
   }
 }

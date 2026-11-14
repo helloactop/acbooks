@@ -2,6 +2,7 @@ from collections.abc import Iterator
 from io import BytesIO
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import pytest
 from alembic import command
@@ -450,3 +451,250 @@ def test_batch_update_enforces_per_book_name_limits(
     filled = browser.get(f"{BOOKS}/{room['id']}").json()
     assert len(filled["tags"]) == 20
     assert len(filled["shelves"]) == 20
+
+
+def test_organization_moves_external_formats_and_rolls_back(
+    management: tuple[TestClient, Path, Path],
+    tmp_path: Path,
+) -> None:
+    browser, database, _ = management
+    source = create_book(
+        browser,
+        title="三体（珍藏版）",
+        authors=["刘慈欣"],
+        tags=["科幻"],
+        shelves=["中文"],
+        isbn="9780306406157",
+        description="来源简介",
+    )
+    target = create_book(
+        browser,
+        title="三体",
+        authors=["刘慈欣"],
+        tags=["科幻", "小说"],
+        shelves=["待读"],
+        isbn="9780306406157",
+        description="目标简介",
+    )
+    source_id, target_id = source["id"], target["id"]
+    epub_id, pdf_id = str(uuid4()), str(uuid4())
+    files = {"三体.epub": b"original epub", "三体.pdf": b"original pdf"}
+    for path, contents in files.items():
+        (tmp_path / path).write_bytes(contents)
+    engine = create_sqlite_engine(database)
+    pair = {"sourceBookId": source_id, "targetBookId": target_id}
+    base = "/api/v1/organization"
+    assert_problem(
+        browser.post(f"{base}/books/merge-preview", json=pair), 403, "FORBIDDEN"
+    )
+    try:
+        with Session(engine) as session, session.begin():
+            session.add(StorageRoot(id="nas", name="NAS", root_path=str(tmp_path), mode="external"))
+            session.flush()
+            for index, (path, contents) in enumerate(files.items()):
+                session.add(
+                    StorageObject(
+                        id=str(index),
+                        root_id="nas",
+                        relative_path=path,
+                        size_bytes=len(contents),
+                        sha256="a" * 64,
+                        mtime_ms=10,
+                    )
+                )
+            session.flush()
+            session.add_all(
+                [
+                    BookFile(id=epub_id, book_id=source_id, storage_object_id="0", format="epub"),
+                    BookFile(id=pdf_id, book_id=target_id, storage_object_id="1", format="pdf"),
+                    BookCopy(id=str(uuid4()), book_id=source_id),
+                    BookIdentifier(
+                        id="ext1", book_id=source_id, scheme="openlibrary", value="OL1M"
+                    ),
+                    BookIdentifier(
+                        id="ext2", book_id=target_id, scheme="openlibrary", value="OL1M"
+                    ),
+                    BookIdentifier(id="ext3", book_id=source_id, scheme="douban", value="123"),
+                ]
+            )
+            session.flush()
+            session.add_all(
+                [
+                    ReadingSession(
+                        id="history",
+                        book_id=source_id,
+                        book_file_id=epub_id,
+                        started_at=0,
+                        ended_at=1000,
+                        active_seconds=1,
+                        source="automatic",
+                    ),
+                    Bookmark(
+                        id="bookmark",
+                        book_id=source_id,
+                        book_file_id=epub_id,
+                        created_at=1,
+                        updated_at=1,
+                    ),
+                    Annotation(
+                        id="note",
+                        book_id=source_id,
+                        book_file_id=epub_id,
+                        note="keep",
+                        created_at=1,
+                        updated_at=1,
+                    ),
+                    Annotation(
+                        id="paper",
+                        book_id=source_id,
+                        note="paper note",
+                        created_at=1,
+                        updated_at=1,
+                    ),
+                    ReadingPosition(
+                        id="position",
+                        book_file_id=epub_id,
+                        locator_json="{}",
+                        percent=34,
+                        revision=5,
+                        updated_at=1,
+                    ),
+                ]
+            )
+        candidates = browser.get(f"{base}/duplicates").json()
+        assert candidates["total"] == 1
+        assert set(candidates["items"][0]["reasons"]) == {"author", "isbn", "external_id", "sha256"}
+
+        preview_url = f"{base}/books/merge-preview"
+        merge_url = f"{base}/books/merge"
+        preview = browser.post(preview_url, json=pair, headers=challenge(browser))
+        assert preview.status_code == 200, preview.text
+        data = preview.json()
+        assert (data["fileCount"], data["copyCount"], data["readingCount"]) == (1, 1, 5)
+        assert {"title", "description"} <= {row["field"] for row in data["conflicts"]}
+        merge = {**pair, "revision": data["revision"], "useSource": ["description"]}
+
+        # Abort after detaching the reading references and moving the file.
+        with engine.begin() as connection:
+            connection.exec_driver_sql("""
+                CREATE TRIGGER reject_restore BEFORE UPDATE OF book_file_id ON annotations
+                WHEN OLD.book_file_id IS NULL AND NEW.book_file_id IS NOT NULL
+                BEGIN SELECT RAISE(ABORT, 'injected failure'); END
+            """)
+        assert browser.post(merge_url, json=merge, headers=challenge(browser)).status_code == 500
+        with Session(engine) as session:
+            assert (
+                session.scalars(select(BookFile.book_id).where(BookFile.id == epub_id)).one()
+                == source_id
+            )
+            assert (
+                session.scalars(
+                    select(Annotation.book_file_id).where(Annotation.id == "note")
+                ).one()
+                == epub_id
+            )
+            assert session.scalars(select(ReadingSession.book_id)).one() == source_id
+        with engine.begin() as connection:
+            connection.exec_driver_sql("DROP TRIGGER reject_restore")
+
+        moved = browser.patch(f"{base}/files/{epub_id}/book", json=pair, headers=challenge(browser))
+        assert moved.status_code == 204, moved.text
+        with Session(engine) as session:
+            assert (
+                session.scalars(select(Annotation.book_id).where(Annotation.id == "note")).one()
+                == target_id
+            )
+            assert (
+                session.scalars(select(Annotation.book_id).where(Annotation.id == "paper")).one()
+                == source_id
+            )
+            assert session.scalars(select(ReadingPosition.revision)).one() == 5
+        assert_problem(
+            browser.post(merge_url, json=merge, headers=challenge(browser)),
+            409,
+            "ORGANIZATION_STALE",
+        )
+
+        reverse = {"sourceBookId": target_id, "targetBookId": source_id}
+        assert (
+            browser.patch(
+                f"{base}/files/{epub_id}/book", json=reverse, headers=challenge(browser)
+            ).status_code
+            == 204
+        )
+        data = browser.post(preview_url, json=pair, headers=challenge(browser)).json()
+        merged = browser.post(
+            merge_url, json={**merge, "revision": data["revision"]}, headers=challenge(browser)
+        )
+        assert merged.status_code == 204, merged.text
+        item = browser.get(f"{BOOKS}/{target_id}").json()
+        assert item["title"] == "三体" and item["description"] == "来源简介"
+        assert {file["id"] for file in item["files"]} == {epub_id, pdf_id}
+        assert set(item["tags"]) == {"科幻", "小说"}
+        assert set(item["shelves"]) == {"中文", "待读"}
+        assert item["copyCount"] == 1
+        assert {
+            (identifier["scheme"], identifier["value"]) for identifier in item["identifiers"]
+        } == {
+            ("isbn", "9780306406157"),
+            ("openlibrary", "OL1M"),
+            ("douban", "123"),
+        }
+        assert browser.get(f"{BOOKS}/{source_id}").status_code == 404
+        with Session(engine) as session:
+            assert session.scalars(select(Annotation.book_id)).all() == [target_id, target_id]
+            assert session.scalars(select(ReadingSession.book_file_id)).one() == epub_id
+            assert session.scalars(select(Bookmark.book_file_id)).one() == epub_id
+            assert session.scalars(select(ReadingPosition.percent)).one() == 34
+            assert set(session.scalars(select(StorageObject.relative_path))) == set(files)
+        for path, contents in files.items():
+            assert (tmp_path / path).read_bytes() == contents
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize(
+    ("kind", "field"),
+    [("tag", "tags"), ("shelf", "shelves"), ("author", "authors"), ("translator", "translators")],
+)
+def test_organization_manages_role_and_category_links(
+    management: tuple[TestClient, Path, Path],
+    kind: str,
+    field: str,
+) -> None:
+    browser, _, _ = management
+    shared = {"authors": ["Shared"], "translators": ["Shared"]}
+    shared[field] = ["Shared", "Other"]
+    book = create_book(browser, **shared)
+    url = f"/api/v1/organization/{kind}"
+    listing = browser.get(url).json()
+    entries = {entry["name"]: entry for entry in listing["items"]}
+    old = entries["Shared"]["id"]
+    other = entries["Other"]["id"]
+    assert entries["Shared"]["bookCount"] == 1
+    assert browser.get(f"{url}/{old}/books").json()["items"][0]["id"] == book["id"]
+    assert_problem(
+        browser.patch(f"{url}/{old}", json={"name": "other"}, headers=challenge(browser)),
+        409,
+        "ORGANIZATION_CONFLICT",
+    )
+    assert (
+        browser.patch(
+            f"{url}/{old}", json={"name": "Renamed"}, headers=challenge(browser)
+        ).status_code
+        == 204
+    )
+    listing = browser.get(url).json()
+    renamed = next(entry["id"] for entry in listing["items"] if entry["name"] == "Renamed")
+    assert (
+        browser.post(
+            f"{url}/{renamed}/merge", json={"targetId": other}, headers=challenge(browser)
+        ).status_code
+        == 204
+    )
+    assert browser.get(f"{BOOKS}/{book['id']}").json()[field] == ["Other"]
+    assert browser.delete(f"{url}/{other}", headers=challenge(browser)).status_code == 204
+    result = browser.get(f"{BOOKS}/{book['id']}").json()
+    assert result[field] == []
+    if kind in ("author", "translator"):
+        assert result["translators" if kind == "author" else "authors"] == ["Shared"]

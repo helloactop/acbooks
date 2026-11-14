@@ -5,11 +5,12 @@ import {
   buttonVariants,
   useLanguage,
 } from "@acbooks/ui";
-import { Download, Trash2 } from "lucide-react";
+import { ArrowRightLeft, Download, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { toApiError, type ApiError } from "../api/client";
+import { BookTargetDialog } from "./BookTargetDialog";
 import { FormatBadges } from "./BookMeta";
 import { libraryErrorMessage } from "./errors";
 import {
@@ -46,6 +47,7 @@ export function BookFilesPanel({
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  const [reassociateTarget, setReassociateTarget] = useState<BookFile | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BookFile | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<ApiError | null>(null);
@@ -198,6 +200,12 @@ export function BookFilesPanel({
                 <Download aria-hidden="true" className="size-4" />
               </a>
               <IconButton
+                label={t("organization.reassociate")}
+                onClick={() => setReassociateTarget(file)}
+              >
+                <ArrowRightLeft aria-hidden="true" />
+              </IconButton>
+              <IconButton
                 label={t("files.delete")}
                 onClick={() => {
                   setDeleteError(null);
@@ -211,6 +219,11 @@ export function BookFilesPanel({
         </ul>
       )}
 
+      {reassociateTarget && (
+        <BookTargetDialog bookId={bookId} fileId={reassociateTarget.id}
+          onClose={() => setReassociateTarget(null)}
+          onChanged={() => { setReassociateTarget(null); onChanged(); }} />
+      )}
       {deleteTarget !== null ? (
         <Modal
           describedBy="delete-file-description"

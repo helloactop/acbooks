@@ -1,6 +1,7 @@
 {
   "brand": "acbooks",
   "nav": {
+    "organization": "Cleanup",
     "contentGroup": "Browse",
     "managementGroup": "Management",
     "main": "Main navigation",

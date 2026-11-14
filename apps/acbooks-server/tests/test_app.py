@@ -186,6 +186,9 @@ def test_business_error_contract(code: BusinessErrorCode) -> None:
         BusinessErrorCode.METADATA_STALE: ("METADATA_STALE", 409),
         BusinessErrorCode.METADATA_UNAVAILABLE: ("METADATA_UNAVAILABLE", 502),
         BusinessErrorCode.IMPORT_FILE_CHANGED: ("IMPORT_FILE_CHANGED", 409),
+        BusinessErrorCode.ORGANIZATION_ENTRY_NOT_FOUND: ("ORGANIZATION_ENTRY_NOT_FOUND", 404),
+        BusinessErrorCode.ORGANIZATION_CONFLICT: ("ORGANIZATION_CONFLICT", 409),
+        BusinessErrorCode.ORGANIZATION_STALE: ("ORGANIZATION_STALE", 409),
         BusinessErrorCode.JOB_NOT_FOUND: ("JOB_NOT_FOUND", 404),
     }[code]
     app = create_app()

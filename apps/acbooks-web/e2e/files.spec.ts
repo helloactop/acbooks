@@ -54,3 +54,34 @@ test("attaches a file while adding a book", async ({ page }) => {
   await card.click();
   await expect(page.getByRole("list", { name: "电子文件" }).getByText("PDF", { exact: true })).toBeVisible();
 });
+
+test("previews a manual merge and keeps the source file", async ({ page }) => {
+  const target = uniqueTitle("三体");
+  const source = uniqueTitle("三体珍藏版");
+  const targetCard = await addBook(page, target);
+  const targetHref = await targetCard.getAttribute("href");
+  const sourceCard = await addBook(page, source);
+  const sourceHref = await sourceCard.getAttribute("href");
+  await sourceCard.click();
+  await page.locator(FILE_INPUT).setInputFiles({
+    buffer: PDF, mimeType: "application/pdf", name: "san-ti.pdf",
+  });
+  const fileList = page.getByRole("list", { name: "电子文件" });
+  await expect(fileList.getByText("PDF", { exact: true })).toBeVisible();
+
+  await page.goto("/library");
+  await page.getByRole("button", { name: "选择", exact: true }).click();
+  await page.getByRole("checkbox", { name: `选择《${target}》` }).check();
+  await page.getByRole("checkbox", { name: `选择《${source}》` }).check();
+  await page.getByRole("button", { name: "合并书籍" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "预览合并" }).click();
+  await expect(dialog.getByText(/将迁移 1 个电子文件/)).toBeVisible();
+  await dialog.getByRole("button", { name: "合并书籍" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: target })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe(targetHref);
+  await expect(fileList.getByText("PDF", { exact: true })).toBeVisible();
+  expect(sourceHref).not.toBeNull();
+  const removed = await page.request.get(`/api/v1/books/${sourceHref?.split("/").at(-1)}`);
+  expect(removed.status()).toBe(404);
+});

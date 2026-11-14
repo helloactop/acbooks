@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { addBook, uniqueTitle } from "./helpers";
+import { addBook, openAddBookDialog, uniqueTitle } from "./helpers";
 
 test("batch edits and deletes selected books", async ({ page }) => {
   const first = uniqueTitle("E2E 批量一");
@@ -57,4 +57,24 @@ test("uploads, replaces, and removes a cover", async ({ page }) => {
   await page.getByRole("button", { name: "封面管理" }).click();
   await page.getByRole("menuitem", { name: "删除封面" }).click();
   await expect(image).toBeHidden();
+});
+
+
+test("reviews duplicate candidates on the library cleanup page", async ({ page }) => {
+  const title = uniqueTitle("重复候选");
+  await addBook(page, title);
+  const addDialog = await openAddBookDialog(page);
+  await addDialog.getByLabel("书名").fill(title);
+  await addDialog.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(addDialog).toBeHidden();
+  await page.goto("/organization");
+  await expect(page.getByRole("heading", { name: "书库整理" })).toBeVisible();
+  const row = page.getByRole("listitem").filter({ hasText: title });
+  await expect(row.getByText("书名相同")).toBeVisible();
+  await row.getByRole("button", { name: "合并书籍" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "预览合并" }).click();
+  await expect(dialog.getByRole("button", { name: "交换书目" })).toBeVisible();
+  await dialog.getByRole("button", { name: "取消" }).click();
+  await expect(row.getByRole("link", { name: title, exact: true })).toHaveCount(2);
 });
