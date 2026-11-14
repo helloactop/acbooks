@@ -397,7 +397,8 @@ def test_scan_metadata_and_explicit_duplicate_resolution(
             "IMPORT_FILE_CHANGED",
         )
         writer.write(nas / "03.pdf")
-        assert scan.run(root_id, True)["updated"] >= 1
+        updated_count = scan.run(root_id, True)["updated"]
+        assert isinstance(updated_count, int) and updated_count >= 1
         response = client.post(f"{pdf_url}/resolve", json={}, headers=challenge(client))
         assert response.status_code == 200, response.text
         assert response.json()["bookId"] != book_id
