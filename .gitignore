@@ -36,9 +36,11 @@ coverage/
 .kotlin/
 /apps/acbooks-android/**/build/
 /apps/acbooks-android/local.properties
+apps/acbooks-android/.idea/
 *.jks
 *.keystore
 
-# OS files
+# Tool and OS files
+.codex-attachments/
 .DS_Store
 Thumbs.db
