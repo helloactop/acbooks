@@ -108,6 +108,8 @@ Room: acbooks-reader.db         # Android databases 目录
 
 统一 FileStorage 接口按来源打开正文；阅读引擎需要可寻址文件而 URI 不支持时，使用校验过的临时副本。流式校验格式、大小及 SHA-256；受管理文件原子发布后写数据库。相同正文可复用内容对象，不自动合并不同书目。清缓存不删除正式副本。外部原件默认只读。
 
+已实现的手动导入通过 Android 系统文件选择器读取 EPUB/PDF，逐本提交。重复选择同一来源和相同内容时跳过；不同来源的相同内容先提示，确认后才另建书目并共用同一份正文。EPUB 优先使用内嵌书名、作者和可解码的内嵌封面；PDF 使用文件名和占位封面。正文及封面按内容哈希存储，Room 的虚拟书架只记录书目关系。导入策略参考 [Readest ingestService](https://github.com/readest/readest/blob/main/apps/readest-app/src/services/ingestService.ts)。
+
 ### 5.2 授权文件夹与批量导入
 
 - 书库提供“导入文件”“授权文件夹”入口；设置可管理多个已授权目录。用 SAF `ACTION_OPEN_DOCUMENT_TREE` 选择目录，持久化实际授予的读取权限（`takePersistableUriPermission`），不申请全盘文件权限。
@@ -140,6 +142,8 @@ Room: acbooks-reader.db         # Android databases 目录
 
 本地 UUID 永久不变；上传后仅新增远程映射，不替换本地主键。远程映射按服务器实例和账号隔离。一本书允许多个文件，进度和标注绑定具体文件版本；不同正文不得盲目套用旧 Locator。阅读位置用版本化 Locator JSON，百分比只用于展示。Room 必须提供迁移，不允许破坏性清库。
 
+目前 EPUB 使用 Readium Navigator，PDF 使用 Android `PdfRenderer` 逐页显示。应用通过 Room 按 `bookFileId` 保存 Readium Locator 或 PDF 页索引。阅读器从应用私有书库读取文件，无需登录。
+
 ## 7. 账号和 API
 
 参考 mybooks-android 的 AuthClient、Endpoint、ConnectionStore 和 ApiClient：
@@ -151,7 +155,9 @@ Room: acbooks-reader.db         # Android databases 目录
 
 现有 acbooks `/api/v1` 已有 books、files、uploads、reading-sessions、reading-positions、bookmarks、annotations、stats。以 `docs/api/` 和实际 OpenAPI 为准，不复用 my-books 的旧路径。
 
-**待后端实现：**原生设备登录、会话验证/撤销、Bearer 鉴权、服务器实例身份与能力声明、完整增量拉取及变更幂等。复用已有 `devices`、`sync_changes`、`sync_mutations` 模型和业务服务；保留 Web Cookie/CSRF 安全规则。不得假设这些能力已经开放。设备 ID 必须绑定认证身份。
+Android 设置已通过 [设备认证接口](../api/android-client.md) 接入原生设备登录、会话验证和撤销。连接使用 Android 系统信任的 HTTPS，设备 Bearer 会话使用 Android Keystore 加密保存，密码仅用于登录请求。Web Cookie/CSRF 规则独立保留。
+
+服务器实例身份与能力发现、增量同步和变更幂等尚未接入 Android。接入时复用已有 `devices`、`sync_changes`、`sync_mutations` 模型及公开 API，设备 ID 必须绑定认证身份。
 
 ## 8. 同步与文件传输
 

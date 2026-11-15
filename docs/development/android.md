@@ -3,8 +3,8 @@
 Android 工程位于 `apps/acbooks-android/`，在 Android Studio 中直接打开该目录。命令行构建使用仓库内的 Gradle Wrapper。
 
 - 使用 JDK 17 或 21，将 `JAVA_HOME` 或 Android Studio 的 Gradle JDK 指向该 JDK。Java 和 Kotlin 字节码目标均为 17。
-- 通过 SDK Manager 安装 Android API 36、Android SDK Build-Tools 35.0.0 和 Android SDK Platform-Tools。将 `ANDROID_HOME` 指向 SDK，或由 Android Studio 写入本机 `local.properties`。
-- 最低系统版本是 Android 6.0（API 23），编译和目标 API 均为 36。
+- 通过 SDK Manager 安装 Android API 37 及 Android SDK Platform-Tools。将 `ANDROID_HOME` 指向 SDK，或由 Android Studio 写入本机 `local.properties`。
+- 最低系统版本是 Android 7.0（API 24），编译 API 为 37，目标 API 为 36。
 - 首次构建需要访问 Gradle 分发站、Google Maven、Maven Central 和 Gradle Plugin Portal。工具链与库版本见 [Version Catalog](../../apps/acbooks-android/gradle/libs.versions.toml) 和 [开源依赖说明](../../LICENSE.md#android-开源依赖)。
 
 从 `apps/acbooks-android/` 执行以下命令。Windows PowerShell 上将 `bash ./gradlew` 换成 `.\gradlew.bat`。

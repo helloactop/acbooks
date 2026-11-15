@@ -7,13 +7,15 @@ bash ./gradlew assembleDebug testDebugUnitTest lintDebug
 bash ./gradlew :app:connectedDebugAndroidTest :core:database:connectedDebugAndroidTest
 ```
 
-连接一个 API 23 或更新的设备运行设备测试。系统设置中的应用语言需在 API 33 或更新的设备验证。构建和安装步骤见 [Android 开发环境](../development/android.md)。
+连接一个 API 24 或更新的设备运行设备测试。系统设置中的应用语言需在 API 33 或更新的设备验证。手势、取消和状态恢复验收见 [Android 动画规范](../ui/android-motion.md)。构建和安装步骤见 [Android 开发环境](../development/android.md)。
 
 | 检查 | 覆盖范围 |
 | --- | --- |
 | DataStore JVM 测试 | 默认跟随系统，显式主题跨 DataStore 实例持久化，未知存储值回退 |
 | 启动仪器测试 | 启动 Activity、Hilt 注入、导航默认进入首页，中英文切换与 Activity 重建，其他语言回退英文 |
+| 导航仪器测试 | 验证边缘手势松手前当前页面保持原位、左右边缘提交返回，以及重建后的路由恢复。验证连续设置导航、下拉菜单和原生底部浮层优先消费返回 |
 | Room 仪器测试 | 测试内存库的生成 DAO 写入和查询 |
+| 本地书库 Room 仪器测试 | 同一来源重复导入、相同内容的独立书目确认，以及移出和删除书架时保留书目 |
 | Android Lint | Android 清单、资源、平台 API 和源码静态检查 |
 | 设计系统 JVM 测试 | 主题色派生的文字与控件对比度、API 与能力分级、Fluent 图标变体和控件加粗 |
 | 组件预览仪器测试 | 语言与主题切换、材质降级、导航与独立添加入口、收藏和书签切换及双语可访问名称、菜单和浮层 |
@@ -27,3 +29,5 @@ bash ./gradlew :app:connectedDebugAndroidTest :core:database:connectedDebugAndro
 公共设计系统在同一环境通过 Debug、未签名 Release 构建、Lint、5 项 JVM 测试与 5 项设备测试。API 31–32 由能力分级单元测试覆盖，模糊和实色路径在 API 36 预览中验证。真实低版本设备、墨水屏及渲染帧耗时尚未验证。
 
 迁移 Fluent UI System Icons 1.0.1 后，使用 JDK 21 通过 Debug、未签名 Release 构建、Lint、8 项 JVM 测试及 API 36 模拟器上的 5 项仪器测试。图标测试覆盖 Filled 导航、Regular 控件描边及收藏和书签变体，组件预览验证中英文可访问名称随状态变化。
+
+Navigation Compose 2.10.2 接入后，Debug 构建、应用和设计系统 Lint、8 项设计系统 JVM 测试通过。API 36 模拟器上的两项导航仪器测试通过，覆盖左右边缘返回、手势取消、Activity 重建后恢复外观页、连续导航和 Sheet 关闭后保留当前 Tab。APK 清单确认最低 API 24，API 24–34 设备运行暂未验证。
