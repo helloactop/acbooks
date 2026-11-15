@@ -1,7 +1,7 @@
 # acbooks Android 架构规范
 
-> 路径：`docs/architecture/android-reader.md`  
-> 工程：`apps/acbooks-android/`  
+> 路径：`docs/architecture/android-reader.md`<br>
+> 工程：`apps/acbooks-android/`<br>
 > 本文为开发规范，未实现的功能按阶段开发。
 
 ## 1. 产品定位

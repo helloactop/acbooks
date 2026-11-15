@@ -1,7 +1,7 @@
 # acbooks Android UI 设计规范
 
-> 建议路径：`docs/ui/android-ui.md`  
-> 工程：`apps/acbooks-android/`  
+> 建议路径：`docs/ui/android-ui.md`<br>
+> 工程：`apps/acbooks-android/`<br>
 > 上位规范：`docs/architecture/android-reader.md`
 
 ## 1. 设计原则

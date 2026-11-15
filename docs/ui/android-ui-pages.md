@@ -1,7 +1,7 @@
 # acbooks Android 页面设计规范
 
-> 路径：`docs/ui/android-ui-pages.md`  
-> 上位规范：[android-ui.md](android-ui.md)、[android-reader.md](../architecture/android-reader.md)  
+> 路径：`docs/ui/android-ui-pages.md`<br>
+> 上位规范：[android-ui.md](android-ui.md)、[android-reader.md](../architecture/android-reader.md)<br>
 > 本文规定页面结构、组件职责与交互；颜色、形状、材质、动效及国际化统一遵循 UI 规范。
 
 ## 1. 主导航与标题
