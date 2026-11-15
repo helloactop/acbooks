@@ -1,19 +1,22 @@
 [versions]
-agp = "8.13.2"
-kotlin = "2.3.10"
-ksp = "2.3.10"
-hilt = "2.58"
-compileSdk = "36"
-minSdk = "23"
+agp = "9.3.2"
+kotlin = "2.4.10"
+ksp = "2.3.14"
+hilt = "2.60.1"
+compileSdk = "37"
+minSdk = "24"
 targetSdk = "36"
-activity = "1.11.0"
+activity = "1.13.0"
 appcompat = "1.7.1"
-compose-bom = "2026.02.00"
-backdrop = "1.0.6"
-shapes = "1.2.0"
+fragment = "1.9.1"
+readium = "3.4.0"
+desugar = "2.1.5"
+compose-bom = "2026.08.00"
+backdrop = "2.0.1"
+shapes = "1.2.1"
 fluent-icons = "1.0.1"
-navigation = "2.9.5"
-lifecycle = "2.9.4"
+navigation = "2.10.2"
+lifecycle = "2.11.0"
 room = "2.8.4"
 datastore = "1.1.7"
 junit = "4.13.2"
@@ -26,6 +29,10 @@ shapes = { module = "io.github.kyant0:shapes", version.ref = "shapes" }
 fluent-icons = { module = "io.github.niyajali:fluentui-system-icons-android", version.ref = "fluent-icons" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+androidx-fragment-compose = { module = "androidx.fragment:fragment-compose", version.ref = "fragment" }
+readium-navigator = { module = "org.readium.kotlin-toolkit:readium-navigator", version.ref = "readium" }
+readium-streamer = { module = "org.readium.kotlin-toolkit:readium-streamer", version.ref = "readium" }
+desugar-jdk = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar" }
 androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
 androidx-compose-foundation = { module = "androidx.compose.foundation:foundation" }
 androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
@@ -45,7 +52,6 @@ androidx-test-runner = { module = "androidx.test:runner", version.ref = "android
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }

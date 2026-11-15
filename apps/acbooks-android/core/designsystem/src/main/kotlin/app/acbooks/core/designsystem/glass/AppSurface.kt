@@ -34,6 +34,7 @@ fun AppSurface(
     foreground: Color = LocalAppColors.current.textPrimary,
     border: Color = Color.Unspecified,
     layerBlock: (GraphicsLayerScope.() -> Unit)? = null,
+    refract: Boolean = material == AppMaterial.Control,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val backdrop = LocalBackdrop.current
@@ -50,7 +51,7 @@ fun AppSurface(
             layerBlock = layerBlock,
             effects = {
                 blur((if (overlay) GlassTokens.overlayBlur else GlassTokens.controlBlur).toPx())
-                if (!overlay && capability == GlassCapability.Refraction &&
+                if (refract && capability == GlassCapability.Refraction &&
                     (shape is RoundedRectangularShape || shape is CornerBasedShape)
                 ) {
                     lens(GlassTokens.refractionHeight.toPx(), GlassTokens.refractionAmount.toPx())

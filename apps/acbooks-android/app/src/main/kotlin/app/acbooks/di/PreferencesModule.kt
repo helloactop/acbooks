@@ -2,6 +2,7 @@ package app.acbooks.di
 
 import android.content.Context
 import app.acbooks.core.datastore.AppearancePreferences
+import app.acbooks.core.datastore.ProfilePreferences
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -16,4 +17,9 @@ object PreferencesModule {
     @Singleton
     fun provideAppearancePreferences(@ApplicationContext context: Context): AppearancePreferences =
         AppearancePreferences(context)
+
+    @Provides
+    @Singleton
+    fun provideProfilePreferences(@ApplicationContext context: Context): ProfilePreferences =
+        ProfilePreferences(context)
 }

@@ -1,5 +1,6 @@
 package app.acbooks.core.designsystem.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -14,8 +15,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import app.acbooks.core.designsystem.glass.AppMaterial
 import app.acbooks.core.designsystem.glass.AppSurface
+import app.acbooks.core.designsystem.icons.AppIcon
+import app.acbooks.core.designsystem.icons.AppIcons
+import app.acbooks.core.designsystem.icons.ControlIcon
+import app.acbooks.core.designsystem.theme.AppShapes
 import app.acbooks.core.designsystem.theme.LocalAppColors
 import app.acbooks.core.designsystem.tokens.AppSizes
 import app.acbooks.core.designsystem.tokens.AppSpacing
@@ -31,6 +37,7 @@ fun AppListItem(
     title: String,
     modifier: Modifier = Modifier,
     supportingText: String? = null,
+    leading: @Composable () -> Unit = {},
     trailing: @Composable () -> Unit = {},
 ) {
     val colors = LocalAppColors.current
@@ -40,6 +47,7 @@ fun AppListItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
+            leading()
             Column(Modifier.weight(1f)) {
                 Text(title, style = AppTypography.body)
                 supportingText?.let { Text(it, style = AppTypography.small, color = colors.textSecondary) }
@@ -47,6 +55,65 @@ fun AppListItem(
             trailing()
         }
     }
+}
+
+@Composable
+fun AppSettingsEntry(
+    title: String,
+    icon: AppIcon,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    supportingText: String? = null,
+) {
+    SettingsEntry(title, onClick, modifier, supportingText, leading = { ControlIcon(icon, contentDescription = null) })
+}
+
+@Composable
+fun AppSettingsProfileCard(
+    nickname: String,
+    editHint: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SettingsEntry(
+        nickname, onClick, modifier, supportingText = editHint,
+        leading = { AppProfileAvatar(Modifier.size(AppSizes.profileAvatar)) },
+    )
+}
+
+@Composable
+fun AppProfileAvatar(modifier: Modifier = Modifier) {
+    AppSurface(
+        modifier.size(AppSizes.avatar),
+        shape = AppShapes.circle,
+        tint = LocalAppColors.current.surfaceSecondary,
+    ) {
+        ControlIcon(AppIcons.Profile, contentDescription = null, modifier = Modifier.align(Alignment.Center))
+    }
+}
+
+@Composable
+private fun SettingsEntry(
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    supportingText: String? = null,
+    leading: @Composable () -> Unit,
+) {
+    AppListItem(
+        title = title,
+        modifier = modifier.clickable(role = Role.Button, onClick = onClick),
+        supportingText = supportingText,
+        leading = leading,
+        trailing = {
+            ControlIcon(
+                AppIcons.ChevronRight,
+                contentDescription = null,
+                small = true,
+                tint = LocalAppColors.current.textSecondary,
+            )
+        },
+    )
 }
 
 @Composable

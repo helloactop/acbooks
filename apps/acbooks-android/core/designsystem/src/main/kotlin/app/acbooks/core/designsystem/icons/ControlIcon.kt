@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.VectorGroup
 import androidx.compose.ui.graphics.vector.VectorPath
+import androidx.compose.ui.unit.Dp
 import app.acbooks.core.designsystem.tokens.AppSizes
 
 @Composable
@@ -20,11 +21,12 @@ fun ControlIcon(
     modifier: Modifier = Modifier,
     small: Boolean = false,
     tint: Color = LocalContentColor.current,
+    iconSize: Dp = if (small) AppSizes.iconSmall else AppSizes.icon,
 ) {
     Icon(
         icon.controlVector,
         contentDescription,
-        modifier.size(if (small) AppSizes.iconSmall else AppSizes.icon),
+        modifier.size(iconSize),
         tint,
     )
 }

@@ -17,11 +17,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.VisualTransformation
 import app.acbooks.core.designsystem.R
 import app.acbooks.core.designsystem.icons.AppIcons
 import app.acbooks.core.designsystem.glass.AppMaterial
@@ -31,6 +33,7 @@ import app.acbooks.core.designsystem.theme.LocalAppColors
 import app.acbooks.core.designsystem.tokens.AppSizes
 import app.acbooks.core.designsystem.tokens.AppSpacing
 import app.acbooks.core.designsystem.tokens.AppTypography
+import app.acbooks.core.designsystem.tokens.IconButtonSize
 
 @Composable
 fun AppTextField(
@@ -42,6 +45,7 @@ fun AppTextField(
     errorMessage: String? = null,
     clearable: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     val colors = LocalAppColors.current
     var focused by remember { mutableStateOf(false) }
@@ -49,7 +53,7 @@ fun AppTextField(
         !enabled -> colors.divider
         errorMessage != null -> colors.destructiveText
         focused -> colors.accentBorder
-        else -> colors.controlBorder
+        else -> Color.Unspecified
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
         Text(label, style = AppTypography.small, color = colors.textPrimary)
@@ -70,6 +74,7 @@ fun AppTextField(
                             if (errorMessage != null) error(errorMessage)
                         },
                     enabled = enabled, singleLine = true, keyboardOptions = keyboardOptions,
+                    visualTransformation = visualTransformation,
                     textStyle = AppTypography.body.copy(color = if (enabled) colors.textPrimary else colors.textSecondary),
                     cursorBrush = SolidColor(colors.accentText),
                     decorationBox = { field ->
@@ -80,7 +85,10 @@ fun AppTextField(
                     },
                 )
                 if (clearable && enabled && value.isNotEmpty()) {
-                    AppIconButton(AppIcons.Clear, stringResource(R.string.app_clear), { onValueChange("") })
+                    LiquidGlassIconButton(
+                        AppIcons.Clear, stringResource(R.string.app_clear), { onValueChange("") },
+                        size = IconButtonSize.XS,
+                    )
                 }
             }
         }

@@ -2,6 +2,7 @@ package app.acbooks.core.designsystem.tokens
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 
@@ -21,6 +22,7 @@ data class AppColors(
     val accentBorder: Color,
     val onAccent: Color,
     val destructive: Color,
+    val onDestructive: Color,
     val destructiveText: Color,
     val controlBorder: Color,
 )
@@ -48,6 +50,7 @@ fun appColors(dark: Boolean, accent: Color = DefaultAccent): AppColors {
         ensureContrast(opaqueAccent, text, listOf(background, surface, secondary, soft), 3.02f),
         if (contrast(Color.Black, opaqueAccent) >= 4.5f) Color.Black else Color.White,
         destructive,
+        if (contrast(Color.Black, destructive) >= 4.5f) Color.Black else Color.White,
         ensureContrast(destructive, text, listOf(surface, secondary), 4.5f),
         ensureContrast(if (light) Color(0xFF6E6E73) else Color(0xFF98989D), text, listOf(surface, secondary), 3f),
     )
@@ -57,6 +60,24 @@ internal fun contrast(first: Color, second: Color): Float {
     val a = first.luminance()
     val b = second.luminance()
     return (maxOf(a, b) + 0.05f) / (minOf(a, b) + 0.05f)
+}
+
+internal fun buttonGlassTint(tint: Color, foreground: Color, preferredOpacity: Float): Color {
+    val worstBackdrop = if (foreground.luminance() <= tint.luminance()) Color.Black else Color.White
+    val glass = tint.copy(alpha = preferredOpacity)
+    if (contrast(foreground, glass.compositeOver(worstBackdrop)) >= 4.5f) return glass
+
+    var low = glass.alpha
+    var high = 1f
+    repeat(16) {
+        val opacity = (low + high) / 2f
+        if (contrast(foreground, tint.copy(alpha = opacity).compositeOver(worstBackdrop)) >= 4.5f) {
+            high = opacity
+        } else {
+            low = opacity
+        }
+    }
+    return tint.copy(alpha = high)
 }
 
 private fun ensureContrast(color: Color, target: Color, backgrounds: List<Color>, minimum: Float): Color {

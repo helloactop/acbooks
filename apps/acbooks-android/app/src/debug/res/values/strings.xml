@@ -22,14 +22,12 @@
     <string name="preview_disabled">Disabled</string>
     <string name="preview_loading">Loading</string>
     <string name="preview_menu">Menu</string>
-    <string name="preview_home">Home</string>
-    <string name="preview_library">Library</string>
-    <string name="preview_stats">Statistics</string>
-    <string name="preview_add">Add</string>
     <string name="preview_overlay_message">This panel samples the scene behind it.</string>
     <string name="preview_close">Close</string>
     <string name="preview_add_favorite">Add to favorites</string>
     <string name="preview_remove_favorite">Remove from favorites</string>
     <string name="preview_add_bookmark">Add bookmark</string>
     <string name="preview_remove_bookmark">Remove bookmark</string>
+    <string name="preview_confirm">Confirm</string>
+    <string name="preview_library_all">All</string>
 </resources>

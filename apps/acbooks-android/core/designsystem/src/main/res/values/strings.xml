@@ -1,3 +1,15 @@
 <resources>
     <string name="app_clear">Clear</string>
+    <string name="app_back">Back</string>
+    <string name="app_library_edit">Edit library</string>
+    <string name="app_library_more">More library actions</string>
+    <string name="app_library_search">Search your library</string>
+    <string name="app_library_categories">Categories</string>
+    <string name="app_select_expanded">Expanded</string>
+    <string name="app_select_collapsed">Collapsed</string>
+    <string name="app_select_placeholder">Select an option</string>
+    <string name="app_dock_home">Home</string>
+    <string name="app_dock_library">Library</string>
+    <string name="app_dock_statistics">Statistics</string>
+    <string name="app_dock_add">Add</string>
 </resources>

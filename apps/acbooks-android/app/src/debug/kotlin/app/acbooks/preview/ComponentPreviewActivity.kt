@@ -43,10 +43,83 @@ class ComponentPreviewActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            ComponentPreview(appearance) { dark ->
+            val updateSystemBars: (Boolean) -> Unit = { dark ->
                 WindowCompat.getInsetsController(window, window.decorView).apply {
                     isAppearanceLightStatusBars = !dark
                     isAppearanceLightNavigationBars = !dark
+                }
+            }
+            if (intent.getBooleanExtra("buttons", false)) {
+                val dark = intent.getBooleanExtra("dark", false)
+                val limit = when (intent.getStringExtra("glass")) {
+                    "solid" -> GlassCapability.Solid
+                    "blur" -> GlassCapability.Blur
+                    else -> GlassCapability.Refraction
+                }
+                SideEffect { updateSystemBars(dark) }
+                ButtonPreview(dark, limit)
+            } else {
+                ComponentPreview(appearance, updateSystemBars)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ButtonPreview(dark: Boolean, capability: GlassCapability) {
+    AcbooksTheme(dark, if (dark) Color(0xFF36C2A5) else DefaultAccent) {
+        val colors = LocalAppColors.current
+        AppGlassScene(
+            Modifier.fillMaxSize(),
+            capabilityLimit = capability,
+            background = {
+                Box(Modifier.fillMaxSize().background(Brush.linearGradient(
+                    0f to colors.background,
+                    0.30f to colors.background,
+                    0.31f to colors.accentSoft,
+                    0.46f to colors.accentSoft,
+                    0.47f to colors.background,
+                    0.56f to colors.background,
+                    0.57f to colors.accentSoft,
+                    1f to colors.background,
+                )))
+            },
+        ) {
+            Column(
+                Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(AppSpacing.page),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.lg),
+            ) {
+                Text("Liquid Glass buttons", style = AppTypography.title, color = colors.textPrimary)
+                Text(LocalGlassCapability.current.name, style = AppTypography.small, color = colors.textSecondary)
+                for (sizes in IconButtonSize.entries.chunked(3)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        for (size in sizes) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(AppSpacing.xs),
+                            ) {
+                                Box(Modifier.height(IconButtonSize.Dock.diameter), contentAlignment = Alignment.Center) {
+                                    LiquidGlassIconButton(AppIcons.Add, size.name, {}, size = size)
+                                }
+                                Text(size.name, style = AppTypography.subhead, color = colors.textPrimary)
+                                Text(
+                                    "${size.diameter.value.toInt()} / ${size.icon.value.toInt()} dp",
+                                    style = AppTypography.caption, color = colors.textSecondary,
+                                )
+                            }
+                        }
+                    }
+                }
+                LiquidGlassButton("Compact · 32 dp", {}, size = TextButtonSize.Compact)
+                LiquidGlassButton("Primary · 44 dp", {}, Modifier.fillMaxWidth(), kind = ButtonKind.Primary)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(ButtonSizeTokens.dialogGap),
+                ) {
+                    LiquidGlassButton("Cancel", {}, Modifier.weight(1f), size = TextButtonSize.Dialog)
+                    LiquidGlassButton(
+                        "Delete", {}, Modifier.weight(1f), size = TextButtonSize.Dialog, kind = ButtonKind.Destructive,
+                    )
                 }
             }
         }
@@ -79,6 +152,7 @@ private fun ComponentPreview(appearance: AppearancePreferences, onTheme: (Boolea
     var favorite by rememberSaveable { mutableStateOf(false) }
     var bookmarked by rememberSaveable { mutableStateOf(false) }
     var search by rememberSaveable { mutableStateOf("") }
+    var libraryFilter by rememberSaveable { mutableIntStateOf(0) }
     val accent = storedAccent?.let { Color(it.toColorInt()) } ?: DefaultAccent
 
     AcbooksTheme(dark, accent) {
@@ -103,14 +177,27 @@ private fun ComponentPreview(appearance: AppearancePreferences, onTheme: (Boolea
                 )
             },
         ) {
-            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-                val wide = maxWidth >= AppSizes.sheet
+            Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
                 Column(
                     Modifier.align(Alignment.TopCenter).widthIn(max = AppSizes.sheet).fillMaxWidth()
-                        .verticalScroll(rememberScrollState()).padding(AppSpacing.page),
+                        .verticalScroll(rememberScrollState()).padding(AppSpacing.page)
+                        .padding(bottom = AppSizes.navigation + AppSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
                 ) {
                     AppTopBar(stringResource(R.string.preview_title))
+                    val filters = listOf(stringResource(R.string.preview_library_all), "EPUB", "PDF")
+                    AppLibraryHeader(
+                        stringResource(R.string.library_title), 0,
+                        onEdit = { dialog = true },
+                        moreItems = listOf(AppMenuItem(stringResource(R.string.preview_dialog), { dialog = true })),
+                    )
+                    AppLibraryTools(
+                        filterLabel = filters[libraryFilter],
+                        filterItems = filters.mapIndexed { index, label -> AppMenuItem(label, { libraryFilter = index }) },
+                        onSearch = { sheet = true },
+                        onCategories = { sheet = true },
+                        modifier = Modifier.padding(horizontal = AppSpacing.page),
+                    )
                     AppSegmentedControl(
                         listOf(stringResource(R.string.preview_system), stringResource(R.string.preview_light), stringResource(R.string.preview_dark)),
                         theme.ordinal, { index -> scope.launch { appearance.setThemeMode(ThemeMode.entries[index]) } },
@@ -118,7 +205,7 @@ private fun ComponentPreview(appearance: AppearancePreferences, onTheme: (Boolea
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
                         listOf("" to stringResource(R.string.preview_system), "en" to "English", "zh-CN" to "简体中文")
                             .forEach { (tag, label) ->
-                                AppButton(label, { AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag)) },
+                                LiquidGlassButton(label, { AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag)) },
                                     kind = ButtonKind.Secondary)
                             }
                     }
@@ -128,11 +215,11 @@ private fun ComponentPreview(appearance: AppearancePreferences, onTheme: (Boolea
                     )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
                         presetAccents.forEach { preset ->
-                            AppButton(preset, { scope.launch { appearance.setAccent(preset) } }, kind = ButtonKind.Secondary)
+                            LiquidGlassButton(preset, { scope.launch { appearance.setAccent(preset) } }, kind = ButtonKind.Secondary)
                         }
-                        AppButton(stringResource(R.string.preview_apply),
+                        LiquidGlassButton(stringResource(R.string.preview_apply),
                             { enteredAccent?.let { scope.launch { appearance.setAccent(it) } } }, enabled = enteredAccent != null)
-                        AppButton(stringResource(R.string.preview_reset), {
+                        LiquidGlassButton(stringResource(R.string.preview_reset), {
                             hex = ""
                             scope.launch { appearance.setAccent(null) }
                         }, kind = ButtonKind.Secondary)
@@ -155,17 +242,17 @@ private fun ComponentPreview(appearance: AppearancePreferences, onTheme: (Boolea
                     )
                     AppSearchField(search, { search = it }, stringResource(R.string.preview_search))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
-                        AppButton(stringResource(R.string.preview_dialog), { dialog = true })
-                        AppButton(stringResource(R.string.preview_sheet), { sheet = true }, kind = ButtonKind.Secondary)
-                        AppButton(stringResource(R.string.preview_danger), { dialog = true }, kind = ButtonKind.Destructive)
-                        AppButton(stringResource(R.string.preview_disabled), {}, enabled = false)
-                        AppButton(stringResource(R.string.preview_loading), {}, loading = true)
-                        AppIconButton(
+                        LiquidGlassButton(stringResource(R.string.preview_dialog), { dialog = true })
+                        LiquidGlassButton(stringResource(R.string.preview_sheet), { sheet = true }, kind = ButtonKind.Secondary)
+                        LiquidGlassButton(stringResource(R.string.preview_danger), { dialog = true }, kind = ButtonKind.Destructive)
+                        LiquidGlassButton(stringResource(R.string.preview_disabled), {}, enabled = false)
+                        LiquidGlassButton(stringResource(R.string.preview_loading), {}, loading = true)
+                        LiquidGlassIconButton(
                             AppIcons.Favorite.forState(favorite),
                             stringResource(if (favorite) R.string.preview_remove_favorite else R.string.preview_add_favorite),
                             { favorite = !favorite },
                         )
-                        AppIconButton(
+                        LiquidGlassIconButton(
                             AppIcons.Bookmark.forState(bookmarked),
                             stringResource(if (bookmarked) R.string.preview_remove_bookmark else R.string.preview_add_bookmark),
                             { bookmarked = !bookmarked },
@@ -174,27 +261,39 @@ private fun ComponentPreview(appearance: AppearancePreferences, onTheme: (Boolea
                             AppMenuItem(stringResource(R.string.preview_dialog), { dialog = true }),
                             AppMenuItem(stringResource(R.string.preview_sheet), { sheet = true }),
                         )) {
-                            AppIconButton(AppIcons.More, stringResource(R.string.preview_menu), { menu = true })
+                            LiquidGlassIconButton(AppIcons.More, stringResource(R.string.preview_menu), { menu = true })
                         }
                     }
-                    val tabs = listOf(
-                        AppNavItem(stringResource(R.string.preview_home), AppIcons.Home),
-                        AppNavItem(stringResource(R.string.preview_library), AppIcons.Library),
-                        AppNavItem(stringResource(R.string.preview_stats), AppIcons.Statistics),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                        AppNavigationBar(tabs, activeTab, { activeTab = it }, Modifier.weight(1f), vertical = wide)
-                        AppAddButton(stringResource(R.string.preview_add), { sheet = true })
-                    }
                 }
+                AppBottomDock(
+                    selected = activeTab,
+                    onSelect = { activeTab = it },
+                    onAdd = { sheet = true },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                        .widthIn(max = AppSizes.sheet).fillMaxWidth()
+                        .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
+                )
             }
-            AppDialog(dialog, stringResource(R.string.preview_dialog), { dialog = false }) {
+            AppDialog(
+                dialog,
+                stringResource(R.string.preview_dialog),
+                { dialog = false },
+                actions = listOf(
+                    AppDialogAction(stringResource(R.string.preview_confirm), AppDialogActionRole.Primary) { dialog = false },
+                    AppDialogAction(stringResource(R.string.preview_close), AppDialogActionRole.Cancel) { dialog = false },
+                ),
+            ) {
                 Text(stringResource(R.string.preview_overlay_message))
-                AppButton(stringResource(R.string.preview_close), { dialog = false })
             }
-            AppSheet(sheet, stringResource(R.string.preview_sheet), { sheet = false }) {
+            AppSheet(
+                sheet,
+                stringResource(R.string.preview_sheet),
+                { sheet = false },
+                actions = listOf(
+                    AppDialogAction(stringResource(R.string.preview_close), AppDialogActionRole.Cancel) { sheet = false },
+                ),
+            ) {
                 AppTextField(search, { search = it }, stringResource(R.string.preview_search))
-                AppButton(stringResource(R.string.preview_close), { sheet = false })
             }
         }
     }

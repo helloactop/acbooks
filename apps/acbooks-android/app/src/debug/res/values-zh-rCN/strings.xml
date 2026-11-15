@@ -22,14 +22,12 @@
     <string name="preview_disabled">已禁用</string>
     <string name="preview_loading">加载中</string>
     <string name="preview_menu">菜单</string>
-    <string name="preview_home">首页</string>
-    <string name="preview_library">书库</string>
-    <string name="preview_stats">统计</string>
-    <string name="preview_add">添加</string>
     <string name="preview_overlay_message">此浮层采样后方场景。</string>
     <string name="preview_close">关闭</string>
     <string name="preview_add_favorite">添加收藏</string>
     <string name="preview_remove_favorite">取消收藏</string>
     <string name="preview_add_bookmark">添加书签</string>
     <string name="preview_remove_bookmark">移除书签</string>
+    <string name="preview_confirm">确定</string>
+    <string name="preview_library_all">全部</string>
 </resources>

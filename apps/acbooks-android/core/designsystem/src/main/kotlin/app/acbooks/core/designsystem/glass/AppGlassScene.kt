@@ -16,6 +16,9 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
+import app.acbooks.core.designsystem.components.AppSelectOverlay
+import app.acbooks.core.designsystem.components.LocalSelectOverlay
+import app.acbooks.core.designsystem.components.SelectOverlayState
 import app.acbooks.core.designsystem.theme.LocalAppColors
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -38,6 +41,7 @@ fun glassCapability(
 internal val LocalBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 val LocalGlassCapability = staticCompositionLocalOf { GlassCapability.Solid }
 internal val LocalGlassDepth = staticCompositionLocalOf { 0 }
+internal val LocalButtonBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 
 @Composable
 fun AppGlassScene(
@@ -45,6 +49,7 @@ fun AppGlassScene(
     reduceTransparency: Boolean = false,
     eInk: Boolean = false,
     capabilityLimit: GlassCapability = GlassCapability.Refraction,
+    sampleButtonBackground: Boolean = false,
     background: @Composable BoxScope.() -> Unit = {},
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -58,30 +63,52 @@ fun AppGlassScene(
         eInk,
     ).coerceAtMost(capabilityLimit)
     val backdrop = if (capability != GlassCapability.Solid) rememberLayerBackdrop() else null
+    val buttonBackdrop = if (backdrop != null && sampleButtonBackground) rememberLayerBackdrop() else null
+    var buttonBackgroundReady by remember(buttonBackdrop) { mutableStateOf(false) }
     var backgroundReady by remember(backdrop) { mutableStateOf(false) }
+    val selectOverlay = remember { SelectOverlayState() }
 
-    Box(modifier) {
-        val capture = if (backdrop == null) Modifier else {
-            Modifier.onGloballyPositioned { backgroundReady = it.size.width > 0 && it.size.height > 0 }
-                .layerBackdrop(backdrop)
-        }
-        Box(
-            Modifier.matchParentSize()
-                .drawWithContent {
-                    val accelerated = drawContext.canvas.nativeCanvas.isHardwareAccelerated
-                    if (canvasAccelerated != accelerated) canvasAccelerated = accelerated
-                    drawContent()
+    CompositionLocalProvider(LocalSelectOverlay provides selectOverlay) {
+        Box(modifier) {
+            if (buttonBackdrop != null) {
+                Box(
+                    Modifier.matchParentSize()
+                        .onGloballyPositioned { buttonBackgroundReady = it.size.width > 0 && it.size.height > 0 }
+                        .layerBackdrop(buttonBackdrop)
+                        .background(colors.background),
+                )
+            }
+            val capture = if (backdrop == null) Modifier else {
+                Modifier.onGloballyPositioned { backgroundReady = it.size.width > 0 && it.size.height > 0 }
+                    .layerBackdrop(backdrop)
+            }
+            Box(
+                Modifier.matchParentSize()
+                    .drawWithContent {
+                        val accelerated = drawContext.canvas.nativeCanvas.isHardwareAccelerated
+                        if (canvasAccelerated != accelerated) canvasAccelerated = accelerated
+                        drawContent()
+                    }
+                    .then(capture)
+                    .background(colors.background),
+            ) {
+                CompositionLocalProvider(
+                    LocalButtonBackdrop provides buttonBackdrop.takeIf { buttonBackgroundReady },
+                    LocalButtonGlassCapability provides capability,
+                ) {
+                    background()
                 }
-                .then(capture)
-                .background(colors.background),
-            content = background,
-        )
-        CompositionLocalProvider(
-            LocalBackdrop provides backdrop.takeIf { backgroundReady },
-            LocalGlassCapability provides capability,
-            LocalGlassDepth provides 0,
-        ) {
-            content()
+            }
+            CompositionLocalProvider(
+                LocalBackdrop provides backdrop.takeIf { backgroundReady },
+                LocalGlassCapability provides capability,
+                LocalGlassDepth provides 0,
+            ) {
+                content()
+                AppSelectOverlay(selectOverlay)
+            }
         }
     }
 }
+
+internal val LocalButtonGlassCapability = staticCompositionLocalOf { GlassCapability.Solid }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +37,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.IntOffset
 import app.acbooks.core.designsystem.glass.AppMaterial
 import app.acbooks.core.designsystem.glass.AppSurface
+import app.acbooks.core.designsystem.glass.LocalBackdrop
+import app.acbooks.core.designsystem.glass.LocalGlassDepth
 import app.acbooks.core.designsystem.icons.AppIcon
 import app.acbooks.core.designsystem.icons.ControlIcon
 import app.acbooks.core.designsystem.theme.AppShapes
@@ -45,6 +48,9 @@ import app.acbooks.core.designsystem.tokens.AppRadius
 import app.acbooks.core.designsystem.tokens.AppSizes
 import app.acbooks.core.designsystem.tokens.AppSpacing
 import app.acbooks.core.designsystem.tokens.AppTypography
+import com.kyant.backdrop.catalog.components.LiquidBottomTab
+import com.kyant.backdrop.catalog.components.LiquidBottomTabs
+import com.kyant.backdrop.catalog.components.LiquidToggle
 
 data class AppNavItem(val label: String, val icon: AppIcon)
 
@@ -56,6 +62,25 @@ fun AppNavigationBar(
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
 ) {
+    require(selected in items.indices)
+    val backdrop = LocalBackdrop.current
+    if (!vertical && backdrop != null && LocalGlassDepth.current == 0) {
+        val selection = rememberUpdatedState(selected)
+        val callback = rememberUpdatedState(onSelect)
+        val currentIndex = remember { { selection.value } }
+        val select = remember { { index: Int -> callback.value(index) } }
+        LiquidBottomTabs(currentIndex, select, backdrop, items.size, modifier.selectableGroup()) {
+            items.forEachIndexed { index, item ->
+                val active = index == selected
+                LiquidBottomTab(onClick = { onSelect(index) }, selected = active) {
+                    ControlIcon(item.icon, contentDescription = null,
+                        tint = if (active) LocalAppColors.current.accentText else LocalAppColors.current.textPrimary)
+                    SelectionLabel(item.label, active)
+                }
+            }
+        }
+        return
+    }
     SelectionBar(items.map { it.label }, selected, onSelect, modifier, vertical, navigation = true) { index, active ->
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             ControlIcon(items[index].icon, contentDescription = null, tint = if (active) LocalAppColors.current.accentText else LocalAppColors.current.textPrimary)
@@ -112,7 +137,7 @@ private fun SelectionBar(
     }
     AppSurface(
         modifier.then(drag).selectableGroup(), AppMaterial.Control, AppShapes.capsule,
-        tint = colors.surfaceSecondary, border = colors.controlBorder,
+        tint = colors.surfaceSecondary,
     ) {
         BoxWithConstraints(Modifier.padding(AppSpacing.xs)) {
             val extent = if (vertical) minHeight else maxWidth / labels.size
@@ -124,7 +149,7 @@ private fun SelectionBar(
                     Modifier.offset { IntOffset(offset.roundToPx(), 0) }.width(extent).fillMaxHeight()
                 }
                 AppSurface(position, shape = AppShapes.inset(AppRadius.capsule, AppSpacing.xs),
-                    tint = colors.accentSoft, border = colors.accentBorder) {}
+                    tint = colors.accentSoft) {}
             }
             if (vertical) {
                 Column(Modifier.widthIn(min = AppSizes.navigation)) {
@@ -173,6 +198,18 @@ fun AppSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val backdrop = LocalBackdrop.current
+    if (enabled && backdrop != null && LocalGlassDepth.current == 0) {
+        val selection = rememberUpdatedState(checked)
+        val callback = rememberUpdatedState(onCheckedChange)
+        val isSelected = remember { { selection.value } }
+        val select = remember { { value: Boolean -> callback.value(value) } }
+        LiquidToggle(
+            isSelected, select, backdrop,
+            modifier.defaultMinSize(minHeight = AppSizes.touch).semantics { contentDescription = label },
+        )
+        return
+    }
     val colors = LocalAppColors.current
     val thumbSize = AppSizes.icon
     val offset by animateDpAsState(
@@ -200,14 +237,12 @@ fun AppSwitch(
             if (enabled) AppMaterial.Control else AppMaterial.Content,
             AppShapes.circle,
             tint = if (checked && enabled) colors.accentSoft else colors.surfaceSecondary,
-            border = if (checked && enabled) colors.accentBorder else colors.controlBorder,
         ) {
             AppSurface(
                 Modifier.align(Alignment.CenterStart).offset { IntOffset(offset.roundToPx(), 0) }
                     .width(thumbSize).height(thumbSize),
                 shape = AppShapes.circle,
                 tint = if (checked && enabled) colors.accentText else colors.surface,
-                border = if (checked && enabled) colors.accentText else colors.controlBorder,
             ) {}
         }
     }

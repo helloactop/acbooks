@@ -37,25 +37,35 @@ acbooks 源码采用 [GPL-3.0-only](LICENSE)。以下为 Android 工程当前直
 
 | 依赖 | 版本 | 许可证 |
 | --- | --- | --- |
-| [Gradle Wrapper](https://github.com/gradle/gradle/blob/v8.14.3/LICENSE) | 8.14.3 | Apache-2.0 |
-| [Android Gradle Plugin](https://android.googlesource.com/platform/tools/base/) | 8.13.2 | Apache-2.0 |
-| [Kotlin、Compose 编译插件](https://github.com/JetBrains/kotlin/blob/v2.3.10/license/LICENSE.txt) | 2.3.10 | Apache-2.0 |
-| [KSP](https://github.com/google/ksp/blob/2.3.10/LICENSE) | 2.3.10 | Apache-2.0 |
-| [Dagger Hilt](https://github.com/google/dagger/blob/dagger-2.58/LICENSE.txt) | 2.58 | Apache-2.0 |
-| [AndroidX Activity、AppCompat、Lifecycle](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 1.11.0 / 1.7.1 / 2.9.4 | Apache-2.0 |
-| [Jetpack Compose、Material 3](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | BOM 2026.02.00（Compose UI 1.10.3、Material 3 1.4.0） | Apache-2.0 |
-| [AndroidLiquidGlass / Backdrop](https://github.com/Kyant0/AndroidLiquidGlass) | 1.0.6 | Apache-2.0 |
-| [Shapes](https://github.com/Kyant0/Shapes) | 1.2.0 | Apache-2.0 |
+| [Gradle Wrapper](https://github.com/gradle/gradle/blob/v9.7.1/LICENSE) | 9.7.1 | Apache-2.0 |
+| [Android Gradle Plugin](https://android.googlesource.com/platform/tools/base/) | 9.3.2 | Apache-2.0 |
+| [Kotlin、Compose 编译插件](https://github.com/JetBrains/kotlin/blob/v2.4.10/license/LICENSE.txt) | 2.4.10 | Apache-2.0 |
+| [KSP](https://github.com/google/ksp/blob/2.3.14/LICENSE) | 2.3.14 | Apache-2.0 |
+| [Dagger Hilt](https://github.com/google/dagger/blob/dagger-2.60.1/LICENSE.txt) | 2.60.1 | Apache-2.0 |
+| [AndroidX Activity、AppCompat、Lifecycle](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 1.13.0 / 1.7.1 / 2.11.0 | Apache-2.0 |
+| [Jetpack Compose、Material 3](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | BOM 2026.08.00（Compose UI 1.12.0、Material 3 1.4.0） | Apache-2.0 |
+| [AndroidLiquidGlass / Backdrop](https://github.com/Kyant0/AndroidLiquidGlass/releases/tag/2.0.1) | 2.0.1 | Apache-2.0 |
+| [Shapes](https://github.com/Kyant0/Shapes) | 1.2.1 | Apache-2.0 |
 | [Fluent UI System Icons](https://github.com/niyajali/fluentui-system-icons) | 1.0.1 | [MIT](#fluent-ui-system-icons) |
-| [Navigation Compose、Room、DataStore](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 2.9.5 / 2.8.4 / 1.1.7 | Apache-2.0 |
+| [Navigation Compose、Room、DataStore](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 2.10.2 / 2.8.4 / 1.1.7 | Apache-2.0 |
 | [AndroidX Test](https://github.com/android/android-test/blob/main/LICENSE) | JUnit 扩展 1.2.1 / Runner 1.6.2 | Apache-2.0 |
 | [JUnit 4](https://github.com/junit-team/junit4/blob/r4.13.2/LICENSE-junit.txt) | 4.13.2 | EPL-1.0 |
 
 [Version Catalog](apps/acbooks-android/gradle/libs.versions.toml) 是直接依赖版本的来源。
 
+设计系统中的按钮、底栏和开关使用 Kyant0 [Backdrop Catalog 2.0.1](https://github.com/Kyant0/AndroidLiquidGlass/tree/2.0.1/app/src/commonMain/kotlin/com/kyant/backdrop/catalog) 源码。acbooks 为按钮补充禁用状态和弹窗所需的尺寸参数，并为底栏选项和开关补充可访问状态。上游版权和 [Apache-2.0 许可证](apps/acbooks-android/core/designsystem/src/main/kotlin/com/kyant/backdrop/catalog/LICENSE) 与源码一同保留。
+
 组件封装参考 [Lumi Books](https://github.com/huangder/Lumi_Books) 和 [prism_ui](https://github.com/chen08209/prism_ui) 的设计与交互。Android 控件图标的描边加粗实现参考 Lumi Books 的 [ControlIcon.kt](https://github.com/huangder/Lumi_Books/blob/HEAD/app/src/main/java/com/huangder/lumibooks/ui/icons/ControlIcon.kt)，该项目按 GPL-3.0 发布。
 
+弹窗操作的语义角色、文案测量和材质分层参考 Lumi Books（GPL-3.0）在提交 `66c6d9d` 中的 [AppDialogAction](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/components/AppDialogAction.kt)、[LiquidGlassButton](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/components/LiquidGlassButton.kt)、[LiquidGlassSurface](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/components/LiquidGlassSurface.kt) 与 [AppTokens](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/theme/AppTokens.kt)。acbooks 使用自有主题令牌和现有 Kyant0 渲染实现。
+
 ## 第三方版权与许可声明
+
+Android 书库顶栏的操作布局参考 Lumi Books 的 [BookshelfScreen](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/bookshelf/BookshelfScreen.kt) 和 [MainTabHeader](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/components/MainTabHeader.kt)。acbooks 使用自有 Compose 组件和主题令牌实现。
+
+Android 服务器设置的连接状态和操作分组参考 mybooks-android（GPL-3.0）的 [MyBooksSettingsScreen](https://github.com/helloactop/mybooks-android/blob/78888d0bcd3e9201dd2021986334b3b19bd11b9e/app/src/main/java/com/huangder/lumibooks/ui/settings/MyBooksSettingsScreen.kt)。登录和验证使用 acbooks 设备认证接口。
+
+Android EPUB 阅读使用 [Readium Kotlin Toolkit 3.4.0](https://github.com/readium/kotlin-toolkit/tree/3.4.0) 的 Streamer 和 Navigator，遵循其 [BSD-3-Clause 许可证](https://github.com/readium/kotlin-toolkit/blob/3.4.0/LICENSE)。Compose 中托管阅读器使用 AndroidX Fragment Compose（Apache-2.0）。
 
 ### shadcn-calendar-heatmap
 
