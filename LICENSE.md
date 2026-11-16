@@ -47,12 +47,15 @@ acbooks 源码采用 [GPL-3.0-only](LICENSE)。以下为 Android 工程当前直
 | [AndroidLiquidGlass / Backdrop](https://github.com/Kyant0/AndroidLiquidGlass/releases/tag/2.0.1) | 2.0.1 | Apache-2.0 |
 | [Haze](https://github.com/chrisbanes/haze/tree/2.1.0) | 2.1.0（`haze`、`haze-blur`） | [Apache-2.0](https://github.com/chrisbanes/haze/blob/2.1.0/LICENSE) |
 | [Shapes](https://github.com/Kyant0/Shapes) | 1.2.1 | Apache-2.0 |
+| [Miuix](https://github.com/compose-miuix-ui/miuix/tree/v0.9.4) | 0.9.4（`miuix-ui-android`、`miuix-preference-android`、`miuix-icons-android`、`miuix-blur-android`、`miuix-squircle-android`、`miuix-nav-android`） | [Apache-2.0](https://github.com/compose-miuix-ui/miuix/blob/v0.9.4/LICENSE) |
 | [Fluent UI System Icons](https://github.com/niyajali/fluentui-system-icons) | 1.0.1 | [MIT](#fluent-ui-system-icons) |
 | [Navigation Compose、Room、DataStore](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 2.10.2 / 2.8.4 / 1.1.7 | Apache-2.0 |
 | [AndroidX Test](https://github.com/android/android-test/blob/main/LICENSE) | JUnit 扩展 1.2.1 / Runner 1.6.2 | Apache-2.0 |
 | [JUnit 4](https://github.com/junit-team/junit4/blob/r4.13.2/LICENSE-junit.txt) | 4.13.2 | EPL-1.0 |
 
 [Version Catalog](apps/acbooks-android/gradle/libs.versions.toml) 是直接依赖版本的来源。
+
+`miuix-ui-android` 会传递引入同项目的 `miuix-core`、`miuix-squircle` 与 `miuix-shader`（均 Apache-2.0），以及 `com.materialkolor:material-color-utilities` 5.0.1（[MIT](https://github.com/jordond/materialkolor/blob/master/LICENSE)）。
 
 主页面与二级页的顶栏高斯模糊使用 Haze 2.1.0 的 `haze` 与 `haze-blur` 模块（Apache-2.0），只采样页面正文，不与 Backdrop 控件层互相采样。
 
