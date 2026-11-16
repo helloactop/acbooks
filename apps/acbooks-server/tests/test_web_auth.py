@@ -63,7 +63,9 @@ def test_session_is_hashed_survives_restart_and_logout_revokes_only_current(
     response = browser.post(LOGIN, json=CREDENTIALS, headers=preauth)
     assert response.status_code == 200
     account = response.json()["account"]
-    assert response.json() == {"account": {"id": account["id"], "username": "Admin"}}
+    assert response.json() == {
+        "account": {"id": account["id"], "username": "Admin", "avatarUpdatedAt": None}
+    }
     raw = browser.cookies[COOKIE]
     assert len(raw) == 43
     cookie = next(value for value in response.headers.get_list("set-cookie") if COOKIE in value)

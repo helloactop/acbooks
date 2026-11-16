@@ -44,6 +44,7 @@ apps/acbooks-server/
 | `imports` | NAS 扫描、文件发现、导入、去重候选与任务编排 |
 | `metadata` | EPUB/PDF/音频元数据提取、封面、外部元数据来源 |
 | `reader` | 阅读状态、会话、位置、书签、划线、笔记 |
+| `profile` | 唯一管理员头像的校验、裁剪、存储与修订时间；账号名仍由 `auth` 负责 |
 | `stats` | 根据 `reading_sessions` 计算时长、次数、间隔、日历和趋势 |
 | `sync` | 设备登记、增量变更、`mutation_id` 幂等及冲突策略 |
 | `opds` | 将书库能力适配为 OPDS，不维护第二套书籍数据 |

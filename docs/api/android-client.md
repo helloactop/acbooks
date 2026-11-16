@@ -7,6 +7,12 @@
 3. 将用户选定的服务器 `bookId`、`bookFileId` 和本地 SHA-256 与文件 URI 一起保存在客户端数据库。多条候选需让用户选择，即使文件字节完全相同也可能属于不同书目。打开本地文件时校验它仍是关联版本。若服务端文件的哈希改变或同步收到文件墓碑，标记关联待确认。索引状态为 `missing` 的文件仍可匹配本地副本。
 4. 未匹配时，可用现有书目 API 选择或创建书目，再提交 `POST /api/v1/uploads?reuseExisting=true`。新文件返回 201，同书已有相同内容且索引为可用时返回 200。两者都返回可用于关联的稳定文件 ID。跨书同哈希仍允许各自关联。
 
+## 账号资料与头像
+
+- `GET /api/v1/auth/me` 返回 `avatarUpdatedAt`；与本地缓存修订不同时，用同一 Bearer 调用 `GET /api/v1/auth/me/avatar` 下载 512×512 JPEG。
+- 上传使用 `PUT /api/v1/auth/me/avatar`，`multipart/form-data` 的 `file` 字段为客户端裁剪压缩后的 JPEG；服务端会再次校验并统一尺寸。超过 5 MB 返回 `413`，损坏或非 JPEG/PNG/WebP 返回 `422`。
+- 设备 Bearer 写入不需要 CSRF；Web Cookie 写入仍须 `X-CSRF-Token` 和可信来源。未登录时客户端可先保存本地头像并标记待同步，登录后按“本地待同步优先，否则服务器修订优先”的规则同步。
+
 ## 下载与校验
 
 - 从文件内容接口下载到临时文件。保存返回的强 `ETag`，断点续传时发送 `Range: bytes=<已下载字节数>-` 和 `If-Range: <ETag>`。收到 206 时，核对 `Content-Range` 起点、总长度与验证器再追加；收到 200 时从头替换临时文件。

@@ -175,7 +175,7 @@ def test_book_orm_supports_copies_and_multiple_files(database: Engine) -> None:
         " VALUES ('bad', 'book', 10, 9, 0, 'manual')",
         "INSERT INTO sync_mutations (id, device_id, mutation_id, created_at)"
         " VALUES ('mutation2', 'device', 'key', 1)",
-        "INSERT INTO auth_accounts VALUES ('account2', 2, 'b', 'b', 'hash', 1, 1, 1)",
+        "INSERT INTO auth_accounts VALUES ('account2', 2, 'b', 'b', 'hash', 1, 1, 1, NULL)",
         "INSERT INTO auth_sessions (id, account_id, session_token_hash, created_at, expires_at)"
         " VALUES ('session', 'account', 'digest', 10, 10)",
         "INSERT INTO auth_tokens (id, account_id, token_hash, kind, scope, label,"
@@ -195,7 +195,7 @@ def test_database_constraints(database: Engine, sql: str) -> None:
             "INSERT INTO devices (id, name) VALUES ('device', 'Reader')",
             "INSERT INTO sync_mutations (id, device_id, mutation_id, created_at)"
             " VALUES ('mutation', 'device', 'key', 1)",
-            "INSERT INTO auth_accounts VALUES ('account', 1, 'a', 'a', 'hash', 1, 1, 1)",
+            "INSERT INTO auth_accounts VALUES ('account', 1, 'a', 'a', 'hash', 1, 1, 1, NULL)",
         ):
             connection.exec_driver_sql(seed)
     with pytest.raises(IntegrityError), database.begin() as connection:
@@ -397,7 +397,7 @@ def test_only_one_admin_can_be_created_concurrently(database: Engine) -> None:
             with database.connect().execution_options(sqlite_begin_immediate=True) as connection:
                 with connection.begin():
                     connection.exec_driver_sql(
-                        "INSERT INTO auth_accounts VALUES (?, 1, ?, ?, 'hash', 1, 1, 1)",
+                        "INSERT INTO auth_accounts VALUES (?, 1, ?, ?, 'hash', 1, 1, 1, NULL)",
                         (name, name, name),
                     )
         except IntegrityError:
@@ -620,6 +620,7 @@ def test_batch_migration_must_preserve_status_triggers(tmp_path: Path, table: st
     # Exercise an independent batch migration on the pre-sync schema.
     (scripts / "versions/0007_sync.py").unlink()
     (scripts / "versions/0008_file_hash.py").unlink()
+    (scripts / "versions/0009_account_avatar.py").unlink()
     command.upgrade(config, "0003")
     migration = scripts / "versions/0006_test_batch.py"
     migration.write_text(

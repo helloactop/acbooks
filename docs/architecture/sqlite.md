@@ -31,7 +31,7 @@
 | 同步 | `sync_changes(seq, entity_type, entity_id, operation, changed_at)` | 递增 `seq`，用于增量游标、实体版本和删除墓碑 |
 | 同步 | `sync_mutations(id, device_id, mutation_id, created_at, request_hash?, receipt_json?)` | 唯一 `(device_id, mutation_id)`，用于幂等重放与内容冲突检查 |
 | 任务 | `background_jobs(id, type, status, payload_json, created_at, updated_at)` | 扫描、导入、解析、整理任务 |
-| 认证 | `auth_accounts(id, singleton_slot, username, username_normalized, password_hash, password_changed_at, created_at, updated_at)` | 唯一管理员账号；`singleton_slot=1` 且唯一，不能创建第二账号 |
+| 认证 | `auth_accounts(id, singleton_slot, username, username_normalized, password_hash, password_changed_at, created_at, updated_at, avatar_updated_at)` | 唯一管理员账号；`singleton_slot=1` 且唯一，不能创建第二账号 |
 | 认证 | `auth_sessions(id, account_id, session_token_hash, created_at, expires_at, revoked_at?, last_seen_at?)` | Web Cookie 会话；服务端可撤销，原文 session token 绝不存库 |
 | 认证 | `auth_tokens(id, account_id, token_hash, kind, scope, label, created_at, expires_at, revoked_at?, last_used_at?)` | 原生端 Bearer / OPDS、WebDAV 应用凭据；按类型与范围限制 |
 | 配置 | `app_settings(key, value_json)` | 系统配置；Alembic 自带迁移版本表 |
@@ -42,12 +42,12 @@
 
 | 表 | 必须满足的 SQLite 约束与行为 |
 | --- | --- |
-| `auth_accounts` | `id TEXT PRIMARY KEY`（UUID）；`singleton_slot INTEGER NOT NULL UNIQUE CHECK(singleton_slot = 1)`；`username_normalized TEXT NOT NULL UNIQUE`；`username` 与 `password_hash` 非空；时间字段 `INTEGER NOT NULL`。用户名在应用层去除首尾空格、规范化并生成大小写无关的 `username_normalized`；不允许插入第二个管理员。 |
+| `auth_accounts` | `id TEXT PRIMARY KEY`（UUID）；`singleton_slot INTEGER NOT NULL UNIQUE CHECK(singleton_slot = 1)`；`username_normalized TEXT NOT NULL UNIQUE`；`username` 与 `password_hash` 非空；`avatar_updated_at` 可空，仅表示头像修订时间，头像文件保存在 `ACBOOKS_AVATARS_DIR`；其余时间字段 `INTEGER NOT NULL`。用户名在应用层去除首尾空格、规范化并生成大小写无关的 `username_normalized`；不允许插入第二个管理员。 |
 | `auth_sessions` | `id TEXT PRIMARY KEY`（UUID）、`account_id TEXT NOT NULL REFERENCES auth_accounts(id) ON DELETE RESTRICT`；`session_token_hash TEXT NOT NULL UNIQUE`；`created_at`、`expires_at` 为非空 UTC 毫秒，且 `expires_at > created_at`；`revoked_at`、`last_seen_at` 可空。仅 Web Cookie 使用。 |
 | `auth_tokens` | `id TEXT PRIMARY KEY`（UUID）、`account_id TEXT NOT NULL REFERENCES auth_accounts(id) ON DELETE RESTRICT`；`token_hash TEXT NOT NULL UNIQUE`；`kind TEXT NOT NULL CHECK(kind IN ('device','application'))`；`scope TEXT NOT NULL CHECK(scope IN ('full','read'))`；`label TEXT NOT NULL`；时间规则同会话，`revoked_at`、`last_used_at` 可空。首版应用凭据 `kind='application'` 必须 `scope='read'`，用 `CHECK(kind <> 'application' OR scope = 'read')` 固定；`device` 凭据可以为 `full`。 |
 
 - `password_hash` 必须为**含参数与随机盐的 Argon2id 编码字符串**；不能存明文、可逆密文或 SHA-256 密码摘要。参数由目标 NAS 性能测试决定，并符合适用的 OWASP 最低要求。
-- Web 会话与客户端/应用令牌必须使用密码学安全随机生成的 **至少 256 位不透明凭据**；数据库只存凭据的 SHA-256 摘要供等值查找。摘要不是密码哈希；不得把原始凭据、Cookie、初始化码写入 `payload_json`、日志或数据库。
+- Web 会话与客户端/应用令牌必须使用密码学安全随机生成的 **至少 256 位不透明凭据**；数据库只存凭据的 SHA-256 摘要供等值查找。摘要不是密码哈希；不得把原始凭据、Cookie 写入 `payload_json`、日志或数据库。
 - 登录创建会话或令牌；请求验证时同时检查关联账号、`expires_at` 与 `revoked_at`；登出撤销当前会话或令牌；修改/本地重置密码须在事务中**撤销该账号全部现存会话和令牌**。
 - **初始化状态只由 `auth_accounts` 是否存在唯一记录判定**，不用 `app_settings` 再存一份 `initialized` 标志；安装码是 `/data/acbooks/secrets/` 内的权限 `0600` 文件，不进入 SQLite。`POST /setup` 在一个 `BEGIN IMMEDIATE` 或等效显式 SQLite 写事务中校验初始化前提并插入管理员；唯一约束保证并发请求只成功一个。初始化事务提交后废止安装码；即使废止文件失败，已有账号也永久阻止公开重试。
 - 单用户**不等于**使用全局超级令牌：应用凭据只读、与登录凭据隔离，支持过期、手动撤销；`devices` 仍只表达阅读同步的设备身份，不替代 `auth_tokens`。
@@ -60,6 +60,12 @@
 上传/替换/删除封面由 Books 服务完成：上传/替换使用独立版本文件名，先写新文件再提交
 数据库，提交成功后清理旧文件，数据库失败时删除新文件并保留原封面；删除封面在提交
 成功后清理文件。不得留下半写文件，也不得把客户端文件名写入数据库。
+
+**头像存储**：唯一管理员头像保存在 `ACBOOKS_AVATARS_DIR`（默认 `/data/acbooks/avatars`），
+文件名固定为 `<account_id>.jpg`，数据库只保存 `avatar_updated_at`（UTC 毫秒，可空）。
+迁移 `0009` 仅用 `ALTER TABLE` 增加该列。上传时由服务端用 Pillow 解码、按 EXIF 方向
+摆正并居中裁成 512×512 JPEG，先写临时文件再原子替换，然后更新修订时间；删除时清空
+修订时间并删除文件。头像不进入书籍封面表或同步变更表。
 
 **显式删除**：用户确认删除书目时，同一事务内删除标签/书架/作者/标识关联、实体副本、
 `reading_positions`、电子文件索引、阅读会话、书签、划线和笔记，再删除书目；

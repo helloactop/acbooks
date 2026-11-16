@@ -93,7 +93,9 @@ def auth_router(
         dependencies.check_csrf(request, token, current, "setup")
         try:
             account_id = setup.initialize(
-                body.username, body.password.get_secret_value(), body.setup_code.get_secret_value()
+                body.username,
+                body.password.get_secret_value(),
+                body.setup_code.get_secret_value() if body.setup_code is not None else None,
             )
         except BusinessError as error:
             logger.info("request_id=%s operation=setup result=%s", request_id, error.code)
@@ -107,7 +109,7 @@ def auth_router(
             secure=secure,
             samesite="strict",
         )
-        return AccountResponse(id=account_id, username=body.username)
+        return AccountResponse(id=account_id, username=body.username, avatar_updated_at=None)
 
     @router.post(
         "/auth/login",
@@ -148,9 +150,7 @@ def auth_router(
             samesite="strict",
         )
         logger.info("request_id=%s operation=login result=authenticated", request_id)
-        return LoginResponse(
-            account=AccountResponse(id=identity.account_id, username=identity.username)
-        )
+        return LoginResponse(account=auth.account(identity))
 
     @router.get(
         "/auth/me",
@@ -166,7 +166,7 @@ def auth_router(
         current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
     ) -> AccountResponse:
         response.headers["Cache-Control"] = "no-store"
-        return AccountResponse(id=current.account_id, username=current.username)
+        return auth.account(current)
 
     @router.post(
         "/auth/logout",

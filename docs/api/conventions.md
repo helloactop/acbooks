@@ -85,16 +85,20 @@
 | --- | --- | --- | --- |
 | `GET /api/v1/setup/status` | 公开 | `200 {"initialized": false}`（或 `true`） | 仅返回布尔值；`Cache-Control: no-store`，不得返回安装码或账号资料 |
 | `GET /api/v1/auth/csrf` | 公开（初始化/登录前）、登录后可用 | `200 {"csrfToken":"..."}`；对未认证浏览器设置短期安全的预认证挑战 Cookie；认证后令牌绑定当前会话 | `Cache-Control: no-store`；CSRF 令牌与挑战必须防伪、短期有效，不能存 URL/日志；可用有服务端密钥签名的双提交方案，无需新增表 |
-| `POST /api/v1/setup` | 仅 `initialized=false` 且验证安装码 | JSON `{username,password,confirmPassword,setupCode}`；`201 {"id":"uuid","username":"ac"}`，`Location: /api/v1/auth/me` | 必须带 `X-CSRF-Token` 和可信来源校验；安装码错误 `403 SETUP_CODE_INVALID`；已初始化 `409 SETUP_ALREADY_INITIALIZED`；限速；服务端原子检查且只创建一个账号；成功后**仍须单独登录** |
-| `POST /api/v1/auth/login` | 公开；**Web Cookie 登录** | JSON `{username,password}`；`200 {"account":{"id":"uuid","username":"ac"}}` + `Set-Cookie` | 必须带 `X-CSRF-Token`、可信来源校验；错误统一 `401 INVALID_CREDENTIALS`，限速；**响应不返回 Cookie 原始值或 Bearer** |
+| `POST /api/v1/setup` | 仅 `initialized=false`，不需要初始化码 | JSON `{username,password,confirmPassword}`；`201 {"id":"uuid","username":"ac","avatarUpdatedAt":null}`，`Location: /api/v1/auth/me` | 必须带 `X-CSRF-Token` 和可信来源校验；已初始化 `409 SETUP_ALREADY_INITIALIZED`；服务端原子检查且只创建一个账号；成功后**仍须单独登录**。未初始化实例应仅暴露在可信网络，首次打开即可领取管理员 |
+| `POST /api/v1/auth/login` | 公开；**Web Cookie 登录** | JSON `{username,password}`；`200 {"account":{"id":"uuid","username":"ac","avatarUpdatedAt":null}}` + `Set-Cookie` | 必须带 `X-CSRF-Token`、可信来源校验；错误统一 `401 INVALID_CREDENTIALS`，限速；**响应不返回 Cookie 原始值或 Bearer** |
 | `POST /api/v1/auth/device-login` | 公开；**Windows/Android 登录** | JSON `{username,password,deviceName?}`；`200 {"accessToken":"仅创建时返回","tokenType":"Bearer","tokenId":"uuid","expiresAt":1800000000000}` | 不产生 Cookie；密码错误同 `INVALID_CREDENTIALS`；受限速/HTTPS保护；Bearer 仅返回一次、不得记录；**无 Cookie 时不需要 CSRF** |
-| `GET /api/v1/auth/me` | 需要会话或 Bearer | `200 {"id":"uuid","username":"ac"}` | 未认证 `401`，不返回 `passwordHash`、凭据或内部角色 |
+| `GET /api/v1/auth/me` | 需要会话或 Bearer | `200 {"id":"uuid","username":"ac","avatarUpdatedAt":null}` | 未认证 `401`，不返回 `passwordHash`、凭据或内部角色 |
+| `GET /api/v1/auth/me/avatar` | 需要会话或 Bearer | `200 image/jpeg`，512×512 | 无头像 `404 AVATAR_NOT_FOUND`；`Cache-Control: private, max-age=0, must-revalidate` |
+| `PUT /api/v1/auth/me/avatar` | 已认证管理员（Cookie 请求需 CSRF） | `multipart/form-data` 的 `file`；`200` 返回更新后的账户 | 服务端用 Pillow 校验并居中裁成 512×512 JPEG；非 JPEG/PNG/WebP 或损坏 `422 INVALID_AVATAR`；超过 5 MB `413 AVATAR_TOO_LARGE` |
+| `DELETE /api/v1/auth/me/avatar` | 已认证管理员（Cookie 请求需 CSRF） | `200` 返回 `avatarUpdatedAt=null` 的账户 | 删除头像文件；重复删除返回同一账户状态 |
 | `POST /api/v1/auth/logout` | 当前有效 Web 会话 / Bearer | `204` 无响应体，撤销**当前**会话或 Token；Web 清除 Cookie | Cookie 认证必须校验 CSRF 和来源，撤销后下一请求 `401` |
 | `PATCH /api/v1/auth/password` | 已认证管理员 | JSON `{currentPassword,newPassword}`；`204` | 校验旧密码；强制撤销**全部**会话、Bearer、应用凭据，客户端重新登录；Cookie 请求须 CSRF |
 
 - **Web 会话**：Cookie 使用 `HttpOnly; Secure; SameSite=Lax`（可采用 `Strict`）、`Path=/` 且不设置 `Domain`；正式 HTTPS 可使用 `__Host-` 前缀。服务端检查会话摘要、过期和撤销；前端不把任何认证令牌放在 `localStorage`。开发环境仅允许受控 localhost 例外。
 - **CSRF**：`POST /setup`、`POST /auth/login` 及所有基于 Cookie 的写请求，必须同时校验 CSRF 与 `Origin` / `Referer` 来源；使用有绑定的预认证挑战处理“尚未登录”的初始化/登录，不可仅依赖 `SameSite` 或 CORS；缺失/伪造的挑战请求拒绝。原生端只有显式 `Authorization: Bearer`，不能接受会话 Cookie 旁路权限判断。
-- **初始化码**：安装时安全生成并放在 `/data/acbooks/secrets/`（`0600`），仅本地部署管理员可取得；不由公开 API 提供、不写入日志、永不作为日常登录凭据；初始化状态只由唯一管理员记录决定。忘记密码走**本地维护命令**，不可重开公开 setup。
+- **首次初始化**：不再要求初始化码。初始化状态只由唯一管理员记录决定；未初始化实例应只绑定 localhost 或可信内网，完成初始化后入口永久关闭。忘记密码走**本地维护命令**，不可重开公开 setup。
+- **头像**：只属于唯一管理员账号，客户端通过 `avatarUpdatedAt` 判断是否需要重新下载；头像文件保存在 `ACBOOKS_AVATARS_DIR`（默认 `/data/acbooks/avatars`），数据库只存修订时间。
 
 首次初始化已开放上述两个 setup 接口及预认证 `GET /api/v1/auth/csrf`。
 调用时先获取 `csrfToken` 并保留挑战 Cookie，再从配置的可信来源提交
@@ -102,8 +106,8 @@
 服务端对用户名执行 Unicode NFKC 规范化并去除首尾空白，要求规范化结果为
 1–128 个字符。密码须为 12–1024 个字符，与确认密码完全一致。
 输入不合规返回 `422 VALIDATION_ERROR`。缺少有效挑战或来源不可信返回
-`403 FORBIDDEN`。初始化码验证采用进程级滚动限额，每分钟最多 5 次，失败后退避，
-限速时返回 `429 RATE_LIMITED` 和 `Retry-After`。安装命令和服务来源配置见
+`403 FORBIDDEN`。初始化不需要一次性初始化码；部署时应先把未初始化实例限制在
+可信网络，初始化完成后公网只保留登录接口。服务来源配置见
 [后端运行说明](../../apps/acbooks-server/README.md#首次管理员初始化)。
 
 Web 登录先调用 `GET /api/v1/auth/csrf` 获取预认证挑战，再携带挑战 Cookie 和

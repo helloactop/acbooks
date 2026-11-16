@@ -35,12 +35,15 @@ class SetupRequest(LoginRequest):
     confirm_password: Annotated[
         SecretStr, Field(alias="confirmPassword", min_length=12, max_length=1024)
     ]
-    setup_code: Annotated[SecretStr, Field(alias="setupCode", min_length=1, max_length=128)]
+    setup_code: Annotated[
+        SecretStr | None, Field(alias="setupCode", min_length=1, max_length=128)
+    ] = None
 
     @model_validator(mode="after")
     def validate_credentials(self) -> Self:
         password = self.password.get_secret_value()
-        self.setup_code.get_secret_value().encode("utf-8")
+        if self.setup_code is not None:
+            self.setup_code.get_secret_value().encode("utf-8")
         if not password.strip() or password != self.confirm_password.get_secret_value():
             raise ValueError("Invalid password confirmation.")
         return self
@@ -53,6 +56,7 @@ class SetupStatus(BaseModel):
 class AccountResponse(BaseModel):
     id: UUID
     username: str
+    avatar_updated_at: int | None = Field(default=None, serialization_alias="avatarUpdatedAt")
 
 
 class CsrfResponse(BaseModel):

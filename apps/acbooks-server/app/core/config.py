@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     covers_dir: Path = Path("/data/acbooks/covers")
     library_dir: Path = Path("/data/acbooks/library")
+    avatars_dir: Path = Path("/data/acbooks/avatars")
     enable_docs: bool = False
     public_origin: str = "http://127.0.0.1:8000"
     web_dist_path: Path | None = None

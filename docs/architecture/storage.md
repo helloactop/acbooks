@@ -18,6 +18,7 @@
 ├── database/acbooks.db    # SQLite；须位于后端本机可靠文件系统
 ├── library/              # acbooks 托管的文件（managed）
 ├── covers/               # 派生封面/缩略图
+├── avatars/              # 管理员头像；由 ACBOOKS_AVATARS_DIR 配置
 ├── cache/                # 可重建的临时缓存
 ├── backups/              # 备份
 ├── logs/                 # 日志

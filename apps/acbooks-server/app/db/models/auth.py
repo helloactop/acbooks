@@ -18,6 +18,7 @@ class AuthAccount(Base):
     username_normalized: Mapped[str] = mapped_column(Text, unique=True)
     password_hash: Mapped[str] = mapped_column(Text)
     password_changed_at: Mapped[int] = mapped_column(Integer)
+    avatar_updated_at: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[int] = mapped_column(Integer)
     updated_at: Mapped[int] = mapped_column(Integer)
 

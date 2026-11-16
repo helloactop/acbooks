@@ -35,6 +35,15 @@ _BUSINESS_PROBLEMS = {
     BusinessErrorCode.RATE_LIMITED: (HTTPStatus.TOO_MANY_REQUESTS, "Too many requests."),
     BusinessErrorCode.BOOK_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Book not found."),
     BusinessErrorCode.COVER_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Cover not found."),
+    BusinessErrorCode.AVATAR_NOT_FOUND: (HTTPStatus.NOT_FOUND, "Avatar not found."),
+    BusinessErrorCode.INVALID_AVATAR: (
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        "Invalid avatar image.",
+    ),
+    BusinessErrorCode.AVATAR_TOO_LARGE: (
+        HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+        "Avatar exceeds the maximum upload size.",
+    ),
     BusinessErrorCode.INVALID_BOOK_FILTER: (
         HTTPStatus.UNPROCESSABLE_ENTITY,
         "Invalid book filter.",

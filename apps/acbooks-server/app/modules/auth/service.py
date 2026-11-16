@@ -34,7 +34,13 @@ from app.modules.auth.repository import (
     revoke_session,
     revoke_token,
 )
-from app.modules.auth.schemas import DeviceLoginResponse, IssuedToken, TokenPage, TokenResponse
+from app.modules.auth.schemas import (
+    AccountResponse,
+    DeviceLoginResponse,
+    IssuedToken,
+    TokenPage,
+    TokenResponse,
+)
 from app.modules.auth.setup_code import read_setup_code
 
 logger = logging.getLogger("uvicorn.error")
@@ -99,11 +105,12 @@ class SetupService:
             self.limit.failed(now)
             raise BusinessError(BusinessErrorCode.SETUP_CODE_INVALID)
 
-    def initialize(self, username: str, password: str, setup_code: str) -> UUID:
+    def initialize(self, username: str, password: str, setup_code: str | None = None) -> UUID:
         if self.initialized():
             raise BusinessError(BusinessErrorCode.SETUP_ALREADY_INITIALIZED)
-        supplied = setup_code.encode("utf-8")
-        self._check_code(supplied)
+        supplied = setup_code.encode("utf-8") if setup_code is not None else None
+        if supplied is not None:
+            self._check_code(supplied)
         password_hash = password_hasher.hash(password)
         account_id = uuid4()
         with (
@@ -113,9 +120,10 @@ class SetupService:
         ):
             if account_exists(session):
                 raise BusinessError(BusinessErrorCode.SETUP_ALREADY_INITIALIZED)
-            code = read_setup_code(self.code_path)
-            if code is None or not compare_digest(code, supplied):
-                raise BusinessError(BusinessErrorCode.SETUP_CODE_INVALID)
+            if supplied is not None:
+                code = read_setup_code(self.code_path)
+                if code is None or not compare_digest(code, supplied):
+                    raise BusinessError(BusinessErrorCode.SETUP_CODE_INVALID)
             add_account(
                 session,
                 str(account_id),
@@ -159,6 +167,15 @@ class WebAuthService:
         self.device_ttl = device_ttl
         self.application_ttl = application_ttl
         self.limit = AttemptLimit(max_attempts=10)
+
+    def account(self, identity: AuthIdentity) -> AccountResponse:
+        with self.read_sessions() as session:
+            row = session.get(AuthAccount, str(identity.account_id))
+        return AccountResponse(
+            id=identity.account_id,
+            username=identity.username,
+            avatar_updated_at=row.avatar_updated_at if row is not None else None,
+        )
 
     def authenticate(self, token: str | None) -> AuthIdentity | None:
         if token is None or not SESSION_TOKEN_PATTERN.fullmatch(token):

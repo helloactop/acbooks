@@ -16,7 +16,8 @@ python -m uvicorn app.main:create_app --factory --no-access-log
 [后端健康检查](../../docs/api/health.md)，Books Core V1 见
 [Books API](../../docs/api/books.md)。
 
-封面保存在 `ACBOOKS_COVERS_DIR`（默认 `/data/acbooks/covers`），本地上传依赖
+封面保存在 `ACBOOKS_COVERS_DIR`（默认 `/data/acbooks/covers`），账号头像保存在
+`ACBOOKS_AVATARS_DIR`（默认 `/data/acbooks/avatars`）。两类上传都依赖
 `python-multipart`（已包含在项目依赖中）。
 
 设置 `ACBOOKS_WEB_DIST_PATH` 指向 Web 构建目录后，服务端在同源下托管静态文件，
@@ -49,15 +50,9 @@ API 与 Worker 的数据库调用可复用 `app.db.session` 的引擎和会话�
 
 ## 首次管理员初始化
 
-迁移到 `head` 后，在宿主机或受信任的容器中，以后端服务用户执行安装命令。
-命令会在 `/data/acbooks/secrets/setup-code` 生成 256 位随机初始化码，不输出码本身。
-部署管理员从宿主机读取该文件。Linux 上目录须归服务用户所有，权限为 `0700`，
-文件权限为 `0600`。Windows 本地开发须将数据目录放在仅当前用户和系统管理员可访问的
-NTFS 目录下，由新文件继承目录 ACL。
-
-```sh
-python -m app.modules.auth.provision
-```
+迁移到 `head` 后启动服务，打开 Web 页面填写用户名、密码和确认密码即可创建唯一管理员。
+不需要初始化码或额外的宿主命令。未初始化实例必须先限制在 localhost 或可信内网，
+完成初始化后再对外开放；初始化完成后创建入口永久关闭。
 
 生产部署将 `ACBOOKS_PUBLIC_ORIGIN` 设为外部 HTTPS 来源，例如 `https://books.example`。
 反向代理终止 TLS 时，应向 Uvicorn 转发 HTTPS 协议信息，并把

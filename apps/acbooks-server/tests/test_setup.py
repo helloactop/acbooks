@@ -51,6 +51,7 @@ def make_client(
     *,
     covers_dir: Path | None = None,
     library_dir: Path | None = None,
+    avatars_dir: Path | None = None,
 ) -> TestClient:
     database, code_path = paths
     app = create_app(
@@ -59,6 +60,7 @@ def make_client(
         setup_code_path=code_path,
         covers_dir=covers_dir,
         library_dir=library_dir,
+        avatars_dir=avatars_dir,
     )
 
     async def simulate_client(scope: Scope, receive: Receive, send: Send) -> None:
@@ -102,6 +104,17 @@ def assert_problem(response: Response, status: int, code: str) -> None:
     assert response.json()["requestId"] == response.headers["X-Request-ID"]
 
 
+def test_setup_does_not_require_a_code(paths: tuple[Path, Path]) -> None:
+    database, code_path = paths
+    with make_client(paths) as client:
+        body = payload(code_path)
+        body.pop("setupCode")
+        response = client.post(SETUP, json=body, headers=challenge(client))
+        assert response.status_code == 201, response.text
+        assert response.json()["username"] == "Admin"
+        assert not code_path.exists()
+
+
 def test_setup_persists_only_argon2id_and_stays_closed_after_restart(
     paths: tuple[Path, Path], client: TestClient, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -118,7 +131,11 @@ def test_setup_persists_only_argon2id_and_stays_closed_after_restart(
     assert response.headers["cache-control"] == "no-store"
     assert "Max-Age=0" in response.headers["set-cookie"]
     result = response.json()
-    assert result == {"id": str(UUID(result["id"])), "username": "Admin"}
+    assert result == {
+        "id": str(UUID(result["id"])),
+        "username": "Admin",
+        "avatarUpdatedAt": None,
+    }
     assert not code_path.exists()
     provision_installation(database, code_path)
     assert not code_path.exists()
@@ -182,20 +199,13 @@ def test_invalid_input(
     assert client.get(STATUS).json() == {"initialized": False}
 
 
-def test_missing_code_and_backoff(
+def test_wrong_code_backoff(
     paths: tuple[Path, Path], client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     now = 100.0
     monkeypatch.setattr(service, "monotonic", lambda: now)
     body = payload(paths[1])
     headers = challenge(client)
-    assert_problem(
-        client.post(
-            SETUP, json={k: v for k, v in body.items() if k != "setupCode"}, headers=headers
-        ),
-        422,
-        "VALIDATION_ERROR",
-    )
     for delay in (1, 2, 4, 8, 45):
         wrong = client.post(SETUP, json={**body, "setupCode": "wrong"}, headers=headers)
         assert_problem(wrong, 403, "SETUP_CODE_INVALID")
@@ -414,4 +424,4 @@ def test_openapi_contract(client: TestClient) -> None:
     assert "Retry-After" in setup["responses"]["429"]["headers"]
     assert "application/problem+json" in setup["responses"]["422"]["content"]
     request = schema["components"]["schemas"]["SetupRequest"]
-    assert set(request["required"]) == {"username", "password", "confirmPassword", "setupCode"}
+    assert set(request["required"]) == {"username", "password", "confirmPassword"}

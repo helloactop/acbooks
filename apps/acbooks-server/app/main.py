@@ -33,6 +33,8 @@ from app.modules.library.router import library_router
 from app.modules.library.service import LibraryService
 from app.modules.metadata.router import metadata_router
 from app.modules.metadata.service import MetadataService
+from app.modules.profile.router import profile_router
+from app.modules.profile.service import ProfileService
 from app.modules.reader.router import reader_router
 from app.modules.reader.service import ReaderService
 from app.modules.stats.router import stats_router
@@ -51,11 +53,13 @@ def create_app(
     web_dist_path: Path | None = None,
     covers_dir: Path | None = None,
     library_dir: Path | None = None,
+    avatars_dir: Path | None = None,
 ) -> FastAPI:
     settings = settings if settings is not None else Settings()
     web_dist = web_dist_path if web_dist_path is not None else settings.web_dist_path
     covers = covers_dir if covers_dir is not None else settings.covers_dir
     library = library_dir if library_dir is not None else settings.library_dir
+    avatars = avatars_dir if avatars_dir is not None else settings.avatars_dir
     if web_dist is not None and not web_dist.is_dir():
         raise RuntimeError(f"Web build directory does not exist: {web_dist}")
     engine = create_sqlite_engine(database_path)
@@ -98,6 +102,10 @@ def create_app(
             auth,
             dependencies,
         ),
+        prefix="/api/v1",
+    )
+    app.include_router(
+        profile_router(ProfileService(engine, avatars), dependencies),
         prefix="/api/v1",
     )
     organization = BookOrganizationService(engine)
