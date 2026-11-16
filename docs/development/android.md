@@ -44,4 +44,6 @@ adb shell am start -n app.acbooks/.preview.ComponentPreviewActivity
 
 预览可切换中英文、跟随系统/浅色/深色、预设或自定义主题色，并模拟降低玻璃能力、减少透明效果和墨水屏。语言和主题设置通过正常应用偏好持久化。
 
-公共控件使用 `AppGlassScene` 声明同窗口背景。普通内容放在实色 `AppSurface`，控件与浮层放在独立前景。API 33+ 启用 Backdrop 折射，API 31–32 使用模糊，其他场景回退实色。锚定菜单使用独立 Popup 窗口并采取实色回退。Backdrop 1.0.6 的公开 API 使用原尺寸效果缓冲区，预览页没有采样倍率选项。
+账号资料：昵称和头像修订/待同步标记保存在 `ProfilePreferences`，头像文件缓存在应用私有目录。设置页点击 56dp 头像通过系统照片选择器选择图片，客户端居中裁剪为 512×512 JPEG；未登录时本地保存并在登录后上传，已登录时直接调用 `/api/v1/auth/me/avatar`；应用启动、登录状态变化和进入设置页时按 `avatarUpdatedAt` 拉取。首页 40dp 玻璃头像按钮读取同一缓存。昵称编辑暂只保留本地显示，后续以弹窗接入。
+
+公共控件使用 `AppGlassScene` 声明同窗口背景。普通内容放在实色 `AppSurface`，控件与浮层放在独立前景。顶栏由 `GlassPageHeader` 通过 Haze 2.1.0（`haze`、`haze-blur`）对滚动正文做渐进高斯模糊；控件与浮层继续使用 Backdrop 2.0.1。API 33+ 启用 Backdrop 折射，API 31–32 使用模糊，其他场景回退实色。锚定菜单和下拉选择在 `AppGlassScene` 内由 `AppMenuHost` 统一承载，只有缺少场景时才回退到独立 Popup 窗口和实色材质；同一时刻只保留一个菜单请求。Backdrop 的公开 API 使用原尺寸效果缓冲区，预览页没有采样倍率选项。

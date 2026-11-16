@@ -24,7 +24,7 @@ Cookie 会话和 CSRF 来源校验保持现有行为，不需要 CORS 或额外�
 API 必须保持**单 Worker**：CSRF 挑战签名和登录限速状态保存在进程内，多 Worker
 会导致校验随机失败。Compose 已固定 `--workers 1`，自行部署时不要调高。
 
-`migrate` 先执行 `alembic upgrade head`，并为尚未初始化的数据库准备一次性初始化码。
+`migrate` 先执行 `alembic upgrade head`。首次初始化不再需要初始化码。
 它成功退出后，Compose 才会启动 API 和 Worker。预期状态为 `migrate` 退出码 0、
 `api` 和 `worker` 健康。Worker 获取排他锁并检查任务表后才通过健康探针，
 `up --wait` 会等待该探针通过。
@@ -46,7 +46,7 @@ CI 在 AMD64 与 ARM64 运行器上分别执行真实的 Compose 部署验收。
 ## 持久化目录
 
 默认使用 Docker 管理的本地卷，三个服务共享容器内的 `/data/acbooks`。
-SQLite 和 Worker 锁位于 `database/`，初始化码位于 `secrets/`，内置备份默认写入 `backups/`。
+SQLite 和 Worker 锁位于 `database/`，头像位于 `avatars/`，内置备份默认写入 `backups/`。
 常规的 `docker compose down` 保留卷，`down --volumes` 会删除命名卷及库内数据。
 活动 SQLite 数据库须使用本机文件系统。
 
@@ -56,7 +56,7 @@ SQLite 和 Worker 锁位于 `database/`，初始化码位于 `secrets/`，内置
 ```sh
 export ACBOOKS_DATA_DIR=/srv/acbooks
 sudo install -d -m 0750 -o 10001 -g 10001 "$ACBOOKS_DATA_DIR"
-for directory in database library covers cache backups logs; do
+for directory in database library covers avatars cache backups logs; do
   sudo install -d -m 0750 -o 10001 -g 10001 "$ACBOOKS_DATA_DIR/$directory"
 done
 sudo install -d -m 0700 -o 10001 -g 10001 "$ACBOOKS_DATA_DIR/secrets"
@@ -71,11 +71,8 @@ API 默认发布到宿主机的 `127.0.0.1:8000`。可用 `ACBOOKS_PORT` 修改�
 受信代理地址。代理应传递 `X-Forwarded-Proto: https`，并把所有路径（包括 `/api`）
 转发到同一个 API 端口。
 
-宿主管理员可在受信终端读取初始化码，随后按 [API 说明](../api/conventions.md#41-初始化与登录路由)提交。
-
-```sh
-docker compose -f deploy/compose.yaml exec -T api cat /data/acbooks/secrets/setup-code
-```
+首次打开页面后直接填写用户名、密码和确认密码即可完成初始化，不需要初始化码。
+未初始化实例必须先限制在 localhost 或可信内网，完成初始化并登录验证后再对外开放。
 
 ## 备份与升级
 

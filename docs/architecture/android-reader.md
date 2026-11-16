@@ -157,6 +157,8 @@ Room: acbooks-reader.db         # Android databases 目录
 
 Android 设置已通过 [设备认证接口](../api/android-client.md) 接入原生设备登录、会话验证和撤销。连接使用 Android 系统信任的 HTTPS，设备 Bearer 会话使用 Android Keystore 加密保存，密码仅用于登录请求。Web Cookie/CSRF 规则独立保留。
 
+账号头像通过 `/api/v1/auth/me/avatar` 与 Web 共用同一份服务器资料。设置页点击 56dp 头像从系统照片选择器取图，按 512×512 居中裁剪并压缩；未登录时先保存到应用私有目录并标记待同步，登录后自动上传；已登录时直接上传。服务器已有头像且本地没有待同步修改时，客户端按 `avatarUpdatedAt` 下载覆盖本地缓存；应用启动、登录状态变化和每次进入设置页都会刷新，首页 40dp 玻璃头像按钮与设置卡片读取同一缓存。昵称仍保存在本地 DataStore，编辑弹窗后续接入，不再使用三级页面。
+
 服务器实例身份与能力发现、增量同步和变更幂等尚未接入 Android。接入时复用已有 `devices`、`sync_changes`、`sync_mutations` 模型及公开 API，设备 ID 必须绑定认证身份。
 
 ## 8. 同步与文件传输

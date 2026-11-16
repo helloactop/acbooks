@@ -11,7 +11,7 @@ bash ./gradlew :app:connectedDebugAndroidTest :core:database:connectedDebugAndro
 
 | 检查 | 覆盖范围 |
 | --- | --- |
-| DataStore JVM 测试 | 默认跟随系统，显式主题跨 DataStore 实例持久化，未知存储值回退 |
+| DataStore JVM 测试 | 默认跟随系统，显式主题跨 DataStore 实例持久化，未知存储值回退；昵称、头像修订与待同步标记持久化 |
 | 启动仪器测试 | 启动 Activity、Hilt 注入、导航默认进入首页，中英文切换与 Activity 重建，其他语言回退英文 |
 | 导航仪器测试 | 验证边缘手势松手前当前页面保持原位、左右边缘提交返回，以及重建后的路由恢复。验证连续设置导航、下拉菜单和原生底部浮层优先消费返回 |
 | Room 仪器测试 | 测试内存库的生成 DAO 写入和查询 |
@@ -31,3 +31,5 @@ bash ./gradlew :app:connectedDebugAndroidTest :core:database:connectedDebugAndro
 迁移 Fluent UI System Icons 1.0.1 后，使用 JDK 21 通过 Debug、未签名 Release 构建、Lint、8 项 JVM 测试及 API 36 模拟器上的 5 项仪器测试。图标测试覆盖 Filled 导航、Regular 控件描边及收藏和书签变体，组件预览验证中英文可访问名称随状态变化。
 
 Navigation Compose 2.10.2 接入后，Debug 构建、应用和设计系统 Lint、8 项设计系统 JVM 测试通过。API 36 模拟器上的两项导航仪器测试通过，覆盖左右边缘返回、手势取消、Activity 重建后恢复外观页、连续导航和 Sheet 关闭后保留当前 Tab。APK 清单确认最低 API 24，API 24–34 设备运行暂未验证。
+
+账号头像与 40dp 玻璃入口：Debug 编译、DataStore JVM 测试通过；API 36 模拟器验证照片选择、512×512 裁剪、本地保存、设置卡片与首页 40dp 玻璃头像显示，以及无服务器时的待同步状态。服务器头像上传、`avatarUpdatedAt` 修订和设备 Bearer 下载同一 512×512 文件由后端 pytest 与 Web 登录实测覆盖；Android 端到端上传需要受信任的 HTTPS 服务器，本轮未验证。

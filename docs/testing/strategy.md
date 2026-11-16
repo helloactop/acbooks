@@ -94,8 +94,8 @@ python apps/acbooks-server/tests/compose/smoke.py
 ```
 
 - 验证迁移权限错误阻止 API 和 Worker 启动，修复权限后检查 Alembic 版本、非 root 用户和 SQLite WAL。
-- 通过启用证书校验的 Caddy HTTPS 代理完成管理员初始化、登录及登出，验证 Cookie、一次性初始化码和代理信任边界。
+- 通过启用证书校验的 Caddy HTTPS 代理完成管理员初始化、登录及登出，验证 Cookie、无初始化码初始化和代理信任边界。
 - 用共享数据卷启动第二个 Worker，验证排他锁和正常关闭，并验证未就绪的 Worker 无法通过 `up --wait`。
-- 重建容器后验证管理员 ID 保留，已使用的初始化码没有重新生成。
+- 重建容器后验证管理员 ID 保留，初始化入口保持关闭。
 
 目标 NAS 的实际绑定目录、域名和代理配置仍需按 [Docker 部署说明](../deployment/docker.md)验收。

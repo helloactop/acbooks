@@ -6,9 +6,10 @@ acbooks 内置 `app.modules.backup`，使用 SQLite Online Backup API 生成一�
 Alembic revision。每个备份旁生成同名 `.json` 清单，包含大小、SHA-256、schema 版本和
 创建时间；恢复前会核对清单，避免使用被截断或混入其他版本的备份。
 
-备份只包含 SQLite 数据库。`storage_roots` 指向的电子书与 `covers/` 封面仍需按 NAS
-快照或文件备份单独保护；`.env`、反向代理证书和 `/data/acbooks/secrets/` 也应一并
-备份。为避免数据库与文件不一致，恢复前会校验备份库引用的 **managed** 电子书与封面
+备份只包含 SQLite 数据库。`storage_roots` 指向的电子书、`covers/` 封面与
+`avatars/` 头像文件仍需按 NAS 快照或文件备份单独保护；`.env`、反向代理证书和
+`/data/acbooks/secrets/` 也应一并备份。头像文件的修订时间存在数据库中，文件缺失时
+客户端会回退为默认图标。为避免数据库与文件不一致，恢复前会校验备份库引用的 **managed** 电子书与封面
 文件是否存在于当前文件系统：存在缺失时默认拒绝恢复（`external` 根文件可能离线，
 不计入）；确认另行恢复或接受缺失时可用 `--allow-missing-files` 放行。
 
