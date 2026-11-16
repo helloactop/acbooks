@@ -1,10 +1,13 @@
 package app.acbooks.core.designsystem.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -15,6 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import app.acbooks.core.designsystem.glass.AppMaterial
 import app.acbooks.core.designsystem.glass.AppSurface
@@ -71,26 +77,54 @@ fun AppSettingsEntry(
 @Composable
 fun AppSettingsProfileCard(
     nickname: String,
-    editHint: String,
-    onClick: () -> Unit,
+    avatarLabel: String,
+    avatar: ImageBitmap?,
+    onAvatarClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsEntry(
-        nickname, onClick, modifier, supportingText = editHint,
-        leading = { AppProfileAvatar(Modifier.size(AppSizes.profileAvatar)) },
-    )
+    AppCard(modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = AppSizes.touch).padding(AppSpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        ) {
+            Box(
+                Modifier.size(AppSizes.profileAvatar)
+                    .clip(AppShapes.circle)
+                    .clickable(role = Role.Button, onClickLabel = avatarLabel, onClick = onAvatarClick),
+                contentAlignment = Alignment.Center,
+            ) {
+                AppProfileAvatar(avatar, Modifier.size(AppSizes.profileAvatar))
+            }
+            Text(nickname, Modifier.weight(1f), style = AppTypography.body)
+        }
+    }
 }
 
 @Composable
-fun AppProfileAvatar(modifier: Modifier = Modifier) {
+fun AppProfileAvatar(image: ImageBitmap?, modifier: Modifier = Modifier) {
     AppSurface(
-        modifier.size(AppSizes.avatar),
+        modifier,
         shape = AppShapes.circle,
         tint = LocalAppColors.current.surfaceSecondary,
     ) {
-        ControlIcon(AppIcons.Profile, contentDescription = null, modifier = Modifier.align(Alignment.Center))
+        if (image != null) {
+            Image(
+                image,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            ControlIcon(
+                AppIcons.Profile,
+                contentDescription = null,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
     }
 }
+
 
 @Composable
 private fun SettingsEntry(

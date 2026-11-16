@@ -45,6 +45,7 @@ acbooks 源码采用 [GPL-3.0-only](LICENSE)。以下为 Android 工程当前直
 | [AndroidX Activity、AppCompat、Lifecycle](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 1.13.0 / 1.7.1 / 2.11.0 | Apache-2.0 |
 | [Jetpack Compose、Material 3](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | BOM 2026.08.00（Compose UI 1.12.0、Material 3 1.4.0） | Apache-2.0 |
 | [AndroidLiquidGlass / Backdrop](https://github.com/Kyant0/AndroidLiquidGlass/releases/tag/2.0.1) | 2.0.1 | Apache-2.0 |
+| [Haze](https://github.com/chrisbanes/haze/tree/2.1.0) | 2.1.0（`haze`、`haze-blur`） | [Apache-2.0](https://github.com/chrisbanes/haze/blob/2.1.0/LICENSE) |
 | [Shapes](https://github.com/Kyant0/Shapes) | 1.2.1 | Apache-2.0 |
 | [Fluent UI System Icons](https://github.com/niyajali/fluentui-system-icons) | 1.0.1 | [MIT](#fluent-ui-system-icons) |
 | [Navigation Compose、Room、DataStore](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 2.10.2 / 2.8.4 / 1.1.7 | Apache-2.0 |
@@ -52,6 +53,8 @@ acbooks 源码采用 [GPL-3.0-only](LICENSE)。以下为 Android 工程当前直
 | [JUnit 4](https://github.com/junit-team/junit4/blob/r4.13.2/LICENSE-junit.txt) | 4.13.2 | EPL-1.0 |
 
 [Version Catalog](apps/acbooks-android/gradle/libs.versions.toml) 是直接依赖版本的来源。
+
+主页面与二级页的顶栏高斯模糊使用 Haze 2.1.0 的 `haze` 与 `haze-blur` 模块（Apache-2.0），只采样页面正文，不与 Backdrop 控件层互相采样。
 
 设计系统中的按钮、底栏和开关使用 Kyant0 [Backdrop Catalog 2.0.1](https://github.com/Kyant0/AndroidLiquidGlass/tree/2.0.1/app/src/commonMain/kotlin/com/kyant/backdrop/catalog) 源码。acbooks 为按钮补充禁用状态和弹窗所需的尺寸参数，并为底栏选项和开关补充可访问状态。上游版权和 [Apache-2.0 许可证](apps/acbooks-android/core/designsystem/src/main/kotlin/com/kyant/backdrop/catalog/LICENSE) 与源码一同保留。
 

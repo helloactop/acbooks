@@ -16,13 +16,16 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
-import app.acbooks.core.designsystem.components.AppSelectOverlay
-import app.acbooks.core.designsystem.components.LocalSelectOverlay
-import app.acbooks.core.designsystem.components.SelectOverlayState
+import app.acbooks.core.designsystem.components.AppMenuHostState
+import app.acbooks.core.designsystem.components.AppMenuOverlay
+import app.acbooks.core.designsystem.components.LocalAppMenuHost
 import app.acbooks.core.designsystem.theme.LocalAppColors
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 
 enum class GlassCapability { Solid, Blur, Refraction }
 
@@ -39,6 +42,7 @@ fun glassCapability(
 }
 
 internal val LocalBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+internal val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
 val LocalGlassCapability = staticCompositionLocalOf { GlassCapability.Solid }
 internal val LocalGlassDepth = staticCompositionLocalOf { 0 }
 internal val LocalButtonBackdrop = staticCompositionLocalOf<Backdrop?> { null }
@@ -63,12 +67,15 @@ fun AppGlassScene(
         eInk,
     ).coerceAtMost(capabilityLimit)
     val backdrop = if (capability != GlassCapability.Solid) rememberLayerBackdrop() else null
+    val hazeState = rememberHazeState()
+    val hazeCapture = if (capability == GlassCapability.Solid) Modifier else Modifier.hazeSource(hazeState)
     val buttonBackdrop = if (backdrop != null && sampleButtonBackground) rememberLayerBackdrop() else null
     var buttonBackgroundReady by remember(buttonBackdrop) { mutableStateOf(false) }
     var backgroundReady by remember(backdrop) { mutableStateOf(false) }
-    val selectOverlay = remember { SelectOverlayState() }
+    val parentMenuHost = LocalAppMenuHost.current
+    val menuHost = remember(parentMenuHost) { parentMenuHost ?: AppMenuHostState() }
 
-    CompositionLocalProvider(LocalSelectOverlay provides selectOverlay) {
+    CompositionLocalProvider(LocalAppMenuHost provides menuHost) {
         Box(modifier) {
             if (buttonBackdrop != null) {
                 Box(
@@ -84,6 +91,7 @@ fun AppGlassScene(
             }
             Box(
                 Modifier.matchParentSize()
+                    .then(hazeCapture)
                     .drawWithContent {
                         val accelerated = drawContext.canvas.nativeCanvas.isHardwareAccelerated
                         if (canvasAccelerated != accelerated) canvasAccelerated = accelerated
@@ -101,11 +109,14 @@ fun AppGlassScene(
             }
             CompositionLocalProvider(
                 LocalBackdrop provides backdrop.takeIf { backgroundReady },
+                LocalHazeState provides hazeState.takeIf {
+                    backgroundReady && capability != GlassCapability.Solid
+                },
                 LocalGlassCapability provides capability,
                 LocalGlassDepth provides 0,
             ) {
                 content()
-                AppSelectOverlay(selectOverlay)
+                if (parentMenuHost == null) AppMenuOverlay(menuHost)
             }
         }
     }

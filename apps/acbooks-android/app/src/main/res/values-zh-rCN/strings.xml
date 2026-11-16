@@ -4,11 +4,8 @@
     <string name="add_books_title">添加书籍</string>
     <string name="settings_title">设置</string>
     <string name="settings_default_nickname">本地读者</string>
-    <string name="settings_edit_nickname_hint">点击修改昵称</string>
-    <string name="settings_edit_nickname_title">修改昵称</string>
-    <string name="settings_nickname_label">昵称</string>
-    <string name="settings_save_nickname">保存</string>
-    <string name="settings_nickname_save_failed">昵称保存失败，请重试。</string>
+    <string name="settings_change_avatar">更换头像</string>
+    <string name="settings_avatar_failed">头像更新失败，请重试。</string>
     <string name="settings_appearance">外观</string>
     <string name="settings_theme">深色模式</string>
     <string name="settings_theme_system">跟随系统</string>
@@ -56,7 +53,6 @@
     <string name="library_search_hint">书名或作者</string>
     <string name="library_sort_title">按书名排序</string>
     <string name="library_sort_recent">按添加时间排序</string>
-    <string name="library_empty">书库还没有书籍</string>
     <string name="library_no_results">没有符合条件的书籍</string>
     <string name="library_shelves">书架</string>
     <string name="library_create_shelf">新建书架</string>
@@ -73,7 +69,6 @@
     <string name="library_format_pdf">PDF</string>
     <string name="library_done">完成</string>
     <string name="reader_open_book">阅读《%1$s》</string>
-    <string name="reader_title">阅读器</string>
     <string name="reader_open_failed">无法打开本地书籍文件。</string>
     <string name="reader_page">第 %1$d 页，共 %2$d 页</string>
     <string name="reader_previous">上一页</string>

@@ -6,7 +6,7 @@
 
 ## 1. 设计原则
 
-- 阅读优先：简洁、适中信息密度、内容清晰；玻璃只用于控件和浮层，不覆盖所有内容。
+- 阅读优先：简洁、适中信息密度、内容清晰；玻璃只用于顶栏、控件和浮层，不覆盖所有内容。
 - 唯一外观为 **Liquid Glass**，支持浅色、深色、跟随系统。无 Material 3 / 普通主题切换；Material 3 可作为 Compose 基础能力，不使用其默认视觉风格。
 - 所有页面共享设计令牌、组件、形状和动效；切换明暗模式不改变布局或操作位置。
 - 首页是默认入口，优先展示本地阅读内容；登录 acbooks 为可选功能，不设置强制登录页。
@@ -26,7 +26,7 @@
 | 图标 | 小图标 18 / 常规 24 dp；统一图标库与线宽 |
 | 触控 | 最小点击区域 48×48dp；视觉尺寸可更小 |
 | 动效 | fast 120 / normal 200 / slow 300 ms；形变使用统一弹簧参数 |
-| 玻璃 | 默认透明度 0.55；控件回退模糊 8dp、浮层 12dp；默认采样 0.5x（待验证） |
+| 玻璃 | 默认透明度 0.55；控件模糊 8dp、浮层 12dp；顶栏高斯模糊 24dp；顶栏底色透明度 0.38 |
 
 ### 2.1 语义颜色
 
@@ -58,11 +58,12 @@
 | Content | 书籍卡片、列表、统计图、正文 | 实色表面，不捕获背景 |
 | Control | 导航、按钮、开关、分段控件、输入框 | 背景采样、模糊、折射、高光 |
 | Overlay | Dialog、Sheet、菜单 | 磨砂玻璃 + 可读底色，优先文字对比度 |
+| TopBar | 主页面与二级页顶栏 | Haze 采样正文并做高斯模糊，叠加底色与底部渐隐 |
 
-- 底层采用 AndroidLiquidGlass / Backdrop；优先正式 Gradle 依赖，固定兼容版本。不复制整个 Lumi 或 prism_ui，不自行重写 Shader。公开 API 无法满足采样优化时再维护源码补丁。
+- 顶栏统一使用 [Haze](https://github.com/chrisbanes/haze) 的 `hazeSource` / `hazeBlur`：页面背景作为采样源，顶栏对滚动正文做高斯模糊，只叠加随主题变化的底色，不做折射。主页面、书库、设置及服务器登录等二级页都由 `GlassPageHeader` 渲染同一套模糊；阅读界面为沉浸式正文，不显示顶栏，因此不应用高斯模糊。控件与浮层继续使用 AndroidLiquidGlass / Backdrop；两类渲染各自独占层，不互相采样。优先正式 Gradle 依赖，固定兼容版本。不复制整个 Lumi 或 prism_ui，不自行重写 Shader。
 - 每个页面/窗口统一管理背景捕获；玻璃不得捕获自身或形成循环引用。浮层最多三层可见功能玻璃，不叠加重复模糊；前景文字和图标保持原始分辨率。
 - 阅读器仅在工具栏、菜单等玻璃浮层可见时采样正文；原生 View / WebView 通过阅读器适配层提供背景，失败时使用可读回退，不持续截图。
-- API 33+ 且能力检测通过：完整折射；API 31–32：模糊回退；不支持硬件效果、缺少背景或减少透明效果时：可读的实色回退；墨水屏禁用光学效果。降级不改变布局、形状和操作。
+- API 33+ 且能力检测通过：控件与浮层使用完整折射，顶栏使用高斯模糊；API 31–32：统一使用模糊；不支持硬件效果、缺少背景或减少透明效果时：可读的实色回退；墨水屏禁用光学效果。降级不改变布局、形状和操作。
 - 采样目标 1x / 2⁄3x / 1⁄2x / 1⁄3x；优先验证实际效果缓冲区缩放能力，不以虚假的画质开关代替实现。自适应降级在有真机帧耗时数据后实现。
 
 ## 4. 公共组件
@@ -74,13 +75,13 @@
 | AppBackButton | 48dp 圆形玻璃返回键，复用 Fluent 箭头、按压交互和玻璃降级路径 |
 | AppNavigationBar | 浮动玻璃胶囊包含首页 / 书库 / 统计，基础高度 64dp；选中滑块弹性移动 |
 | AppAddButton | 独立玻璃圆形添加入口，64×64dp，与主导航并排；触发导入菜单，不参与导航选中状态 |
-| AppTopBar | 返回、标题、操作；滚动时可渐进模糊 |
+| AppTopBar | 返回、标题、操作；滚动时用 Haze 对正文做渐进高斯模糊（24dp），底部 24dp 渐隐 |
 | AppSecondaryPage | 二级页面容器，统一滚动正文与顶栏。左侧返回，页面名称按整个顶栏居中 |
-| MainTabHeader | 首页、书库、统计统一左上角 32sp Bold 大标题；首页右上角头像进入设置 |
+| MainTabHeader | 首页、书库、统计统一左上角 32sp Bold 大标题；首页右上角 40dp 圆形玻璃头像按钮进入设置，有头像时显示同步图片，否则显示 Fluent 人像图标 |
 | AppLibraryHeader / AppLibraryTools | 书库大标题和圆形玻璃操作按钮；下方复用搜索和筛选分类胶囊 |
 | AppCard / AppListItem | 普通内容材质；卡片圆角 14–18dp；列表自适应内容 |
 | AppSettingsEntry | 设置目录统一入口，左侧图标、名称、最右侧箭头，整行点击进入详情 |
-| AppSettingsProfileCard | 设置目录首项，左侧 56dp 圆形头像，右侧昵称及「点击修改昵称」，最右侧箭头 |
+| AppSettingsProfileCard | 设置目录首项，左侧 56dp 圆形头像，右侧昵称；不显示说明、右箭头或修改昵称入口。点击头像选择图片，按圆形裁剪后本地保存并同步服务器 |
 | AppTextField / AppSearchField | 标签、清除、错误和焦点统一；最小高度 48dp |
 | AppSwitch / AppSegmentedControl | 统一滑块、选中及拖动状态 |
 | AppMenu | 锚定触发控件；菜单项基础高度 48dp，适配长文本 |
@@ -138,10 +139,10 @@
 - 主导航为首页 / 书库 / 统计 + 独立添加按钮；首页为默认入口，设置由首页头像进入。
 - 设置首页仅展示已接通的详情入口。修改控件放在对应的详情页，通过圆形返回键或系统返回回到上一层。
 - 深色模式等单选设置使用 `AppGlassSelect`。玻璃面板从选择框位置展开，空间不足时向上摆放。选择条目、点击外部或返回时关闭，无可采样背景时使用主题实色。
-- 设置目录首项为头像卡片，整张卡片进入昵称编辑。未设置昵称时显示本地化的「本地读者」，修改后存入本地 DataStore。
-- 三个主页面共享 `MainTabHeader`，大标题左对齐并避开系统状态栏。首页头像使用 40dp 圆形表面和至少 48dp 触控区，作为设置入口。手机使用浮动底栏，宽屏使用侧栏。使用 edge-to-edge 与 WindowInsets，滚动内容可经过悬浮导航下方，最后一项可完整滚出遮挡区。
+- 设置目录首项为头像卡片，只显示头像与昵称；未设置昵称时显示本地化的「本地读者」。昵称编辑暂不提供，后续以独立弹窗接入，不再使用三级页面。点击 56dp 头像打开系统照片选择器，图片按 512×512 居中裁剪并压缩；未登录时保存本地并标记待同步，登录后自动上传；服务器已有头像且本地无待同步修改时下载覆盖本地。
+- 三个主页面共享 `MainTabHeader`，大标题左对齐并避开系统状态栏。首页头像使用 40dp 圆形玻璃按钮和至少 48dp 触控区，图片内缩 2dp 保留玻璃描边，作为设置入口。手机使用浮动底栏，宽屏使用侧栏。使用 edge-to-edge 与 WindowInsets，滚动内容可经过悬浮导航下方，最后一项可完整滚出遮挡区。
 - 二级页面使用 `AppSecondaryPage`。顶栏与主页面共用安全区下 12dp 顶部留白、24dp 左右边距和 48dp 最小行高。左侧使用共享圆形玻璃 `AppBackButton`。页面名使用 20sp SemiBold，以整个顶栏的宽度为基准居中，标题两侧预留相同空间。
-- 主页面与二级页共用滚动玻璃材质。滚动位置为零时整条顶栏透明，正文滚到顶栏下方时，前 24dp 的滚动距离逐渐增加背景模糊、轻微折射和随深浅主题变化的底色。玻璃层在底部跨越顶栏边缘的 24dp 范围内逐渐淡至透明。顶栏只采样正文，标题和操作始终位于前景，渐隐区不计入顶栏布局和触摸范围。
+- 主页面与二级页共用滚动玻璃材质，由 `GlassPageHeader` 统一渲染。滚动位置为零时整条顶栏透明；正文滚到顶栏下方时，前 24dp 的滚动距离把 Haze 高斯模糊从 0 增加到 24dp，并叠加随深浅主题变化的 0.38 不透明度底色，不做折射。模糊层在底部跨越顶栏边缘的 24dp 范围内逐渐淡至透明。顶栏只采样正文，标题和操作始终位于前景，渐隐区不计入顶栏布局和触摸范围。内容不足一屏、无法滚动的页面（如服务器登录）不会出现可采样的正文，顶栏保持透明；阅读界面不显示顶栏。
 - 业务页面统一使用设计系统组件，书籍与阅读正文保持内容优先；大字号及英文长文本允许换行，不压缩触控区域。
 
 ## 6. 中英文国际化
@@ -157,7 +158,7 @@ core/designsystem/src/main/
 ├── kotlin/.../designsystem/
 │   ├── tokens/       # Colors、Typography、Spacing、Radius、Sizes、Motion、GlassTokens
 │   ├── theme/        # AcbooksTheme、AppShapes、ReaderTheme
-│   ├── glass/        # Backdrop、Surface、Capability、Sampling、Motion
+│   ├── glass/        # Backdrop、Haze、Surface、Capability、Sampling、Motion
 │   ├── components/   # App* 公共组件
 │   └── icons/        # 统一图标入口
 └── res/              # 公共组件中英文资源
@@ -168,12 +169,13 @@ core/designsystem/src/main/
 ## 8. 实现与验收
 
 1. 先实现令牌、主题、连续圆角、玻璃能力检测与公共组件预览，再开发业务页面。
-2. 真机验证浅/深色、主题色切换/恢复及重启持久化、两种语言、大字号、横竖屏、API 31/33+ 及不支持玻璃的设备；检查滚动、菜单、导航、阅读浮层的清晰度与帧耗时；验证三个页面 Tab 与独立添加按钮的选中状态、菜单取消和导入返回行为。
+2. 真机验证浅/深色、主题色切换/恢复及重启持久化、两种语言、大字号、横竖屏、API 31/33+ 及不支持玻璃的设备；检查顶栏高斯模糊在主页面和二级页滚动时是否只采样正文、底部渐隐是否正确，以及菜单、导航、阅读浮层的清晰度与帧耗时；验证三个页面 Tab 与独立添加按钮的选中状态、菜单取消和导入返回行为；验证头像选择、圆形裁剪、40dp 玻璃描边、未登录本地保存及登录后与 Web 双向同步。
 3. 不增加其他外观主题，不复制业务页面，不让视觉效果阻塞本地阅读；新增或升级依赖时，在[仓库根目录的 LICENSE.md](../../LICENSE.md#android-开源依赖)统一更新开源依赖说明及适用的版权与许可证文本。
 
 ## 9. 开源参考
 
 - [Lumi Books 当前 UI 与动效规范](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/devdocs/lumi-ui-motion-design-system.md)：令牌、材质分层、形状、阅读浮层与动效。
 - [Lumi AppTokens.kt](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/theme/AppTokens.kt) / [AppPresentation.kt](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/theme/AppPresentation.kt)：实际设计参数。
-- [AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)、[Shapes](https://github.com/Kyant0/Shapes)：渲染与连续圆角。
+- [AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)、[Shapes](https://github.com/Kyant0/Shapes)：控件与浮层的背景采样、折射与连续圆角。
+- [Haze](https://github.com/chrisbanes/haze)：顶栏对滚动正文的高斯模糊。
 - [FlClash](https://github.com/chen08209/FlClash)、[prism_ui](https://github.com/chen08209/prism_ui)：组件封装、弹性导航及捕获优化；只参考设计，不引入 Flutter 依赖。

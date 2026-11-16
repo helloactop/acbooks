@@ -27,6 +27,8 @@ dependencies {
     implementation(libs.backdrop)
     implementation(libs.shapes)
     implementation(libs.fluent.icons)
+    implementation(libs.haze)
+    implementation(libs.haze.blur)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)

@@ -20,6 +20,7 @@ import app.acbooks.core.designsystem.theme.AcbooksTheme
 import app.acbooks.core.designsystem.tokens.DefaultAccent
 import app.acbooks.navigation.AcbooksNavHost
 import app.acbooks.library.LibraryViewModel
+import app.acbooks.profile.ProfileAvatars
 import app.acbooks.server.ServerSessions
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -30,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var appearance: AppearancePreferences
     @Inject lateinit var profile: ProfilePreferences
     private val serverSessions by lazy { ServerSessions(applicationContext) }
+    private val profileAvatars by lazy { ProfileAvatars(applicationContext, profile, serverSessions) }
     private val library: LibraryViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,9 +60,9 @@ class MainActivity : AppCompatActivity() {
                     themeMode = themeMode,
                     nickname = nickname,
                     serverSessions = serverSessions,
+                    profileAvatars = profileAvatars,
                     library = library,
                     onThemeModeChange = { mode -> scope.launch { appearance.setThemeMode(mode) } },
-                    onSaveNickname = profile::setNickname,
                 )
             }
         }

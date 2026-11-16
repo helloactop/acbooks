@@ -23,6 +23,7 @@ internal enum class ServerEndpoint(val path: String) {
     Health("/api/v1/health"),
     Login("/api/v1/auth/device-login"),
     Account("/api/v1/auth/me"),
+    Avatar("/api/v1/auth/me/avatar"),
     Logout("/api/v1/auth/logout"),
 }
 

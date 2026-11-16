@@ -1,11 +1,13 @@
 package app.acbooks.core.designsystem.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -20,9 +22,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -42,6 +49,7 @@ import app.acbooks.core.designsystem.theme.AppShapes
 import app.acbooks.core.designsystem.theme.LocalAppColors
 import app.acbooks.core.designsystem.tokens.AppMotion
 import app.acbooks.core.designsystem.tokens.AppSizes
+import app.acbooks.core.designsystem.tokens.AppSpacing
 import app.acbooks.core.designsystem.tokens.ButtonSizeTokens
 import app.acbooks.core.designsystem.tokens.IconButtonSize
 import app.acbooks.core.designsystem.tokens.TextButtonSize
@@ -152,6 +160,48 @@ fun LiquidGlassIconButton(
         paddingY = 0.dp,
     ) {
         ControlIcon(icon, label, iconSize = size.icon)
+    }
+}
+
+@Composable
+fun LiquidGlassAvatarButton(
+    image: ImageBitmap?,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = AppSizes.avatar,
+    enabled: Boolean = true,
+) {
+    val inset = touchInset(size)
+    GlassButtonSurface(
+        modifier = modifier.size(size + inset * 2).semantics { contentDescription = label },
+        onClick = onClick,
+        kind = ButtonKind.Secondary,
+        enabled = enabled,
+        loading = false,
+        visualHeight = size,
+        touchInsetX = inset,
+        touchInsetY = inset,
+        paddingX = 0.dp,
+        paddingY = 0.dp,
+    ) {
+        Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.size(size - AppSpacing.xs).clip(AppShapes.circle),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (image != null) {
+                    Image(
+                        image,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    ControlIcon(AppIcons.Profile, contentDescription = null, iconSize = 20.dp)
+                }
+            }
+        }
     }
 }
 

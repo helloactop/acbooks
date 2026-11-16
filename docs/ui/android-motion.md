@@ -1,6 +1,6 @@
 # acbooks Android 动画规范
 
-页面转场由 Jetpack Compose Animation 和 Navigation Compose 的 `NavHost` 管理。液态玻璃材质、交互形变与图标遵循 [Android UI 规范](android-ui.md)。
+页面转场由 Jetpack Compose Animation 管理；根路由使用 Navigation Compose 的 `NavHost`，三个主 Tab 使用 `HorizontalPager`。液态玻璃材质、交互形变与图标遵循 [Android UI 规范](android-ui.md)。
 
 ## 页面转场
 
@@ -8,7 +8,7 @@
 - 导航返回时，当前页向屏幕右侧滑出，上一页在原位显示。顶栏返回键、系统返回键、边缘手势提交和 Dock 返回首页均使用此转场。
 - 页面前进和返回共用 `AppMotion.pageDurationMillis`，默认 200ms，使用同一条对称缓动曲线。Compose 遵循系统动画时长缩放。
 - 应用清单关闭系统预测性返回动画。拖动期间当前页保持原位，手势取消后保留当前路由和输入。
-- 根 `NavHost` 与 Tab 的 `NavHost` 共用 `NavigationMotion.kt`。书籍封面和书名入口同样使用页面横滑，返回保留书架筛选和滚动位置。
+- 根 `NavHost` 使用 `NavigationMotion.kt`；Tab 切换由 `HorizontalPager` 的水平滑动承载，底栏选中项和 `currentPage` 同步。书籍封面和书名入口使用根路由页面横滑，返回保留书架筛选和滚动位置。
 - 顶栏返回键仅接受当前已恢复到前台的路由发出的操作，避免连点同时弹出多级。只有正在显示且独立消费返回的覆盖层可注册局部返回处理。
 
 ## 浮层

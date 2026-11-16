@@ -15,6 +15,7 @@ compose-bom = "2026.08.00"
 backdrop = "2.0.1"
 shapes = "1.2.1"
 fluent-icons = "1.0.1"
+haze = "2.1.0"
 navigation = "2.10.2"
 lifecycle = "2.11.0"
 room = "2.8.4"
@@ -27,6 +28,8 @@ androidx-test-runner = "1.6.2"
 backdrop = { module = "io.github.kyant0:backdrop", version.ref = "backdrop" }
 shapes = { module = "io.github.kyant0:shapes", version.ref = "shapes" }
 fluent-icons = { module = "io.github.niyajali:fluentui-system-icons-android", version.ref = "fluent-icons" }
+haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-fragment-compose = { module = "androidx.fragment:fragment-compose", version.ref = "fragment" }

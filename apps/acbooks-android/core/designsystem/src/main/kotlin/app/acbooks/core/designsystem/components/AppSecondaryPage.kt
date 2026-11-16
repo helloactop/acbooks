@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,15 +33,15 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import app.acbooks.core.designsystem.glass.AppGlassScene
-import app.acbooks.core.designsystem.glass.LocalBackdrop
+import app.acbooks.core.designsystem.glass.LocalHazeState
 import app.acbooks.core.designsystem.theme.LocalAppColors
 import app.acbooks.core.designsystem.tokens.AppSizes
 import app.acbooks.core.designsystem.tokens.AppSpacing
 import app.acbooks.core.designsystem.tokens.AppTypography
 import app.acbooks.core.designsystem.tokens.GlassTokens
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.hazeBlur
 
 @Composable
 fun AppSecondaryPage(
@@ -78,8 +77,6 @@ fun AppSecondaryPage(
     }
 }
 
-private val HeaderShape = RoundedCornerShape(GlassTokens.headerRefractionHeight)
-
 @Composable
 internal fun GlassPageHeader(
     scrollOffset: Int,
@@ -89,13 +86,16 @@ internal fun GlassPageHeader(
     val revealDistance = with(LocalDensity.current) { GlassTokens.headerRevealDistance.toPx() }
     val progress = (scrollOffset / revealDistance).coerceIn(0f, 1f)
     val colors = LocalAppColors.current
-    val backdrop = LocalBackdrop.current
+    val hazeState = LocalHazeState.current
     Box(modifier.fillMaxWidth()) {
-        if (backdrop != null && progress > 0f) {
+        if (hazeState != null && progress > 0f) {
+            val blurStyle = remember(progress) {
+                HazeBlurStyle { blurRadius(GlassTokens.headerBlur * progress) }
+            }
             Box(
                 Modifier.matchParentSize()
                     .layout { measurable, constraints ->
-                        // Extend the glass below the header without moving the content or its hit targets.
+                        // Extend the blur below the header without moving the content or its hit targets.
                         val extra = (GlassTokens.headerFadeHeight / 2).roundToPx()
                         val height = constraints.maxHeight
                         val layer = measurable.measure(
@@ -115,23 +115,16 @@ internal fun GlassPageHeader(
                             drawRect(fade, blendMode = BlendMode.DstIn)
                         }
                     }
-                    .drawBackdrop(
-                        backdrop = backdrop,
-                        shape = { HeaderShape },
-                        effects = {
-                            blur(GlassTokens.controlBlur.toPx() * progress)
-                            lens(
-                                GlassTokens.headerRefractionHeight.toPx() * progress,
-                                GlassTokens.headerRefractionAmount.toPx() * progress,
-                            )
-                        },
-                        highlight = null,
-                        shadow = null,
-                        onDrawSurface = {
-                            drawRect(colors.background.copy(alpha = GlassTokens.headerTintOpacity * progress))
-                        },
+                    .hazeBlur(
+                        input = HazeInput.Sources(hazeState),
+                        style = blurStyle,
                     ),
-            )
+            ) {
+                Box(
+                    Modifier.matchParentSize()
+                        .background(colors.background.copy(alpha = GlassTokens.headerTintOpacity * progress)),
+                )
+            }
         }
         content()
     }

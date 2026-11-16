@@ -107,9 +107,8 @@ internal object GlassTokens {
     val overlayBlur = 12.dp
     val refractionHeight = 12.dp
     val refractionAmount = 16.dp
+    val headerBlur = 24.dp
     val headerRevealDistance = 24.dp
     val headerFadeHeight = 24.dp
-    val headerRefractionHeight = 8.dp
-    val headerRefractionAmount = 6.dp
     const val headerTintOpacity = 0.38f
 }

@@ -32,22 +32,29 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.platform.LocalDensity
+import kotlin.math.roundToInt
 import app.acbooks.core.designsystem.glass.AppMaterial
 import app.acbooks.core.designsystem.glass.AppSurface
 import app.acbooks.core.designsystem.glass.LocalBackdrop
@@ -60,8 +67,6 @@ import app.acbooks.core.designsystem.tokens.AppTypography
 import app.acbooks.core.designsystem.tokens.GlassTokens
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.Role
-
-data class AppMenuItem(val label: String, val onClick: () -> Unit, val enabled: Boolean = true)
 
 internal val popupEnterTransition =
     fadeIn(tween(AppMotion.popupDuration, easing = AppMotion.symmetricEasing)) +
@@ -90,6 +95,54 @@ fun AppMenu(
     modifier: Modifier = Modifier,
     anchor: @Composable () -> Unit,
 ) {
+    val host = LocalAppMenuHost.current
+    if (host == null) {
+        AppMenuPopup(expanded, onDismiss, items, modifier, anchor)
+        return
+    }
+    val bounds = remember { mutableStateOf<IntRect?>(null) }
+    val currentItems by rememberUpdatedState(items)
+    val currentDismiss by rememberUpdatedState(onDismiss)
+    val currentPanel by rememberUpdatedState<@Composable (Boolean, () -> Unit) -> Unit> { enabled, close ->
+        AppMenuPanel(currentItems, enabled, Role.Button) { item ->
+            close()
+            item.onClick()
+        }
+    }
+    val request = remember(host, bounds) {
+        AppMenuRequest(
+            anchor = bounds,
+            matchAnchorWidth = false,
+            alignEnd = true,
+            overlapAnchor = false,
+            onDismiss = { currentDismiss() },
+            content = { enabled, close -> currentPanel(enabled, close) },
+        )
+    }
+    val active = host.popup === request
+    DisposableEffect(host, request) {
+        onDispose { if (host.popup === request) host.clear() }
+    }
+    LaunchedEffect(expanded, active, bounds.value) {
+        if (expanded && bounds.value != null) {
+            if (!active) host.show(request)
+        } else if (!expanded && active) {
+            host.clear()
+        }
+    }
+    Box(modifier.onGloballyPositioned { bounds.value = it.boundsInRoot().toIntRect() }) {
+        anchor()
+    }
+}
+
+@Composable
+private fun AppMenuPopup(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    items: List<AppMenuItem>,
+    modifier: Modifier,
+    anchor: @Composable () -> Unit,
+) {
     Box(modifier) {
         anchor()
         val visibility = remember { MutableTransitionState(false) }
@@ -104,26 +157,10 @@ fun AppMenu(
                 // Popup has its own window and cannot sample the scene's coordinates.
                 CompositionLocalProvider(LocalBackdrop provides null) {
                     AnimatedPopupContent(visibility) {
-                        val colors = LocalAppColors.current
-                        AppSurface(
-                            material = AppMaterial.Overlay,
-                            shape = AppShapes.large,
-                            tint = colors.surface,
-                        ) {
-                            Column(Modifier.widthIn(min = AppSizes.navigation, max = AppSizes.dialog)
-                                .verticalScroll(rememberScrollState()).padding(AppSpacing.xs)) {
-                                items.forEach { item ->
-                                    Box(
-                                        Modifier.fillMaxWidth().heightIn(min = AppSizes.touch)
-                                            .clickable(enabled = expanded && item.enabled, role = Role.Button) {
-                                                onDismiss()
-                                                item.onClick()
-                                            }.padding(AppSpacing.sm),
-                                        contentAlignment = Alignment.CenterStart,
-                                    ) {
-                                        Text(item.label, color = if (item.enabled) colors.textPrimary else colors.textSecondary)
-                                    }
-                                }
+                        Box(Modifier.widthIn(min = AppSizes.navigation, max = AppSizes.dialog)) {
+                            AppMenuPanel(items, enabled = expanded, role = Role.Button) { item ->
+                                onDismiss()
+                                item.onClick()
                             }
                         }
                     }
@@ -132,6 +169,8 @@ fun AppMenu(
         }
     }
 }
+
+private fun Rect.toIntRect() = IntRect(left.roundToInt(), top.roundToInt(), right.roundToInt(), bottom.roundToInt())
 
 @Composable
 internal fun rememberMenuPosition(gap: Int, overlapAnchor: Boolean = false) = remember(gap, overlapAnchor) {

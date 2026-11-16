@@ -4,6 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.URI
 import java.security.GeneralSecurityException
@@ -34,6 +35,10 @@ internal class ServerSession(
 }
 
 internal enum class ServerError { Address, Credentials, Expired, RateLimited, Tls, Connection, Response, Storage }
+
+internal data class ServerAccount(val username: String, val avatarUpdatedAt: Long?)
+
+private const val MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
 internal class ServerFailure(val error: ServerError) : IOException()
 
@@ -83,7 +88,7 @@ internal class ServerSessions(context: Context) {
             val newSession = ServerSession(base, username.trim(), token, expiresAt)
             try {
                 val account = checkAccount(newSession)
-                val verified = ServerSession(base, account, token, expiresAt)
+                val verified = ServerSession(base, account.username, token, expiresAt)
                 store.write(verified)
                 current.value = verified
             } catch (failure: IOException) {
@@ -108,10 +113,109 @@ internal class ServerSessions(context: Context) {
         }
     }
 
-    private fun checkAccount(session: ServerSession): String {
+    private fun checkAccount(session: ServerSession): ServerAccount {
         if (session.isExpired()) throw ServerFailure(ServerError.Expired)
-        return request(session.address, ServerEndpoint.Account, 200, token = session.token)
-            .optString("username").takeIf { it.isNotBlank() } ?: throw ServerFailure(ServerError.Response)
+        val account = request(session.address, ServerEndpoint.Account, 200, token = session.token)
+        val username = account.optString("username").takeIf { it.isNotBlank() }
+            ?: throw ServerFailure(ServerError.Response)
+        val revision = if (account.isNull("avatarUpdatedAt")) null else account.optLong("avatarUpdatedAt")
+        if (revision != null && revision <= 0) throw ServerFailure(ServerError.Response)
+        return ServerAccount(username, revision)
+    }
+
+    suspend fun account(session: ServerSession): ServerAccount = requestOnIo { checkAccount(session) }
+
+    suspend fun fetchAvatar(session: ServerSession): ByteArray = requestOnIo {
+        if (session.isExpired()) throw ServerFailure(ServerError.Expired)
+        val connection = session.address.endpoint(ServerEndpoint.Avatar).openConnection() as HttpsURLConnection
+        try {
+            connection.instanceFollowRedirects = false
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 10_000
+            connection.useCaches = false
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("Accept", "image/jpeg")
+            connection.setRequestProperty("Authorization", "Bearer ${session.token}")
+            val status = connection.responseCode
+            if (status != 200) {
+                throw ServerFailure(
+                    when (status) {
+                        401 -> ServerError.Expired
+                        429 -> ServerError.RateLimited
+                        in 500..599 -> ServerError.Connection
+                        else -> ServerError.Response
+                    },
+                )
+            }
+            if (connection.contentType?.startsWith("image/") != true) {
+                throw ServerFailure(ServerError.Response)
+            }
+            connection.inputStream.use { stream ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(16 * 1024)
+                while (true) {
+                    val read = stream.read(buffer)
+                    if (read < 0) break
+                    output.write(buffer, 0, read)
+                    if (output.size() > MAX_AVATAR_BYTES) throw ServerFailure(ServerError.Response)
+                }
+                if (output.size() == 0) throw ServerFailure(ServerError.Response)
+                output.toByteArray()
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    suspend fun uploadAvatar(session: ServerSession, image: ByteArray): ServerAccount = requestOnIo {
+        if (session.isExpired()) throw ServerFailure(ServerError.Expired)
+        if (image.isEmpty() || image.size > MAX_AVATAR_BYTES) {
+            throw ServerFailure(ServerError.Response)
+        }
+        val boundary = "acbooks-${java.util.UUID.randomUUID()}"
+        val head = (
+            "--$boundary\r\n" +
+                "Content-Disposition: form-data; name=\"file\"; filename=\"avatar.jpg\"\r\n" +
+                "Content-Type: image/jpeg\r\n\r\n"
+            ).toByteArray(Charsets.UTF_8)
+        val tail = "\r\n--$boundary--\r\n".toByteArray(Charsets.UTF_8)
+        val connection = session.address.endpoint(ServerEndpoint.Avatar)
+            .openConnection() as HttpsURLConnection
+        try {
+            connection.instanceFollowRedirects = false
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 15_000
+            connection.useCaches = false
+            connection.requestMethod = "PUT"
+            connection.doOutput = true
+            connection.setFixedLengthStreamingMode(head.size + image.size + tail.size)
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+            connection.setRequestProperty("Authorization", "Bearer ${session.token}")
+            connection.outputStream.use { stream ->
+                stream.write(head)
+                stream.write(image)
+                stream.write(tail)
+            }
+            val status = connection.responseCode
+            if (status != 200) {
+                throw ServerFailure(
+                    when (status) {
+                        401 -> ServerError.Expired
+                        429 -> ServerError.RateLimited
+                        in 500..599 -> ServerError.Connection
+                        else -> ServerError.Response
+                    },
+                )
+            }
+            val account = connection.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
+                JSONObject(reader.readText())
+            }
+            val revision = if (account.isNull("avatarUpdatedAt")) null else account.optLong("avatarUpdatedAt")
+            ServerAccount(account.optString("username"), revision)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private suspend fun <T> requestOnIo(block: suspend () -> T): T = withContext(Dispatchers.IO) {

@@ -163,15 +163,9 @@ internal fun LibraryScreen(
                     }
                     if (!catalog.loaded) {
                         item(span = { GridItemSpan(maxLineSpan) }) { AppProgress() }
-                    } else if (books.isEmpty()) {
+                    } else if (books.isEmpty() && catalog.books.isNotEmpty()) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
-                            AppState(
-                                title = stringResource(
-                                    if (catalog.books.isEmpty()) R.string.library_empty else R.string.library_no_results,
-                                ),
-                            ) {
-                                if (catalog.books.isEmpty()) LiquidGlassButton(chooseFiles, onImport, kind = ButtonKind.Primary)
-                            }
+                            AppState(title = stringResource(R.string.library_no_results))
                         }
                     }
                     items(books, key = { it.id }) { book ->

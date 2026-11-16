@@ -1,5 +1,8 @@
 package app.acbooks.reader
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
@@ -13,9 +16,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -28,13 +31,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.compose.AndroidFragment
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.acbooks.R
 import app.acbooks.core.designsystem.components.LiquidGlassButton
 import app.acbooks.core.designsystem.components.AppProgress
-import app.acbooks.core.designsystem.components.AppSecondaryTopBar
 import app.acbooks.core.designsystem.components.ButtonKind
 import app.acbooks.core.designsystem.theme.LocalAppColors
 import app.acbooks.core.designsystem.tokens.AppSpacing
@@ -55,33 +60,46 @@ private sealed interface ReaderState {
 internal fun LocalReaderScreen(
     model: LibraryViewModel,
     bookId: String,
-    onBack: () -> Unit,
 ) {
     val colors = LocalAppColors.current
-    val catalog by model.catalog.collectAsStateWithLifecycle()
-    val title = catalog.books.firstOrNull { it.id == bookId }?.title ?: stringResource(R.string.reader_title)
     val state by produceState<ReaderState>(ReaderState.Loading, bookId) {
         val source = model.openBook(bookId)
         value = if (source == null) ReaderState.Unavailable
         else ReaderState.Ready(source, if (source.format == "pdf") model.readingPosition(source.id) else null)
     }
+    ImmersiveReader()
 
-    Column(Modifier.fillMaxSize().background(colors.background).safeDrawingPadding()) {
-        AppSecondaryTopBar(title, onBack)
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            when (val reader = state) {
-                ReaderState.Loading -> AppProgress()
-                ReaderState.Unavailable -> Text(stringResource(R.string.reader_open_failed))
-                is ReaderState.Ready -> if (reader.file.format == "epub") {
-                    val dark = colors.background.luminance() < 0.5f
-                    val args = remember(bookId, dark) { EpubDocumentFragment.arguments(bookId, dark) }
-                    AndroidFragment<EpubDocumentFragment>(modifier = Modifier.fillMaxSize(), arguments = args)
-                } else {
-                    PdfBook(reader, model)
-                }
+    Box(Modifier.fillMaxSize().background(colors.background), contentAlignment = Alignment.Center) {
+        when (val reader = state) {
+            ReaderState.Loading -> AppProgress()
+            ReaderState.Unavailable -> Text(stringResource(R.string.reader_open_failed))
+            is ReaderState.Ready -> if (reader.file.format == "epub") {
+                val dark = colors.background.luminance() < 0.5f
+                val args = remember(bookId, dark) { EpubDocumentFragment.arguments(bookId, dark) }
+                AndroidFragment<EpubDocumentFragment>(modifier = Modifier.fillMaxSize(), arguments = args)
+            } else {
+                PdfBook(reader, model)
             }
         }
     }
+}
+
+@Composable
+private fun ImmersiveReader() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val controller = view.context.findActivity()?.window
+            ?.let { WindowCompat.getInsetsController(it, view) }
+        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller?.hide(WindowInsetsCompat.Type.systemBars())
+        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 private data class RenderedPdf(val index: Int, val count: Int, val bitmap: Bitmap)

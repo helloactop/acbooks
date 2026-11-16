@@ -5,11 +5,8 @@
     <string name="add_books_title">Add books</string>
     <string name="settings_title">Settings</string>
     <string name="settings_default_nickname">Local reader</string>
-    <string name="settings_edit_nickname_hint">Tap to change nickname</string>
-    <string name="settings_edit_nickname_title">Change nickname</string>
-    <string name="settings_nickname_label">Nickname</string>
-    <string name="settings_save_nickname">Save</string>
-    <string name="settings_nickname_save_failed">Couldn’t save the nickname. Try again.</string>
+    <string name="settings_change_avatar">Change avatar</string>
+    <string name="settings_avatar_failed">Couldn’t update the avatar. Try again.</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_theme">Dark mode</string>
     <string name="settings_theme_system">System</string>
@@ -57,7 +54,6 @@
     <string name="library_search_hint">Title or author</string>
     <string name="library_sort_title">Sort by title</string>
     <string name="library_sort_recent">Sort by date added</string>
-    <string name="library_empty">No books yet</string>
     <string name="library_no_results">No matching books</string>
     <string name="library_shelves">Shelves</string>
     <string name="library_create_shelf">Create shelf</string>
@@ -74,7 +70,6 @@
     <string name="library_format_pdf">PDF</string>
     <string name="library_done">Done</string>
     <string name="reader_open_book">Read %1$s</string>
-    <string name="reader_title">Reader</string>
     <string name="reader_open_failed">Could not open the local book file.</string>
     <string name="reader_page">Page %1$d of %2$d</string>
     <string name="reader_previous">Previous</string>
