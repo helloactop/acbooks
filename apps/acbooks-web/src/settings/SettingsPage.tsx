@@ -1,8 +1,14 @@
 import { Button, SegmentedControl, useLanguage, useTheme } from "@acbooks/ui";
 import { ArrowLeft, ChevronRight, Monitor, Moon, Sun } from "lucide-react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import {
+  deleteAccountAvatar,
+  prepareAvatarFile,
+  uploadAccountAvatar,
+} from "../auth/auth-api";
 import { useAppShell } from "../layout/app-shell-context";
 import {
   SETTINGS_NAV_GROUPS,
@@ -23,11 +29,41 @@ export function SettingsPage() {
   const { language, setLanguage } = useLanguage();
   const {
     accountName,
+    avatarUrl,
     loggingOut,
     logoutError,
+    onAccountChange,
     onLogout,
     search,
   } = useAppShell();
+  const avatarInput = useRef<HTMLInputElement>(null);
+  const [avatarBusy, setAvatarBusy] = useState<"upload" | "remove" | null>(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const initial = Array.from(accountName.trim())[0]?.toUpperCase() ?? "?";
+
+  const uploadAvatar = async (file: File) => {
+    setAvatarBusy("upload");
+    setAvatarFailed(false);
+    try {
+      onAccountChange(await uploadAccountAvatar(await prepareAvatarFile(file)));
+    } catch {
+      setAvatarFailed(true);
+    } finally {
+      setAvatarBusy(null);
+    }
+  };
+
+  const removeAvatar = async () => {
+    setAvatarBusy("remove");
+    setAvatarFailed(false);
+    try {
+      onAccountChange(await deleteAccountAvatar());
+    } catch {
+      setAvatarFailed(true);
+    } finally {
+      setAvatarBusy(null);
+    }
+  };
   const section = settingsSectionFromSearch(search);
   const items = SETTINGS_NAV_GROUPS.flatMap((group) => group.items);
   const currentItem = items.find((item) => item.section === section);
@@ -47,6 +83,70 @@ export function SettingsPage() {
       return (
         <div className="flex flex-col gap-2" key={item.section}>
           <SettingsGroup ariaLabel={t(item.labelKey)}>
+            <SettingsRow label={t("settings.avatar")}>
+              <div className="flex items-center gap-3">
+                {avatarUrl === null ? (
+                  <span
+                    aria-hidden="true"
+                    className="flex size-14 shrink-0 items-center justify-center rounded-full bg-accent-soft text-lg font-semibold text-accent-text"
+                  >
+                    {initial}
+                  </span>
+                ) : (
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className="size-14 shrink-0 rounded-full object-cover"
+                    src={avatarUrl}
+                  />
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (file !== undefined) {
+                        void uploadAvatar(file);
+                      }
+                    }}
+                    ref={avatarInput}
+                    type="file"
+                  />
+                  <Button
+                    disabled={avatarBusy !== null}
+                    loading={avatarBusy === "upload"}
+                    onClick={() => {
+                      avatarInput.current?.click();
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {avatarBusy === "upload"
+                      ? t("settings.avatarUploading")
+                      : avatarUrl === null
+                        ? t("settings.avatarUpload")
+                        : t("settings.avatarChange")}
+                  </Button>
+                  {avatarUrl === null ? null : (
+                    <Button
+                      disabled={avatarBusy !== null}
+                      loading={avatarBusy === "remove"}
+                      onClick={() => {
+                        void removeAvatar();
+                      }}
+                      size="sm"
+                      variant="danger"
+                    >
+                      {avatarBusy === "remove"
+                        ? t("settings.avatarRemoving")
+                        : t("settings.avatarRemove")}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </SettingsRow>
             <SettingsRow label={t("settings.accountName")}>
               <span className="text-sm text-muted-foreground">
                 {accountName}
@@ -64,6 +164,11 @@ export function SettingsPage() {
               </Button>
             </SettingsRow>
           </SettingsGroup>
+          {avatarFailed ? (
+            <p className="text-sm text-destructive-text" role="alert">
+              {t("settings.avatarFailed")}
+            </p>
+          ) : null}
           {logoutError !== undefined ? (
             <p className="text-sm text-destructive-text" role="alert">
               {logoutError}

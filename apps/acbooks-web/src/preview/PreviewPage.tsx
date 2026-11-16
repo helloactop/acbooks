@@ -252,13 +252,6 @@ export function PreviewPage() {
               />
             </Field>
             <Field
-              description={t("forms.initializationCodeDescription")}
-              error={t("forms.initializationCodeError")}
-              label={t("forms.initializationCode")}
-            >
-              <Input autoComplete="one-time-code" controlSize="auth" />
-            </Field>
-            <Field
               description={t("forms.disabledDescription")}
               label={t("forms.disabledLabel")}
             >

@@ -106,10 +106,13 @@ export function AuthenticatedLayout({
 
   return (
     <AppShell
-      accountName={guard.account.username}
+      account={guard.account}
       expireSession={onSessionExpired}
       loggingOut={loggingOut}
       logoutError={logoutError}
+      onAccountChange={(account) => {
+        setGuard({ account, status: "ready" });
+      }}
       onLogout={() => {
         void handleLogout();
       }}

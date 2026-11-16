@@ -5,22 +5,16 @@ import { useTranslation } from "react-i18next";
 import type { SetupRequest } from "./auth-api";
 import { AuthAlert } from "./AuthAlert";
 
-type SetupField =
-  | "confirmPassword"
-  | "password"
-  | "setupCode"
-  | "username";
+type SetupField = "confirmPassword" | "password" | "username";
 
 type SetupFieldError =
   | "passwordMismatch"
   | "passwordTooShort"
-  | "setupCodeRequired"
   | "usernameRequired";
 
 const ERROR_KEYS: Record<SetupFieldError, string> = {
   passwordMismatch: "setup.passwordMismatch",
   passwordTooShort: "setup.passwordTooShort",
-  setupCodeRequired: "setup.setupCodeRequired",
   usernameRequired: "setup.usernameRequired",
 };
 
@@ -43,7 +37,6 @@ export function SetupForm({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [setupCode, setSetupCode] = useState("");
   const [errors, setErrors] = useState<
     Partial<Record<SetupField, SetupFieldError>>
   >({});
@@ -64,9 +57,6 @@ export function SetupForm({
       case "confirmPassword":
         setConfirmPassword(value);
         break;
-      case "setupCode":
-        setSetupCode(value);
-        break;
     }
     setErrors((current) => ({ ...current, [field]: undefined }));
     onClearError();
@@ -75,7 +65,6 @@ export function SetupForm({
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedUsername = username.trim();
-    const trimmedSetupCode = setupCode.trim();
     const nextErrors: Partial<Record<SetupField, SetupFieldError>> = {};
 
     if (trimmedUsername.length === 0) {
@@ -87,9 +76,6 @@ export function SetupForm({
     if (confirmPassword !== password) {
       nextErrors.confirmPassword = "passwordMismatch";
     }
-    if (trimmedSetupCode.length === 0) {
-      nextErrors.setupCode = "setupCodeRequired";
-    }
 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -99,7 +85,6 @@ export function SetupForm({
     onSubmit({
       confirmPassword,
       password,
-      setupCode: trimmedSetupCode,
       username: trimmedUsername,
     });
   };
@@ -175,29 +160,6 @@ export function SetupForm({
           placeholder={t("setup.confirmPasswordPlaceholder")}
           required
           value={confirmPassword}
-        />
-      </Field>
-
-      <Field
-        description={t("setup.setupCodeDescription")}
-        error={errorFor("setupCode")}
-        htmlFor="setup-code"
-        label={t("setup.setupCode")}
-      >
-        <Input
-          autoCapitalize="none"
-          autoComplete="one-time-code"
-          controlSize="auth"
-          disabled={busy}
-          id="setup-code"
-          maxLength={128}
-          onChange={(event) => {
-            update("setupCode", event.target.value);
-          }}
-          placeholder={t("setup.setupCodePlaceholder")}
-          required
-          spellCheck={false}
-          value={setupCode}
         />
       </Field>
 

@@ -80,9 +80,14 @@ function renderApp() {
         <LocationProbe />
         <HistoryControls />
         <AppShell
-          accountName="admin"
+          account={{
+            avatarUpdatedAt: null,
+            id: "11111111-1111-4111-8111-111111111111",
+            username: "admin",
+          }}
           expireSession={vi.fn()}
           loggingOut={false}
+          onAccountChange={vi.fn()}
           onLogout={vi.fn()}
         >
           <Routes>

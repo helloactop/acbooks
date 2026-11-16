@@ -7,11 +7,13 @@ import { rememberSettingsReturn, settingsHref } from "./routes";
 
 export interface AppTopBarProps {
   accountName: string;
+  avatarUrl: string | null;
   searchInputRef: RefObject<HTMLInputElement | null>;
 }
 
 export function AppTopBar({
   accountName,
+  avatarUrl,
   searchInputRef,
 }: AppTopBarProps) {
   const { t } = useTranslation("app");
@@ -36,12 +38,21 @@ export function AppTopBar({
           }}
           to={settingsHref()}
         >
-          <span
-            aria-hidden="true"
-            className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent-text"
-          >
-            {initial}
-          </span>
+          {avatarUrl === null ? (
+            <span
+              aria-hidden="true"
+              className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent-text"
+            >
+              {initial}
+            </span>
+          ) : (
+            <img
+              alt=""
+              aria-hidden="true"
+              className="size-6 shrink-0 rounded-full object-cover"
+              src={avatarUrl}
+            />
+          )}
           <span className="max-w-[140px] truncate text-[13px] font-medium">
             {accountName}
           </span>

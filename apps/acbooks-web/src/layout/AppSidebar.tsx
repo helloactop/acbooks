@@ -13,6 +13,7 @@ import {
 
 export interface AppSidebarProps {
   accountName: string;
+  avatarUrl?: string | null;
   focusSearchOnOpen?: boolean;
   onClose?: () => void;
   onFocusSearchHandled?: () => void;
@@ -23,6 +24,7 @@ export interface AppSidebarProps {
 
 export function AppSidebar({
   accountName,
+  avatarUrl = null,
   focusSearchOnOpen = false,
   onClose,
   onFocusSearchHandled,
@@ -124,12 +126,21 @@ export function AppSidebar({
           replace={replaceNavigation}
           to={settingsHref()}
         >
-          <span
-            aria-hidden="true"
-            className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent-text"
-          >
-            {initial}
-          </span>
+          {avatarUrl === null ? (
+            <span
+              aria-hidden="true"
+              className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent-text"
+            >
+              {initial}
+            </span>
+          ) : (
+            <img
+              alt=""
+              aria-hidden="true"
+              className="size-6 shrink-0 rounded-full object-cover"
+              src={avatarUrl}
+            />
+          )}
           <span className="min-w-0 flex-1 truncate text-left font-medium">
             {accountName}
           </span>

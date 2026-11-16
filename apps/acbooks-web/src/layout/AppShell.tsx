@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 
+import { accountAvatarUrl, type Account } from "../auth/auth-api";
 import { AppRail } from "./AppRail";
 import { AppShellContext } from "./app-shell-context";
 import { AppTopBar } from "./AppTopBar";
@@ -19,11 +20,12 @@ import {
 import { useMediaQuery } from "./use-media-query";
 
 export interface AppShellProps {
-  accountName: string;
+  account: Account;
   children: ReactNode;
   expireSession: () => void;
   loggingOut: boolean;
   logoutError?: string;
+  onAccountChange: (account: Account) => void;
   onLogout: () => void;
 }
 
@@ -45,13 +47,16 @@ function withDrawerEntry(state: unknown): Record<string, unknown> {
 }
 
 export function AppShell({
-  accountName,
+  account,
   children,
   expireSession,
   loggingOut,
   logoutError,
+  onAccountChange,
   onLogout,
 }: AppShellProps) {
+  const accountName = account.username;
+  const avatarUrl = accountAvatarUrl(account);
   const location = useLocation();
   const navigate = useNavigate();
   const navigationType = useNavigationType();
@@ -167,25 +172,31 @@ export function AppShell({
 
   const contextValue = useMemo(
     () => ({
+      account,
       accountName,
+      avatarUrl,
       closeNavigation,
       expireSession,
       loggingOut,
       logoutError,
       mainRef,
       navigationOpen,
+      onAccountChange,
       onLogout,
       openNavigation,
       pathname,
       search,
     }),
     [
+      account,
       accountName,
+      avatarUrl,
       closeNavigation,
       expireSession,
       loggingOut,
       logoutError,
       navigationOpen,
+      onAccountChange,
       onLogout,
       openNavigation,
       pathname,
@@ -202,6 +213,7 @@ export function AppShell({
           {isTabletUp ? (
             <AppTopBar
               accountName={accountName}
+              avatarUrl={avatarUrl}
               searchInputRef={desktopSearchRef}
             />
           ) : null}
@@ -219,6 +231,7 @@ export function AppShell({
         {!isTabletUp ? (
           <MobileNavigation
             accountName={accountName}
+            avatarUrl={avatarUrl}
             focusSearchOnOpen={focusSearchOnOpen}
             onClose={closeNavigation}
             onFocusSearchHandled={handleFocusSearchHandled}

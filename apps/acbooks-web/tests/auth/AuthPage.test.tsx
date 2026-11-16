@@ -116,7 +116,7 @@ describe("AuthPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("用户名")).toBeInTheDocument();
     expect(screen.getByLabelText("确认密码")).toBeInTheDocument();
-    expect(screen.getByLabelText("初始化码")).toBeInTheDocument();
+    expect(screen.queryByLabelText("初始化码")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "初始化" }),
     ).toBeInTheDocument();
@@ -270,7 +270,6 @@ describe("AuthPage", () => {
     await user.type(screen.getByLabelText("用户名"), "  Admin  ");
     await user.type(screen.getByLabelText("密码"), PASSWORD);
     await user.type(screen.getByLabelText("确认密码"), PASSWORD);
-    await user.type(screen.getByLabelText("初始化码"), " code-123 ");
     await user.click(screen.getByRole("button", { name: "初始化" }));
 
     expect(
@@ -289,7 +288,6 @@ describe("AuthPage", () => {
     expect(JSON.parse(String(setupCall?.[1]?.body))).toEqual({
       confirmPassword: PASSWORD,
       password: PASSWORD,
-      setupCode: "code-123",
       username: "Admin",
     });
   });
@@ -310,7 +308,6 @@ describe("AuthPage", () => {
     expect(
       screen.getByText("密码至少需要 12 个字符。"),
     ).toBeInTheDocument();
-    expect(screen.getByText("请输入初始化码。")).toBeInTheDocument();
     expect(findCall("POST", "/setup")).toBeUndefined();
   });
 
@@ -333,7 +330,6 @@ describe("AuthPage", () => {
     await user.type(screen.getByLabelText("用户名"), "Admin");
     await user.type(screen.getByLabelText("密码"), PASSWORD);
     await user.type(screen.getByLabelText("确认密码"), PASSWORD);
-    await user.type(screen.getByLabelText("初始化码"), "code-123");
     await user.click(screen.getByRole("button", { name: "初始化" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
