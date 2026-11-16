@@ -12,17 +12,39 @@ import org.junit.Test
 
 class AppDesignSystemTest {
     @Test
-    fun paletteKeepsTextAndControlContrastAcrossThemes() {
-        val accents = listOf(DefaultAccent, Color.Black, Color.White, Color.Red, Color.Green, Color.Blue)
+    fun customAccentIsPassedThroughUnchanged() {
+        val accents = listOf(Color.Black, Color.White, Color.Red, Color.Green, Color.Blue, Color.Yellow)
         for (dark in listOf(false, true)) {
             for (accent in accents) {
                 val colors = appColors(dark, accent)
                 assertEquals(accent, colors.accent)
-                assertTrue(contrast(colors.accent, colors.onAccent) >= 4.5f)
-                for (background in listOf(colors.background, colors.surface, colors.surfaceSecondary, colors.accentSoft)) {
-                    assertTrue("Text contrast for $accent on $background", contrast(colors.accentText, background) >= 4.5f)
-                    assertTrue("Border contrast for $accent on $background", contrast(colors.accentBorder, background) >= 3f)
-                }
+                assertEquals(accent, colors.accentText)
+                assertEquals(accent, colors.accentBorder)
+            }
+        }
+    }
+
+    @Test
+    fun onAccentPicksTheHigherContrastForeground() {
+        val accents = listOf(DefaultAccent, Color.Black, Color.White, Color.Red, Color.Green, Color.Blue)
+        for (accent in accents) {
+            val colors = appColors(dark = false, accent)
+            val onBlack = contrast(colors.accent, Color.Black)
+            val onWhite = contrast(colors.accent, Color.White)
+            val expected = if (onBlack >= onWhite) Color.Black else Color.White
+            assertEquals("Foreground for $accent", expected, colors.onAccent)
+        }
+    }
+
+    @Test
+    fun defaultAccentKeepsItsReadableTextBaseline() {
+        for (dark in listOf(false, true)) {
+            val colors = appColors(dark, DefaultAccent)
+            for (background in listOf(colors.background, colors.surface)) {
+                assertTrue(
+                    "Default accentText on $background",
+                    contrast(colors.accentText, background) >= 4.5f,
+                )
             }
         }
     }

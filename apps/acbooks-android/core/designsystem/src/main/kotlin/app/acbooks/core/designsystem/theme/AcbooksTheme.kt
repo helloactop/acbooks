@@ -12,8 +12,14 @@ import androidx.compose.ui.graphics.Color
 import app.acbooks.core.designsystem.tokens.AppTypography
 import app.acbooks.core.designsystem.tokens.DefaultAccent
 import app.acbooks.core.designsystem.tokens.appColors
+import app.acbooks.core.designsystem.tokens.toMiuixColors
+import app.acbooks.core.designsystem.tokens.toAppColors
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.defaultTextStyles
 
 val LocalAppColors = staticCompositionLocalOf { appColors(dark = false) }
+
+internal val LocalAppDarkTheme = staticCompositionLocalOf { false }
 
 private val TypographyTokens = Typography(
     displaySmall = AppTypography.display,
@@ -26,13 +32,21 @@ private val TypographyTokens = Typography(
     labelSmall = AppTypography.caption,
 )
 
+/**
+ * The single theme entry for the app. [MiuixTheme] holds the only colour source;
+ * [LocalAppColors] is derived from it so components written against the original
+ * acbooks palette keep working without a second palette.
+ */
 @Composable
 fun AcbooksTheme(
     darkTheme: Boolean,
     accent: Color = DefaultAccent,
     content: @Composable () -> Unit,
 ) {
-    val colors = remember(darkTheme, accent) { appColors(darkTheme, accent) }
+    val miuixColors = remember(darkTheme, accent) {
+        appColors(darkTheme, accent).toMiuixColors(darkTheme)
+    }
+    val colors = remember(miuixColors) { miuixColors.toAppColors(darkTheme) }
     val scheme = remember(darkTheme, colors) {
         (if (darkTheme) darkColorScheme() else lightColorScheme()).copy(
             primary = colors.accentText,
@@ -51,7 +65,32 @@ fun AcbooksTheme(
         )
     }
 
-    CompositionLocalProvider(LocalAppColors provides colors) {
-        MaterialTheme(colorScheme = scheme, typography = TypographyTokens, content = content)
+    MiuixTheme(
+        colors = miuixColors,
+        textStyles = remember { miuixTextStyles() },
+    ) {
+        CompositionLocalProvider(
+            LocalAppColors provides colors,
+            LocalAppDarkTheme provides darkTheme,
+        ) {
+            MaterialTheme(colorScheme = scheme, typography = TypographyTokens, content = content)
+        }
     }
 }
+
+private fun miuixTextStyles() = defaultTextStyles(
+    main = AppTypography.body,
+    paragraph = AppTypography.body,
+    body1 = AppTypography.body,
+    body2 = AppTypography.small,
+    button = AppTypography.subhead,
+    footnote1 = AppTypography.caption,
+    footnote2 = AppTypography.tiny,
+    headline1 = AppTypography.body,
+    headline2 = AppTypography.small,
+    subtitle = AppTypography.subhead,
+    title1 = AppTypography.display,
+    title2 = AppTypography.title,
+    title3 = AppTypography.section,
+    title4 = AppTypography.headline,
+)

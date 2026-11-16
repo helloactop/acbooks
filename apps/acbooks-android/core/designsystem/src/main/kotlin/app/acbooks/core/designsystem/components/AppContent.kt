@@ -64,44 +64,6 @@ fun AppListItem(
 }
 
 @Composable
-fun AppSettingsEntry(
-    title: String,
-    icon: AppIcon,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    supportingText: String? = null,
-) {
-    SettingsEntry(title, onClick, modifier, supportingText, leading = { ControlIcon(icon, contentDescription = null) })
-}
-
-@Composable
-fun AppSettingsProfileCard(
-    nickname: String,
-    avatarLabel: String,
-    avatar: ImageBitmap?,
-    onAvatarClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    AppCard(modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = AppSizes.touch).padding(AppSpacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
-        ) {
-            Box(
-                Modifier.size(AppSizes.profileAvatar)
-                    .clip(AppShapes.circle)
-                    .clickable(role = Role.Button, onClickLabel = avatarLabel, onClick = onAvatarClick),
-                contentAlignment = Alignment.Center,
-            ) {
-                AppProfileAvatar(avatar, Modifier.size(AppSizes.profileAvatar))
-            }
-            Text(nickname, Modifier.weight(1f), style = AppTypography.body)
-        }
-    }
-}
-
-@Composable
 fun AppProfileAvatar(image: ImageBitmap?, modifier: Modifier = Modifier) {
     AppSurface(
         modifier,

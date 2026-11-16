@@ -29,8 +29,8 @@ data class AppColors(
 
 fun appColors(dark: Boolean, accent: Color = DefaultAccent): AppColors {
     val light = !dark
-    val background = if (light) Color(0xFFFBFBFC) else Color.Black
-    val surface = if (light) Color.White else Color(0xFF1C1C1E)
+    val background = if (light) Color(0xFFF7F7F7) else Color.Black
+    val surface = if (light) Color.White else Color(0xFF242424)
     val secondary = if (light) Color(0xFFF2F2F7) else Color(0xFF2C2C2E)
     val text = if (light) Color.Black else Color.White
     val opaqueAccent = accent.copy(alpha = 1f)
@@ -38,7 +38,7 @@ fun appColors(dark: Boolean, accent: Color = DefaultAccent): AppColors {
     val accentText = if (opaqueAccent == DefaultAccent) {
         if (light) Color(0xFF285FC1) else Color(0xFF8AB4FF)
     } else {
-        ensureContrast(opaqueAccent, text, listOf(background, surface, secondary, soft), 4.5f)
+        opaqueAccent
     }
     val destructive = if (light) Color(0xFFD92D3A) else Color(0xFFFF6961)
 
@@ -46,8 +46,7 @@ fun appColors(dark: Boolean, accent: Color = DefaultAccent): AppColors {
         background, surface, secondary, text,
         if (light) Color(0xFF6E6E73) else Color(0xFF98989D),
         if (light) Color(0xFFE5E5EA) else Color(0xFF38383A),
-        opaqueAccent, accentText, soft,
-        ensureContrast(opaqueAccent, text, listOf(background, surface, secondary, soft), 3.02f),
+        opaqueAccent, accentText, soft, opaqueAccent,
         if (contrast(Color.Black, opaqueAccent) >= 4.5f) Color.Black else Color.White,
         destructive,
         if (contrast(Color.Black, destructive) >= 4.5f) Color.Black else Color.White,

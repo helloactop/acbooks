@@ -5,6 +5,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.compose.foundation.ScrollState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -45,12 +47,11 @@ import androidx.navigation.compose.rememberNavController
 import app.acbooks.R
 import app.acbooks.core.datastore.ThemeMode
 import app.acbooks.core.designsystem.components.AppBottomDock
-import app.acbooks.core.designsystem.components.AppCard
-import app.acbooks.core.designsystem.components.AppSecondaryPage
-import app.acbooks.core.designsystem.components.AppGlassSelect
-import app.acbooks.core.designsystem.components.AppSelectOption
-import app.acbooks.core.designsystem.components.AppSettingsEntry
-import app.acbooks.core.designsystem.components.AppSettingsProfileCard
+import app.acbooks.core.designsystem.components.AppMiuixCard
+import app.acbooks.core.designsystem.components.AppMiuixPage
+import app.acbooks.core.designsystem.components.AppMiuixProfileCard
+import app.acbooks.core.designsystem.components.AppMiuixSettingsGroup
+import app.acbooks.core.designsystem.components.AppMiuixSettingsRow
 import app.acbooks.core.designsystem.components.MainTabBody
 import app.acbooks.core.designsystem.components.MainTabHeader
 import app.acbooks.core.designsystem.glass.AppGlassScene
@@ -72,6 +73,7 @@ import app.acbooks.server.ServerLoginScreen
 import app.acbooks.server.ServerSettingsScreen
 import app.acbooks.server.serverStatusLabel
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 
 private const val HOME_ROUTE = "home"
 private const val LIBRARY_ROUTE = "library"
@@ -155,13 +157,15 @@ internal fun AcbooksNavHost(
             AppearanceSettingsScreen(themeMode, onThemeModeChange) { navController.returnFrom(entry) }
         }
         composable(SERVICES_ROUTE) { entry ->
-            AppSecondaryPage(stringResource(R.string.settings_services), { navController.returnFrom(entry) }) {
-                AppSettingsEntry(
-                    title = stringResource(R.string.server_title),
-                    icon = AppIcons.Cloud,
-                    supportingText = stringResource(serverStatusLabel(session)),
-                    onClick = { navController.navigate(SERVER_ROUTE) { launchSingleTop = true } },
-                )
+            AppMiuixPage(stringResource(R.string.settings_services), { navController.returnFrom(entry) }) {
+                AppMiuixSettingsGroup {
+                    AppMiuixSettingsRow(
+                        title = stringResource(R.string.server_title),
+                        icon = AppIcons.Cloud,
+                        supportingText = stringResource(serverStatusLabel(session)),
+                        onClick = { navController.navigate(SERVER_ROUTE) { launchSingleTop = true } },
+                    )
+                }
             }
         }
         composable(SERVER_ROUTE) { entry ->
@@ -285,8 +289,8 @@ private fun SettingsScreen(
         if (uri != null) onAvatarPicked(uri)
     }
     LaunchedEffect(Unit) { onRefreshAvatar() }
-    AppSecondaryPage(stringResource(R.string.settings_title), onBack) {
-        AppSettingsProfileCard(
+    AppMiuixPage(stringResource(R.string.settings_title), onBack) {
+        AppMiuixProfileCard(
             nickname = nickname,
             avatarLabel = stringResource(R.string.settings_change_avatar),
             avatar = avatar,
@@ -301,16 +305,18 @@ private fun SettingsScreen(
                 color = colors.textSecondary,
             )
         }
-        AppSettingsEntry(
-            title = stringResource(R.string.settings_appearance),
-            icon = AppIcons.Appearance,
-            onClick = onAppearance,
-        )
-        AppSettingsEntry(
-            title = stringResource(R.string.settings_services),
-            icon = AppIcons.Cloud,
-            onClick = onServices,
-        )
+        AppMiuixSettingsGroup {
+            AppMiuixSettingsRow(
+                title = stringResource(R.string.settings_appearance),
+                icon = AppIcons.Appearance,
+                onClick = onAppearance,
+            )
+            AppMiuixSettingsRow(
+                title = stringResource(R.string.settings_services),
+                icon = AppIcons.Cloud,
+                onClick = onServices,
+            )
+        }
     }
 }
 
@@ -320,18 +326,36 @@ private fun AppearanceSettingsScreen(
     onThemeModeChange: (ThemeMode) -> Unit,
     onBack: () -> Unit,
 ) {
-    AppSecondaryPage(stringResource(R.string.settings_appearance), onBack) {
-        AppCard(Modifier.fillMaxWidth()) {
-            AppGlassSelect(
-                label = stringResource(R.string.settings_theme),
-                options = listOf(
-                    AppSelectOption(ThemeMode.SYSTEM, stringResource(R.string.settings_theme_system)),
-                    AppSelectOption(ThemeMode.LIGHT, stringResource(R.string.settings_theme_light)),
-                    AppSelectOption(ThemeMode.DARK, stringResource(R.string.settings_theme_dark)),
+    val currentLocales = AppCompatDelegate.getApplicationLocales()
+    val languageTags = listOf("", "en", "zh-CN")
+    val currentLanguageTag = if (currentLocales.isEmpty) "" else currentLocales.toLanguageTags()
+    AppMiuixPage(stringResource(R.string.settings_appearance), onBack) {
+        AppMiuixCard {
+            OverlayDropdownPreference(
+                items = listOf(
+                    stringResource(R.string.settings_theme_system),
+                    stringResource(R.string.settings_theme_light),
+                    stringResource(R.string.settings_theme_dark),
                 ),
-                value = themeMode,
-                onValueChange = onThemeModeChange,
-                modifier = Modifier.padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
+                selectedIndex = ThemeMode.entries.indexOf(themeMode),
+                title = stringResource(R.string.settings_theme),
+                onSelectedIndexChange = { index ->
+                    ThemeMode.entries.getOrNull(index)?.let(onThemeModeChange)
+                },
+            )
+            OverlayDropdownPreference(
+                items = listOf(
+                    stringResource(R.string.settings_language_system),
+                    stringResource(R.string.settings_language_english),
+                    stringResource(R.string.settings_language_chinese),
+                ),
+                selectedIndex = languageTags.indexOf(currentLanguageTag).coerceAtLeast(0),
+                title = stringResource(R.string.settings_language),
+                onSelectedIndexChange = { index ->
+                    languageTags.getOrNull(index)?.let { tag ->
+                        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
+                    }
+                },
             )
         }
     }

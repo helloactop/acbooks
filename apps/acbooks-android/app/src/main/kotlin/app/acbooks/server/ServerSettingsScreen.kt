@@ -28,11 +28,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import app.acbooks.R
 import app.acbooks.core.designsystem.components.LiquidGlassButton
-import app.acbooks.core.designsystem.components.AppCard
-import app.acbooks.core.designsystem.components.AppSecondaryPage
+import app.acbooks.core.designsystem.components.AppMiuixCard
+import app.acbooks.core.designsystem.components.AppMiuixPage
 import app.acbooks.core.designsystem.components.AppTextField
 import app.acbooks.core.designsystem.components.ButtonKind
-import app.acbooks.core.designsystem.glass.AppSurface
 import app.acbooks.core.designsystem.icons.AppIcons
 import app.acbooks.core.designsystem.icons.ControlIcon
 import app.acbooks.core.designsystem.theme.LocalAppColors
@@ -61,8 +60,8 @@ internal fun ServerSettingsScreen(
     val action = rememberServerAction()
     val connected = session != null && !session.isExpired()
 
-    AppSecondaryPage(stringResource(R.string.server_title), onBack) {
-        AppCard(Modifier.fillMaxWidth()) {
+    AppMiuixPage(stringResource(R.string.server_title), onBack) {
+        AppMiuixCard {
             Column(
                 Modifier.fillMaxWidth().padding(AppSpacing.lg),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -104,7 +103,7 @@ internal fun ServerSettingsScreen(
             )
         }
         if (session != null) {
-            AppCard(Modifier.fillMaxWidth()) {
+            AppMiuixCard {
                 Column(
                     Modifier.fillMaxWidth().padding(AppSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
@@ -142,7 +141,7 @@ internal fun ServerSettingsScreen(
         }
         ServerFeedback(action)
 
-        AppSurface(Modifier.fillMaxWidth(), tint = colors.surfaceSecondary) {
+        AppMiuixCard {
             Column(Modifier.padding(AppSpacing.md), verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -173,8 +172,8 @@ internal fun ServerLoginScreen(
     val address = addressDraft ?: session?.address?.toASCIIString().orEmpty()
     val username = usernameDraft ?: session?.username.orEmpty()
 
-    AppSecondaryPage(stringResource(R.string.server_login_title), onBack) {
-        AppCard(Modifier.fillMaxWidth()) {
+    AppMiuixPage(stringResource(R.string.server_login_title), onBack) {
+        AppMiuixCard {
             Column(
                 Modifier.fillMaxWidth().padding(AppSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
@@ -237,7 +236,7 @@ internal fun ServerLoginScreen(
             }
         }
 
-        AppCard(Modifier.fillMaxWidth()) {
+        AppMiuixCard {
             Text(
                 stringResource(R.string.server_help),
                 modifier = Modifier.padding(AppSpacing.md),
