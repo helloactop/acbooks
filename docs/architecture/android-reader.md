@@ -30,7 +30,7 @@ acbooks Android 是 acbooks 生态的独立、本地优先阅读器。
 
 ## 3. 技术栈与架构
 
-Kotlin + Jetpack Compose + Material 3；ViewModel + StateFlow；Hilt；Room/SQLite；DataStore；OkHttp/Retrofit；WorkManager；Readium。PDF 先验证渲染、文本选择和标注能力，再确定引擎。首期支持 EPUB/PDF，不自研排版引擎。
+Kotlin + Jetpack Compose + Miuix；ViewModel + StateFlow；Hilt；Room/SQLite；DataStore；OkHttp/Retrofit；WorkManager；Readium。PDF 先验证渲染、文本选择和标注能力，再确定引擎。首期支持 EPUB/PDF，不自研排版引擎。
 
 ```text
 Compose UI / ViewModel
@@ -41,6 +41,8 @@ Data ── Room + 本地文件 + ReaderEngine
         ↑
 Sync ── API Client ── acbooks Server
 ```
+
+Android 应用界面直接使用 Miuix 组件和默认主题。阅读正文由现有引擎渲染。界面范围见 [Android UI 设计规范](../ui/android-ui.md)。
 
 UI 只观察本地数据。导入、阅读和编辑先在本地提交；网络任务独立执行，成功后更新本地数据。阅读器引擎通过统一接口打开文件、定位、获取进度，不依赖登录或同步模块。
 

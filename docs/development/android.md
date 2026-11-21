@@ -22,7 +22,7 @@ bash ./gradlew :app:installDebug
 | --- | --- |
 | `:app` | Application、Activity、Hilt 组装、Compose Navigation 和应用语言声明 |
 | `:feature:home` | 免登录启动占位页和中英文资源 |
-| `:core:designsystem` | 主题入口：`AcbooksTheme` 产出唯一的 Miuix `Colors` 并映射为 Material 3 外壳，`LocalAppColors` 由同一份色值反向还原 |
+| `:core:designsystem` | 当前提供 `AcbooksTheme`、Miuix 依赖及旧主题适配 |
 | `:core:datastore` | 独立的外观偏好，默认跟随系统，支持持久化浅色和深色选项 |
 | `:core:database` | Room/KSP 和 schema 输出配置，以仪器测试验证 DAO；正式书库表随本地书库模块引入 |
 
@@ -34,6 +34,14 @@ bash ./gradlew :app:installDebug
 
 构建检查与设备测试见 [Android 测试说明](../testing/android.md)。
 
+## Miuix 迁移
+
+Android 全部应用界面以 [Android UI 设计规范](../ui/android-ui.md) 为准。直接使用 Miuix 组件和默认主题，范围包括阅读器控件、导航与浮层。
+
+当前代码已接入 Miuix 0.9.4。设置层级使用 Miuix 的 `Card`、`ArrowPreference` 和 `OverlayDropdownPreference`，并通过 `AppMiuixPage` 提供浮层宿主。全局 `AcbooksTheme` 仍保留项目语义色映射，其他界面仍有 Glass、Fluent 和 Material 3 实现。这些是迁移前的实现状态。
+
+迁移时按页面替换旧控件，核对现有外观偏好的兼容处理，待所有调用方迁移完成后清理主题映射和旧视觉依赖。Version Catalog 以实际使用的 Miuix 模块为准。
+
 ## 组件预览
 
 安装 Debug APK 后运行：
@@ -44,12 +52,4 @@ adb shell am start -n app.acbooks/.preview.ComponentPreviewActivity
 
 预览可切换中英文、跟随系统/浅色/深色、预设或自定义主题色，并模拟降低玻璃能力、减少透明效果和墨水屏。语言和主题设置通过正常应用偏好持久化。
 
-账号资料：昵称和头像修订/待同步标记保存在 `ProfilePreferences`，头像文件缓存在应用私有目录。设置页点击 56dp 头像通过系统照片选择器选择图片，客户端居中裁剪为 512×512 JPEG；未登录时本地保存并在登录后上传，已登录时直接调用 `/api/v1/auth/me/avatar`；应用启动、登录状态变化和进入设置页时按 `avatarUpdatedAt` 拉取。首页 40dp 玻璃头像按钮读取同一缓存。昵称编辑暂只保留本地显示，后续以弹窗接入。
-
-公共控件使用 `AppGlassScene` 声明同窗口背景。普通内容放在实色 `AppSurface`，控件与浮层放在独立前景。顶栏由 `GlassPageHeader` 通过 Haze 2.1.0（`haze`、`haze-blur`）对滚动正文做渐进高斯模糊；控件与浮层继续使用 Backdrop 2.0.1。硬件加速且未启用减少透明效果时启用 Backdrop 折射，其他场景回退模糊或实色。锚定菜单和下拉选择在 `AppGlassScene` 内由 `AppMenuHost` 统一承载，只有缺少场景时才回退到独立 Popup 窗口和实色材质；同一时刻只保留一个菜单请求。Backdrop 的公开 API 使用原尺寸效果缓冲区，预览页没有采样倍率选项。
-
-设置层级（设置目录、外观、服务、服务器、登录）全部使用 Miuix 0.9.4：页面用 `AppMiuixPage` 包裹（内含 Miuix `Scaffold`，`contentWindowInsets` 置零避免与 `AppSecondaryPage` 的安全区叠加，同时为 `Overlay*` 提供 popup host），卡片统一用 `AppMiuixCard` 或 `AppMiuixSettingsGroup`，设置入口行用 `ArrowPreference`，外观页的主题模式与语言用 `OverlayDropdownPreference`。
-
-主题已交给 Miuix：`AcbooksTheme` 是唯一入口，内部先由 `appColors()` 生成 15 个语义色，经 `toMiuixColors()` 填入 Miuix `Colors` 并作为全局唯一色源，再用 `toAppColors()` 反向还原出 `LocalAppColors`，因此 Miuix 组件与既有 Glass/Fluent 组件共享同一份色值。两个映射互逆，由 `AppMiuixThemeTest` 的往返测试覆盖。Miuix 未使用的 `errorContainer` / `onErrorContainer` 承载 `destructiveText` 与 `controlBorder`。设计系统以 `api` 暴露 `miuix-ui` 与 `miuix-preference`，业务模块可直接引用 Miuix 组件。
-
-圆角、行内边距、行分隔线不覆盖，保持 Miuix 默认（16dp 圆角、16dp 内边距、无分隔线）。玻璃按钮 `LiquidGlassButton`、Backdrop 采样、Haze 顶栏模糊与折射逻辑均未改动，只是改为从同一份 Miuix 色板取色。注意 `MiuixTheme` 现在覆盖全 App，其 `LocalIndication` 与 `LocalOverscrollFactory` 会作用于所有子树；启用态玻璃按钮本来就 `indication = null`，影响面为禁用态与滚动回弹观感。
+账号资料：昵称和头像修订/待同步标记保存在 `ProfilePreferences`，头像文件缓存在应用私有目录。设置页点击 56dp 头像通过系统照片选择器选择图片，客户端居中裁剪为 512×512 JPEG；未登录时本地保存并在登录后上传，已登录时直接调用 `/api/v1/auth/me/avatar`；应用启动、登录状态变化和进入设置页时按 `avatarUpdatedAt` 拉取。首页头像入口读取同一缓存。昵称编辑暂只保留本地显示，后续以弹窗接入。

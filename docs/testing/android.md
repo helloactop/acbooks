@@ -22,6 +22,14 @@ bash ./gradlew :app:connectedDebugAndroidTest :core:database:connectedDebugAndro
 
 报告位于各模块的 `build/reports/`。启动测试可在未配置账号和服务器的设备上运行。
 
+## Miuix 迁移验收
+
+以下为迁移完成后的验收要求。当前测试表和初始化验收记录描述已有实现。
+
+- 组件预览验证直接使用 Miuix 的主导航、顶栏、表单、按钮、菜单、对话框和底部浮层。覆盖跟随系统、浅色、深色、中英文、字体缩放与 TalkBack。
+- 设备测试覆盖 API 33 及以上、小屏、横屏、平板、Tab 状态保留和逐级返回。验证导入浮层、设置、服务器登录，以及 EPUB/PDF 的翻页、目录、书签和阅读设置。
+- 代码检查确认应用可见控件使用 Miuix 默认样式，旧设计令牌、主题映射和已无引用的视觉依赖已清理。
+
 ## 初始化验收
 
 基于 `ffe9310` 的 Android 初始化工作区在 Windows、JDK 21 和 Android 16（API 36）模拟器上通过上述检查。DataStore JVM 测试 2 项、设备测试 4 项全部通过。Lint 无错误，保留依赖更新、目标 API 和启动图标等警告。低版本设备与实体设备尚未验证。

@@ -18,7 +18,7 @@
 | 数据库 | SQLite（WAL） |
 | Web | React、TypeScript、Vite |
 | Windows | Tauri、React、TypeScript；按需使用 Rust |
-| Android | Kotlin、Jetpack Compose、Room、Readium |
+| Android | Kotlin、Jetpack Compose、Miuix、Room、Readium |
 | iOS（后续） | Swift、SwiftUI；可评估 KMP |
 | 阅读 / 文件处理 | Readium、PDFium、Python 文件解析工具 |
 | 部署 | Docker Compose；NAS / Linux 统一部署包；Web 构建产物由 FastAPI 同源托管 |
