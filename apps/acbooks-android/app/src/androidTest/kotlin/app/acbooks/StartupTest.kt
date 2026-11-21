@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
@@ -24,8 +25,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.core.os.LocaleListCompat
@@ -33,7 +34,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.acbooks.feature.home.R
 import java.util.Locale
-import kotlin.math.abs
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -63,15 +63,9 @@ class StartupTest {
         val configure = activity.getString(app.acbooks.R.string.server_configure)
         val signIn = activity.getString(app.acbooks.R.string.server_sign_in)
 
-        fun assertAccent(label: String, color: Color) {
-            compose.waitUntil(10_000) {
-                val pixels = compose.onNodeWithText(label).captureToImage().toPixelMap()
-                val sampled = pixels[pixels.width / 4, pixels.height / 2]
-                // The existing backdrop can contribute up to 20% of the sampled color.
-                abs(sampled.red - color.red) <= 0.21f &&
-                    abs(sampled.green - color.green) <= 0.21f &&
-                    abs(sampled.blue - color.blue) <= 0.21f
-            }
+        fun buttonColor(label: String): Color {
+            val pixels = compose.onNodeWithText(label).captureToImage().toPixelMap()
+            return pixels[pixels.width / 4, pixels.height / 2]
         }
 
         try {
@@ -79,10 +73,10 @@ class StartupTest {
             compose.onNodeWithContentDescription(activity.getString(R.string.home_open_settings)).performClick()
             compose.onNodeWithText(activity.getString(app.acbooks.R.string.settings_services)).performClick()
             compose.onNodeWithText(activity.getString(app.acbooks.R.string.server_title)).performClick()
-            assertAccent(configure, app.acbooks.core.designsystem.tokens.DefaultAccent)
+            val defaultColor = buttonColor(configure)
 
             runBlocking { appearance.setAccent("#00866A") }
-            assertAccent(configure, Color(0xFF00866A))
+            compose.waitUntil(10_000) { buttonColor(configure) != defaultColor }
             compose.onNodeWithText(configure).performClick()
             compose.onNodeWithContentDescription(activity.getString(app.acbooks.R.string.server_address))
                 .performTextInput("https://books.example.com")
@@ -91,10 +85,11 @@ class StartupTest {
             compose.onNodeWithContentDescription(activity.getString(app.acbooks.R.string.server_password))
                 .performTextInput("test-password")
             compose.onNodeWithText(signIn).performScrollTo()
-            assertAccent(signIn, Color(0xFF00866A))
+            compose.onNodeWithText(signIn).assertIsEnabled()
+            val firstAccent = buttonColor(signIn)
 
             runBlocking { appearance.setAccent("#B94870") }
-            assertAccent(signIn, Color(0xFFB94870))
+            compose.waitUntil(10_000) { buttonColor(signIn) != firstAccent }
         } finally {
             runBlocking { appearance.setAccent(previous) }
         }

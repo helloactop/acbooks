@@ -9,22 +9,22 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -35,12 +35,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,30 +48,36 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.acbooks.R
 import app.acbooks.core.database.LocalBookCard
-import app.acbooks.core.designsystem.components.LiquidGlassButton
-import app.acbooks.core.designsystem.components.LiquidGlassIconButton
-import app.acbooks.core.designsystem.components.AppLibraryHeader
-import app.acbooks.core.designsystem.components.AppLibraryTools
-import app.acbooks.core.designsystem.components.AppListItem
-import app.acbooks.core.designsystem.components.AppMenuItem
-import app.acbooks.core.designsystem.components.AppProgress
-import app.acbooks.core.designsystem.components.AppSecondaryPage
-import app.acbooks.core.designsystem.components.AppSheet
-import app.acbooks.core.designsystem.components.AppState
-import app.acbooks.core.designsystem.components.AppSwitch
-import app.acbooks.core.designsystem.components.AppTextField
-import app.acbooks.core.designsystem.components.ButtonKind
-import app.acbooks.core.designsystem.glass.AppGlassScene
-import app.acbooks.core.designsystem.glass.AppSurface
-import app.acbooks.core.designsystem.icons.AppIcons
-import app.acbooks.core.designsystem.theme.LocalAppColors
-import app.acbooks.core.designsystem.tokens.AppSizes
-import app.acbooks.core.designsystem.tokens.AppSpacing
-import app.acbooks.core.designsystem.tokens.AppTypography
-import app.acbooks.core.designsystem.tokens.IconButtonSize
-import app.acbooks.core.designsystem.tokens.TextButtonSize
+import app.acbooks.core.designsystem.R as UiR
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
+import top.yukonga.miuix.kmp.basic.ListPopupColumn
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.Backdrop
+import top.yukonga.miuix.kmp.glass.GlassBottomSheet
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Clear
+import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.extended.Folder
+import top.yukonga.miuix.kmp.icon.extended.More
+import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowListPopup
 
 private enum class LibraryPanel { Search, Shelves, Create, Delete }
 
@@ -81,11 +87,13 @@ internal fun LibraryScreen(
     onImport: () -> Unit,
     onReadBook: (String) -> Unit,
     onOpenDetails: (String) -> Unit,
+    backdrop: Backdrop,
 ) {
     val catalog by model.catalog.collectAsStateWithLifecycle()
     val error by model.shelfError.collectAsStateWithLifecycle()
     val grid = rememberLazyGridState()
-    var measuredHeader by remember { mutableIntStateOf(0) }
+    var showMore by rememberSaveable { mutableStateOf(false) }
+    var showFormats by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var format by rememberSaveable { mutableStateOf("") }
     var shelfId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -106,11 +114,6 @@ internal fun LibraryScreen(
         }
         if (sortByTitle) matching.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title }) else matching
     }
-    val headerHeight = if (measuredHeader == 0) AppSpacing.tabHeaderTop + AppSizes.touch
-        else with(LocalDensity.current) { measuredHeader.toDp() }
-    val scrollOffset = grid.firstVisibleItemScrollOffset
-    val pastFirstItem = grid.firstVisibleItemIndex > 0
-    val headerOffset = if (pastFirstItem) Int.MAX_VALUE else scrollOffset
     val all = stringResource(R.string.library_all)
     val chooseFiles = stringResource(R.string.library_import_files)
     val shelfLabel = stringResource(R.string.library_shelves)
@@ -120,177 +123,217 @@ internal fun LibraryScreen(
         panel = LibraryPanel.Shelves
     }
 
-    AppGlassScene(
-        Modifier.fillMaxSize(),
-        sampleButtonBackground = true,
-        background = {
-            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-                val cells = when {
-                    maxWidth >= 600.dp -> GridCells.Adaptive(140.dp)
-                    maxWidth < 340.dp -> GridCells.Fixed(2)
-                    else -> GridCells.Fixed(3)
-                }
-                LazyVerticalGrid(
-                    columns = cells,
-                    state = grid,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        start = AppSpacing.page,
-                        end = AppSpacing.page,
-                        top = headerHeight + AppSpacing.md,
-                        bottom = AppSizes.navigation + AppSpacing.page,
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.libraryToolsGap),
-                    verticalArrangement = Arrangement.spacedBy(AppSpacing.lg),
-                ) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
-                            AppLibraryTools(
-                                filterLabel = filterLabel,
-                                filterItems = listOf(
-                                    AppMenuItem(all, { format = "" }),
-                                    AppMenuItem(stringResource(R.string.library_format_epub), { format = "epub" }),
-                                    AppMenuItem(stringResource(R.string.library_format_pdf), { format = "pdf" }),
-                                ),
-                                onSearch = { panel = LibraryPanel.Search },
-                                onCategories = openShelves,
-                            )
-                            shelf?.let { Text(it.name, style = AppTypography.headline) }
-                            if (query.isNotBlank()) {
-                                LiquidGlassButton(query, { query = "" }, size = TextButtonSize.Compact)
+    Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            TopAppBar(
+                title = stringResource(R.string.library_title),
+                modifier = Modifier.semantics(mergeDescendants = true) { heading() },
+                defaultWindowInsetsPadding = false,
+                actions = {
+                    Box {
+                        IconButton(onClick = { showMore = true }, minWidth = 48.dp, minHeight = 48.dp) {
+                            Icon(MiuixIcons.More, stringResource(UiR.string.app_library_more))
+                        }
+                        WindowListPopup(show = showMore, onDismissRequest = { showMore = false }) {
+                            ListPopupColumn {
+                                BasicComponent(title = chooseFiles, onClick = { showMore = false; onImport() })
+                                BasicComponent(
+                                    title = stringResource(R.string.library_shelf_management),
+                                    onClick = { showMore = false; openShelves() },
+                                )
+                                BasicComponent(
+                                    title = stringResource(if (sortByTitle) R.string.library_sort_recent else R.string.library_sort_title),
+                                    onClick = { showMore = false; sortByTitle = !sortByTitle },
+                                )
                             }
                         }
                     }
-                    if (!catalog.loaded) {
-                        item(span = { GridItemSpan(maxLineSpan) }) { AppProgress() }
-                    } else if (books.isEmpty() && catalog.books.isNotEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            AppState(title = stringResource(R.string.library_no_results))
-                        }
-                    }
-                    items(books, key = { it.id }) { book ->
-                        Column(
-                            Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(AppSpacing.xs),
-                        ) {
-                            val readLabel = stringResource(R.string.reader_open_book, book.title)
-                            BookCover(
-                                book, model,
-                                Modifier
-                                    .semantics { contentDescription = readLabel }
-                                    .clickable(role = Role.Button) { onReadBook(book.id) },
-                            )
-                            Box(
-                                Modifier.fillMaxWidth().heightIn(min = AppSizes.touch)
-                                    .clickable(role = Role.Button) { onOpenDetails(book.id) },
-                                contentAlignment = Alignment.CenterStart,
-                            ) {
-                                Text(book.title, style = AppTypography.small, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            }
-                            Text(
-                                book.author ?: book.format.uppercase(),
-                                style = AppTypography.caption,
-                                color = LocalAppColors.current.textSecondary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
+                },
+            )
         },
-    ) {
-        AppLibraryHeader(
-            title = stringResource(R.string.library_title),
-            scrollOffset = headerOffset,
-            modifier = Modifier.align(Alignment.TopCenter).safeDrawingPadding()
-                .onSizeChanged { measuredHeader = it.height },
-            moreItems = listOf(
-                AppMenuItem(chooseFiles, onImport),
-                AppMenuItem(stringResource(R.string.library_shelf_management), openShelves),
-                AppMenuItem(
-                    stringResource(if (sortByTitle) R.string.library_sort_recent else R.string.library_sort_title),
-                    { sortByTitle = !sortByTitle },
-                ),
-            ),
-        )
-    }
-
-    val panelTitle = when (panel) {
-        LibraryPanel.Search -> stringResource(R.string.library_search)
-        LibraryPanel.Shelves -> shelfLabel
-        LibraryPanel.Create -> stringResource(R.string.library_create_shelf)
-        LibraryPanel.Delete -> stringResource(R.string.library_shelf_delete)
-        null -> ""
-    }
-    AppSheet(panel != null, panelTitle, { panel = null }) {
-        when (panel) {
-            LibraryPanel.Search -> {
-                AppTextField(query, { query = it }, stringResource(R.string.library_search_hint), clearable = true)
-                LiquidGlassButton(
-                    stringResource(R.string.library_done), { panel = null }, Modifier.fillMaxWidth(),
-                    kind = ButtonKind.Primary, size = TextButtonSize.Dialog,
-                )
+    ) { padding ->
+        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+            val cells = when {
+                maxWidth >= 600.dp -> GridCells.Adaptive(140.dp)
+                maxWidth < 340.dp -> GridCells.Fixed(2)
+                else -> GridCells.Fixed(3)
             }
-            LibraryPanel.Shelves -> {
-                LiquidGlassButton(
-                    all, { shelfId = null; panel = null }, Modifier.fillMaxWidth(),
-                    kind = if (shelf == null) ButtonKind.Primary else ButtonKind.Secondary,
-                )
-                catalog.shelves.forEach { option ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        LiquidGlassButton(
-                            option.name, { shelfId = option.id; panel = null }, Modifier.weight(1f),
-                            kind = if (shelf == option) ButtonKind.Primary else ButtonKind.Secondary,
+            LazyVerticalGrid(
+                columns = cells,
+                state = grid,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(stringResource(UiR.string.app_library_search), { panel = LibraryPanel.Search }, Modifier.weight(1f))
+                            Box {
+                                TextButton(filterLabel, { showFormats = true })
+                                WindowListPopup(show = showFormats, onDismissRequest = { showFormats = false }) {
+                                    ListPopupColumn {
+                                        listOf(
+                                            "" to all,
+                                            "epub" to stringResource(R.string.library_format_epub),
+                                            "pdf" to stringResource(R.string.library_format_pdf),
+                                        ).forEach { (value, label) ->
+                                            val checked = format == value
+                                            BasicComponent(
+                                                title = label,
+                                                modifier = Modifier.semantics { selected = checked },
+                                                titleColor = BasicComponentDefaults.titleColor(
+                                                    color = if (checked) {
+                                                        MiuixTheme.colorScheme.primary
+                                                    } else {
+                                                        MiuixTheme.colorScheme.onBackground
+                                                    },
+                                                ),
+                                                endActions = { if (checked) Icon(MiuixIcons.Ok, null) },
+                                                onClick = {
+                                                    format = value
+                                                    showFormats = false
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            IconButton(onClick = openShelves, minWidth = 48.dp, minHeight = 48.dp) {
+                                Icon(MiuixIcons.Folder, stringResource(UiR.string.app_library_categories))
+                            }
+                        }
+                        shelf?.let { Text(it.name, style = MiuixTheme.textStyles.title4) }
+                        if (query.isNotBlank()) TextButton(query, { query = "" })
+                    }
+                }
+                if (!catalog.loaded) {
+                    item(span = { GridItemSpan(maxLineSpan) }) { CircularProgressIndicator() }
+                } else if (books.isEmpty() && catalog.books.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(stringResource(R.string.library_no_results))
+                    }
+                }
+                items(books, key = { it.id }) { book ->
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        val readLabel = stringResource(R.string.reader_open_book, book.title)
+                        BookCover(
+                            book, model,
+                            Modifier.semantics { contentDescription = readLabel }
+                                .clickable(role = Role.Button) { onReadBook(book.id) },
                         )
-                        LiquidGlassIconButton(
-                            AppIcons.Clear, stringResource(R.string.library_shelf_delete),
-                            { deleteId = option.id; panel = LibraryPanel.Delete },
-                            kind = ButtonKind.Destructive,
-                            size = IconButtonSize.XS,
+                        Box(
+                            Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                                .clickable(role = Role.Button) { onOpenDetails(book.id) },
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            Text(book.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                        Text(
+                            book.author ?: book.format.uppercase(),
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
-                LiquidGlassButton(
-                    stringResource(R.string.library_create_shelf),
-                    { draft = ""; model.clearShelfError(); panel = LibraryPanel.Create },
-                    Modifier.fillMaxWidth(),
-                    kind = ButtonKind.Primary,
-                )
             }
-            LibraryPanel.Create -> {
-                AppTextField(
-                    draft, { draft = it.take(80); model.clearShelfError() },
-                    stringResource(R.string.library_shelf_name),
-                    errorMessage = error?.let { stringResource(it) },
-                )
-                LiquidGlassButton(
-                    stringResource(R.string.library_create_shelf),
-                    { model.createShelf(draft) { panel = LibraryPanel.Shelves } },
-                    Modifier.fillMaxWidth(),
-                    kind = ButtonKind.Primary, size = TextButtonSize.Dialog,
-                    enabled = draft.isNotBlank(),
-                )
-            }
-            LibraryPanel.Delete -> if (deleting != null) {
-                Text(stringResource(R.string.library_shelf_delete_message, deleting.name))
-                LiquidGlassButton(
-                    stringResource(R.string.library_shelf_delete),
-                    {
-                        model.deleteShelf(deleting.id)
-                        panel = LibraryPanel.Shelves
-                    },
-                    Modifier.fillMaxWidth(),
-                    kind = ButtonKind.Destructive,
-                    size = TextButtonSize.Dialog,
-                )
-                LiquidGlassButton(stringResource(R.string.library_done), { panel = LibraryPanel.Shelves }, Modifier.fillMaxWidth(),
-                    size = TextButtonSize.Dialog)
-            }
-            null -> Unit
         }
-        if (panel != LibraryPanel.Create) {
-            error?.let { Text(stringResource(it), color = LocalAppColors.current.destructiveText) }
+
+        val panelTitle = when (panel) {
+            LibraryPanel.Search -> stringResource(R.string.library_search)
+            LibraryPanel.Shelves -> shelfLabel
+            LibraryPanel.Create -> stringResource(R.string.library_create_shelf)
+            LibraryPanel.Delete -> stringResource(R.string.library_shelf_delete)
+            null -> ""
+        }
+        GlassBottomSheet(
+            show = panel != null,
+            title = panelTitle,
+            onDismissRequest = { panel = null },
+            backdrop = backdrop,
+        ) {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                when (panel) {
+                    LibraryPanel.Search -> {
+                        TextField(
+                            query, { query = it }, Modifier.fillMaxWidth(),
+                            label = stringResource(R.string.library_search_hint), singleLine = true,
+                            trailingIcon = {
+                                if (query.isNotEmpty()) {
+                                    IconButton(onClick = { query = "" }) { Icon(MiuixIcons.Clear, stringResource(UiR.string.app_clear)) }
+                                }
+                            },
+                        )
+                        TextButton(
+                            stringResource(R.string.library_done), { panel = null }, Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.textButtonColorsPrimary(),
+                        )
+                    }
+                    LibraryPanel.Shelves -> {
+                        TextButton(
+                            all, { shelfId = null; panel = null }, Modifier.fillMaxWidth(),
+                            colors = if (shelf == null) ButtonDefaults.textButtonColorsPrimary() else ButtonDefaults.textButtonColors(),
+                        )
+                        catalog.shelves.forEach { option ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(
+                                    option.name, { shelfId = option.id; panel = null }, Modifier.weight(1f),
+                                    colors = if (shelf == option) ButtonDefaults.textButtonColorsPrimary() else ButtonDefaults.textButtonColors(),
+                                )
+                                IconButton(onClick = { deleteId = option.id; panel = LibraryPanel.Delete }, minWidth = 48.dp, minHeight = 48.dp) {
+                                    Icon(MiuixIcons.Delete, stringResource(R.string.library_shelf_delete), tint = MiuixTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                        TextButton(
+                            stringResource(R.string.library_create_shelf),
+                            { draft = ""; model.clearShelfError(); panel = LibraryPanel.Create },
+                            Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.textButtonColorsPrimary(),
+                        )
+                    }
+                    LibraryPanel.Create -> {
+                        TextField(
+                            draft, { draft = it.take(80); model.clearShelfError() }, Modifier.fillMaxWidth(),
+                            label = stringResource(R.string.library_shelf_name), singleLine = true,
+                        )
+                        error?.let { Text(stringResource(it), color = MiuixTheme.colorScheme.error) }
+                        TextButton(
+                            stringResource(R.string.library_create_shelf),
+                            { model.createShelf(draft) { panel = LibraryPanel.Shelves } },
+                            Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.textButtonColorsPrimary(),
+                            enabled = draft.isNotBlank(),
+                        )
+                    }
+                    LibraryPanel.Delete -> if (deleting != null) {
+                        Text(stringResource(R.string.library_shelf_delete_message, deleting.name))
+                        TextButton(
+                            stringResource(R.string.library_shelf_delete),
+                            {
+                                model.deleteShelf(deleting.id)
+                                panel = LibraryPanel.Shelves
+                            },
+                            Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.textButtonColors(
+                                color = MiuixTheme.colorScheme.error, textColor = MiuixTheme.colorScheme.onError,
+                            ),
+                        )
+                        TextButton(stringResource(R.string.library_done), { panel = LibraryPanel.Shelves }, Modifier.fillMaxWidth())
+                    }
+                    null -> Unit
+                }
+                if (panel != LibraryPanel.Create) {
+                    error?.let { Text(stringResource(it), color = MiuixTheme.colorScheme.error) }
+                }
+            }
         }
     }
 }
@@ -304,59 +347,73 @@ internal fun LibraryBookDetails(
     val catalog by model.catalog.collectAsStateWithLifecycle()
     val error by model.shelfError.collectAsStateWithLifecycle()
     val book = catalog.books.firstOrNull { it.id == bookId }
-    AppSecondaryPage(stringResource(R.string.library_book_details), onBack) {
-        if (!catalog.loaded) {
-            AppProgress()
-        } else if (book == null) {
-            Text(stringResource(R.string.library_book_missing))
-        } else {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Box(Modifier.widthIn(max = AppSizes.navigation * 2).fillMaxWidth()) {
-                    BookCover(book, model, Modifier)
+    Scaffold(topBar = {
+        SmallTopAppBar(
+            title = stringResource(R.string.library_book_details),
+            modifier = Modifier.semantics(mergeDescendants = true) { heading() },
+            navigationIcon = {
+                IconButton(onBack, minWidth = 48.dp, minHeight = 48.dp) {
+                    Icon(MiuixIcons.Back, stringResource(UiR.string.app_back))
                 }
-            }
-            Text(book.title, style = AppTypography.title)
-            book.author?.let { Text(it, color = LocalAppColors.current.textSecondary) }
-            Text(book.format.uppercase(), style = AppTypography.caption)
-            Text(stringResource(R.string.library_shelves), style = AppTypography.headline)
-            if (catalog.shelves.isEmpty()) {
-                Text(stringResource(R.string.library_shelf_empty), style = AppTypography.small)
-            }
-            catalog.shelves.forEach { shelf ->
-                AppListItem(title = shelf.name, trailing = {
-                    AppSwitch(
+            },
+        )
+    }) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (!catalog.loaded) {
+                CircularProgressIndicator()
+            } else if (book == null) {
+                Text(stringResource(R.string.library_book_missing))
+            } else {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Box(Modifier.widthIn(max = 128.dp).fillMaxWidth()) {
+                        BookCover(book, model, Modifier)
+                    }
+                }
+                Text(book.title, style = MiuixTheme.textStyles.title2)
+                book.author?.let { Text(it, color = MiuixTheme.colorScheme.onSurfaceVariantSummary) }
+                Text(book.format.uppercase(), style = MiuixTheme.textStyles.footnote1)
+                Text(stringResource(R.string.library_shelves), style = MiuixTheme.textStyles.title4)
+                if (catalog.shelves.isEmpty()) {
+                    Text(stringResource(R.string.library_shelf_empty), style = MiuixTheme.textStyles.body2)
+                }
+                catalog.shelves.forEach { shelf ->
+                    SwitchPreference(
+                        title = shelf.name,
                         checked = catalog.memberships.any { it.bookId == bookId && it.shelfId == shelf.id },
                         onCheckedChange = { model.setMembership(bookId, shelf.id, it) },
-                        label = shelf.name,
                     )
-                })
+                }
+                error?.let { Text(stringResource(it), color = MiuixTheme.colorScheme.error) }
             }
-            error?.let { Text(stringResource(it), color = LocalAppColors.current.destructiveText) }
         }
     }
 }
 
 @Composable
 private fun BookCover(book: LocalBookCard, model: LibraryViewModel, modifier: Modifier) {
-    val colors = LocalAppColors.current
     val image by produceState<ImageBitmap?>(null, book.sha256) {
         value = withContext(Dispatchers.IO) {
             model.coverFile(book.sha256)?.takeIf { it.isFile }?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() }
         }
     }
-    AppSurface(modifier.fillMaxWidth().aspectRatio(3f / 4f), tint = colors.surfaceSecondary) {
-        val cover = image
-        if (cover != null) {
-            Image(cover, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        } else {
-            Text(
-                book.title,
-                Modifier.align(Alignment.Center).padding(AppSpacing.sm).clearAndSetSemantics {},
-                style = AppTypography.small,
-                textAlign = TextAlign.Center,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis,
-            )
+    Card(modifier.fillMaxWidth().aspectRatio(3f / 4f), insideMargin = PaddingValues(0.dp)) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            val cover = image
+            if (cover != null) {
+                Image(cover, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else {
+                Text(
+                    book.title,
+                    Modifier.padding(8.dp).clearAndSetSemantics {},
+                    style = MiuixTheme.textStyles.body2,
+                    textAlign = TextAlign.Center,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -365,45 +422,50 @@ private fun BookCover(book: LocalBookCard, model: LibraryViewModel, modifier: Mo
 internal fun LibraryImportPanel(
     visible: Boolean,
     model: LibraryViewModel,
+    backdrop: Backdrop,
     onChooseFiles: () -> Unit,
     onOpenLibrary: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val status by model.progress.collectAsStateWithLifecycle()
-    AppSheet(visible, stringResource(R.string.add_books_title), onDismiss) {
-        val progress = status
-        if (progress?.running == true) {
-            Text(stringResource(R.string.library_import_progress, progress.processed, progress.total))
-            AppProgress(Modifier.fillMaxWidth(), progress.processed.toFloat() / progress.total)
-            LiquidGlassButton(stringResource(R.string.library_import_cancel), model::cancelImport, Modifier.fillMaxWidth(),
-                kind = ButtonKind.Secondary)
-        } else {
-            if (progress != null) {
-                if (progress.processed < progress.total) {
-                    Text(stringResource(R.string.library_import_cancelled, progress.processed, progress.total))
-                }
-                Text(
-                    stringResource(
-                        R.string.library_import_result,
-                        progress.added, progress.duplicate, progress.unsupported, progress.failed,
-                    ),
-                )
-                if (progress.matching > 0) {
-                    Text(stringResource(R.string.library_import_matches, progress.matching))
-                    LiquidGlassButton(
-                        stringResource(R.string.library_import_matches_action),
-                        model::importMatches, Modifier.fillMaxWidth(),
-                        kind = ButtonKind.Secondary,
+    GlassBottomSheet(
+        show = visible,
+        title = stringResource(R.string.add_books_title),
+        onDismissRequest = onDismiss,
+        backdrop = backdrop,
+    ) {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val progress = status
+            if (progress?.running == true) {
+                Text(stringResource(R.string.library_import_progress, progress.processed, progress.total))
+                LinearProgressIndicator(progress = { progress.processed.toFloat() / progress.total }, modifier = Modifier.fillMaxWidth())
+                TextButton(stringResource(R.string.library_import_cancel), model::cancelImport, Modifier.fillMaxWidth())
+            } else {
+                if (progress != null) {
+                    if (progress.processed < progress.total) {
+                        Text(stringResource(R.string.library_import_cancelled, progress.processed, progress.total))
+                    }
+                    Text(
+                        stringResource(
+                            R.string.library_import_result,
+                            progress.added, progress.duplicate, progress.unsupported, progress.failed,
+                        ),
                     )
+                    if (progress.matching > 0) {
+                        Text(stringResource(R.string.library_import_matches, progress.matching))
+                        TextButton(
+                            stringResource(R.string.library_import_matches_action),
+                            model::importMatches, Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
-            }
-            LiquidGlassButton(
-                stringResource(R.string.library_import_files), onChooseFiles, Modifier.fillMaxWidth(),
-                kind = ButtonKind.Primary,
-            )
-            if ((progress?.added ?: 0) > 0) {
-                LiquidGlassButton(stringResource(R.string.library_open), onOpenLibrary, Modifier.fillMaxWidth(),
-                    kind = ButtonKind.Secondary)
+                TextButton(
+                    stringResource(R.string.library_import_files), onChooseFiles, Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
+                if ((progress?.added ?: 0) > 0) {
+                    TextButton(stringResource(R.string.library_open), onOpenLibrary, Modifier.fillMaxWidth())
+                }
             }
         }
     }

@@ -6,8 +6,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.Color
 import androidx.core.graphics.toColorInt
@@ -16,15 +17,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.acbooks.core.datastore.AppearancePreferences
 import app.acbooks.core.datastore.ProfilePreferences
 import app.acbooks.core.datastore.ThemeMode
-import app.acbooks.core.designsystem.theme.AcbooksTheme
-import app.acbooks.core.designsystem.tokens.DefaultAccent
-import app.acbooks.navigation.AcbooksNavHost
 import app.acbooks.library.LibraryViewModel
+import app.acbooks.navigation.AcbooksNavHost
 import app.acbooks.profile.ProfileAvatars
 import app.acbooks.server.ServerSessions
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.ThemeController
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -55,7 +57,15 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            AcbooksTheme(darkTheme, accent?.let { Color(it.toColorInt()) } ?: DefaultAccent) {
+            val theme = remember(themeMode, accent) {
+                val scheme = when (themeMode) {
+                    ThemeMode.SYSTEM -> if (accent == null) ColorSchemeMode.System else ColorSchemeMode.MonetSystem
+                    ThemeMode.LIGHT -> if (accent == null) ColorSchemeMode.Light else ColorSchemeMode.MonetLight
+                    ThemeMode.DARK -> if (accent == null) ColorSchemeMode.Dark else ColorSchemeMode.MonetDark
+                }
+                ThemeController(colorSchemeMode = scheme, keyColor = accent?.let { Color(it.toColorInt()) })
+            }
+            MiuixTheme(theme) {
                 AcbooksNavHost(
                     themeMode = themeMode,
                     nickname = nickname,

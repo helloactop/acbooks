@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -33,22 +32,22 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.compose.AndroidFragment
 import app.acbooks.R
-import app.acbooks.core.designsystem.components.LiquidGlassButton
-import app.acbooks.core.designsystem.components.AppProgress
-import app.acbooks.core.designsystem.components.ButtonKind
-import app.acbooks.core.designsystem.theme.LocalAppColors
-import app.acbooks.core.designsystem.tokens.AppSpacing
 import app.acbooks.library.LibraryViewModel
 import app.acbooks.library.ReadableBookFile
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private sealed interface ReaderState {
     data object Loading : ReaderState
@@ -61,7 +60,7 @@ internal fun LocalReaderScreen(
     model: LibraryViewModel,
     bookId: String,
 ) {
-    val colors = LocalAppColors.current
+    val colors = MiuixTheme.colorScheme
     val state by produceState<ReaderState>(ReaderState.Loading, bookId) {
         val source = model.openBook(bookId)
         value = if (source == null) ReaderState.Unavailable
@@ -71,7 +70,7 @@ internal fun LocalReaderScreen(
 
     Box(Modifier.fillMaxSize().background(colors.background), contentAlignment = Alignment.Center) {
         when (val reader = state) {
-            ReaderState.Loading -> AppProgress()
+            ReaderState.Loading -> CircularProgressIndicator()
             ReaderState.Unavailable -> Text(stringResource(R.string.reader_open_failed))
             is ReaderState.Ready -> if (reader.file.format == "epub") {
                 val dark = colors.background.luminance() < 0.5f
@@ -126,7 +125,7 @@ private fun PdfBook(ready: ReaderState.Ready, model: LibraryViewModel) {
     val result = rendered
     val page = result?.getOrNull()
     if (page == null) {
-        if (result == null) AppProgress() else Text(stringResource(R.string.reader_open_failed))
+        if (result == null) CircularProgressIndicator() else Text(stringResource(R.string.reader_open_failed))
         return
     }
     LaunchedEffect(source.id, page.index) {
@@ -140,18 +139,18 @@ private fun PdfBook(ready: ReaderState.Ready, model: LibraryViewModel) {
             contentScale = ContentScale.Fit,
         )
         Row(
-            Modifier.fillMaxWidth().padding(AppSpacing.sm),
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm, Alignment.CenterHorizontally),
+            Modifier.fillMaxWidth().padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LiquidGlassButton(
+            TextButton(
                 stringResource(R.string.reader_previous), { requestedPage = page.index - 1 },
-                kind = ButtonKind.Secondary, enabled = page.index > 0,
+                enabled = page.index > 0,
             )
             Text(stringResource(R.string.reader_page, page.index + 1, page.count))
-            LiquidGlassButton(
+            TextButton(
                 stringResource(R.string.reader_next), { requestedPage = page.index + 1 },
-                kind = ButtonKind.Secondary, enabled = page.index + 1 < page.count,
+                enabled = page.index + 1 < page.count,
             )
         }
     }

@@ -5,7 +5,11 @@ plugins {
 
 android {
     namespace = "app.acbooks.core.designsystem"
-    compileSdk = libs.versions.compileSdk.get().toInt()
+    compileSdk {
+        version = release(libs.versions.compileSdk.get().toInt()) {
+            minorApiLevel = libs.versions.compileSdkMinor.get().toInt()
+        }
+    }
 
     defaultConfig {
         minSdk = libs.versions.minSdk.get().toInt()
@@ -24,20 +28,11 @@ kotlin {
 }
 
 dependencies {
-    implementation(libs.backdrop)
-    implementation(libs.shapes)
-    implementation(libs.fluent.icons)
-    implementation(libs.haze)
-    implementation(libs.haze.blur)
     api(libs.miuix.ui)
     api(libs.miuix.preference)
-    implementation(libs.miuix.icons)
-    implementation(libs.miuix.blur)
+    api(libs.miuix.glass)
+    api(libs.miuix.icons)
+    api(libs.miuix.blur)
     implementation(libs.miuix.squircle)
     implementation(libs.miuix.nav)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.foundation)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.activity.compose)
-    testImplementation(libs.junit)
 }

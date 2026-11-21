@@ -6,37 +6,42 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.os.LocaleListCompat
-import androidx.compose.foundation.ScrollState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
@@ -46,20 +51,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import app.acbooks.R
 import app.acbooks.core.datastore.ThemeMode
-import app.acbooks.core.designsystem.components.AppBottomDock
-import app.acbooks.core.designsystem.components.AppMiuixCard
-import app.acbooks.core.designsystem.components.AppMiuixPage
-import app.acbooks.core.designsystem.components.AppMiuixProfileCard
-import app.acbooks.core.designsystem.components.AppMiuixSettingsGroup
-import app.acbooks.core.designsystem.components.AppMiuixSettingsRow
-import app.acbooks.core.designsystem.components.MainTabBody
-import app.acbooks.core.designsystem.components.MainTabHeader
-import app.acbooks.core.designsystem.glass.AppGlassScene
-import app.acbooks.core.designsystem.icons.AppIcons
-import app.acbooks.core.designsystem.theme.LocalAppColors
-import app.acbooks.core.designsystem.tokens.AppSizes
-import app.acbooks.core.designsystem.tokens.AppSpacing
-import app.acbooks.core.designsystem.tokens.AppTypography
+import app.acbooks.core.designsystem.R as UiR
 import app.acbooks.feature.home.HomeHeader
 import app.acbooks.library.LibraryBookDetails
 import app.acbooks.library.LibraryImportPanel
@@ -68,12 +60,36 @@ import app.acbooks.library.LibraryViewModel
 import app.acbooks.profile.AvatarSync
 import app.acbooks.profile.ProfileAvatars
 import app.acbooks.reader.LocalReaderScreen
-import app.acbooks.server.ServerSessions
 import app.acbooks.server.ServerLoginScreen
+import app.acbooks.server.ServerSessions
 import app.acbooks.server.ServerSettingsScreen
 import app.acbooks.server.serverStatusLabel
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.glass.GlassFloatingActionButton
+import top.yukonga.miuix.kmp.glass.GlassNavigationBar
+import top.yukonga.miuix.kmp.glass.GlassNavigationItem
+import top.yukonga.miuix.kmp.glass.GlassNavigationRail
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Add
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.CloudFill
+import top.yukonga.miuix.kmp.icon.extended.ContactsCircle
+import top.yukonga.miuix.kmp.icon.extended.Folder
+import top.yukonga.miuix.kmp.icon.extended.Home
+import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.icon.extended.Tasks
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private const val HOME_ROUTE = "home"
 private const val LIBRARY_ROUTE = "library"
@@ -109,7 +125,7 @@ internal fun AcbooksNavHost(
     NavHost(
         navController = navController,
         startDestination = HOME_ROUTE,
-        modifier = Modifier.fillMaxSize().clipToBounds().background(LocalAppColors.current.background),
+        modifier = Modifier.fillMaxSize().clipToBounds().background(MiuixTheme.colorScheme.surface),
         enterTransition = { pageEnter() },
         exitTransition = { ExitTransition.KeepUntilTransitionsFinished },
         popEnterTransition = { EnterTransition.None },
@@ -157,12 +173,22 @@ internal fun AcbooksNavHost(
             AppearanceSettingsScreen(themeMode, onThemeModeChange) { navController.returnFrom(entry) }
         }
         composable(SERVICES_ROUTE) { entry ->
-            AppMiuixPage(stringResource(R.string.settings_services), { navController.returnFrom(entry) }) {
-                AppMiuixSettingsGroup {
-                    AppMiuixSettingsRow(
+            Scaffold(topBar = {
+                SmallTopAppBar(
+                    title = stringResource(R.string.settings_services),
+                    modifier = Modifier.semantics(mergeDescendants = true) { heading() },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.returnFrom(entry) }, minWidth = 48.dp, minHeight = 48.dp) {
+                            Icon(MiuixIcons.Back, stringResource(UiR.string.app_back))
+                        }
+                    },
+                )
+            }) { padding ->
+                Card(Modifier.padding(padding).padding(16.dp)) {
+                    ArrowPreference(
                         title = stringResource(R.string.server_title),
-                        icon = AppIcons.Cloud,
-                        supportingText = stringResource(serverStatusLabel(session)),
+                        summary = stringResource(serverStatusLabel(session)),
+                        startAction = { Icon(MiuixIcons.CloudFill, null) },
                         onClick = { navController.navigate(SERVER_ROUTE) { launchSingleTop = true } },
                     )
                 }
@@ -213,63 +239,77 @@ private fun MainTabs(
         scope.launch { pagerState.animateScrollToPage(0) }
     }
 
-    AppGlassScene(
-        modifier = Modifier.fillMaxSize(),
-        background = {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-                key = { dockRoutes[it] },
-            ) { page ->
-                when (dockRoutes[page]) {
-                    HOME_ROUTE -> MainTabDestination { scroll, modifier ->
-                        HomeHeader(scroll, avatar, onOpenSettings, modifier)
+    val backdrop = rememberLayerBackdrop()
+    val items = listOf(
+        GlassNavigationItem(MiuixIcons.Home, stringResource(UiR.string.app_dock_home)),
+        GlassNavigationItem(MiuixIcons.Folder, stringResource(UiR.string.app_dock_library)),
+        GlassNavigationItem(MiuixIcons.Tasks, stringResource(UiR.string.app_dock_statistics)),
+    )
+    val addAction: @Composable () -> Unit = {
+        GlassFloatingActionButton(onClick = { showAdd = true }, backdrop = backdrop) {
+            Icon(MiuixIcons.Add, stringResource(UiR.string.app_dock_add))
+        }
+    }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = maxWidth >= 600.dp
+        Scaffold(
+            bottomBar = {
+                if (!wide) {
+                    GlassNavigationBar(
+                        items, pagerState.currentPage, ::selectTab, backdrop,
+                        trailingAction = addAction,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    )
+                }
+            },
+        ) { padding ->
+            Row(Modifier.fillMaxSize().padding(padding).imePadding()) {
+                if (wide) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        addAction()
+                        GlassNavigationRail(
+                            items, pagerState.currentPage, ::selectTab, backdrop, showToggle = false,
+                            defaultWindowInsetsPadding = false,
+                        )
                     }
-                    LIBRARY_ROUTE -> LibraryScreen(library, { showAdd = true }, onReadBook, onOpenDetails)
-                    else -> MainTabDestination { scroll, modifier ->
-                        MainTabHeader(stringResource(R.string.statistics_title), scroll, modifier)
+                }
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.weight(1f).fillMaxSize()
+                        .layerBackdrop(backdrop),
+                    key = { dockRoutes[it] },
+                ) { page ->
+                    when (dockRoutes[page]) {
+                        HOME_ROUTE -> HomeHeader(avatar, onOpenSettings)
+                        LIBRARY_ROUTE -> LibraryScreen(
+                            model = library,
+                            onImport = { showAdd = true },
+                            onReadBook = onReadBook,
+                            onOpenDetails = onOpenDetails,
+                            backdrop = backdrop,
+                        )
+                        else -> TopAppBar(
+                            title = stringResource(R.string.statistics_title),
+                            modifier = Modifier.semantics(mergeDescendants = true) { heading() },
+                            defaultWindowInsetsPadding = false,
+                        )
                     }
                 }
             }
-        },
-    ) {
-        Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-            AppBottomDock(
-                selected = pagerState.currentPage,
-                onSelect = ::selectTab,
-                onAdd = { showAdd = true },
-                modifier = Modifier.align(Alignment.BottomCenter)
-                    .widthIn(max = AppSizes.sheet).fillMaxWidth()
-                    .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
+            LibraryImportPanel(
+                visible = showAdd,
+                model = library,
+                backdrop = backdrop,
+                onChooseFiles = {
+                    picker.launch(arrayOf("application/epub+zip", "application/pdf", "application/octet-stream", "application/zip"))
+                },
+                onOpenLibrary = {
+                    showAdd = false
+                    selectTab(dockRoutes.indexOf(LIBRARY_ROUTE))
+                },
+                onDismiss = { showAdd = false },
             )
         }
-        LibraryImportPanel(
-            visible = showAdd,
-            model = library,
-            onChooseFiles = {
-                picker.launch(arrayOf("application/epub+zip", "application/pdf", "application/octet-stream", "application/zip"))
-            },
-            onOpenLibrary = {
-                showAdd = false
-                selectTab(dockRoutes.indexOf(LIBRARY_ROUTE))
-            },
-            onDismiss = { showAdd = false },
-        )
-    }
-}
-
-@Composable
-private fun MainTabDestination(header: @Composable (ScrollState, Modifier) -> Unit) {
-    val scroll = rememberScrollState()
-    var headerHeight by remember { mutableIntStateOf(0) }
-    AppGlassScene(
-        modifier = Modifier.fillMaxSize(),
-        background = { MainTabBody(scroll, headerHeight) },
-    ) {
-        header(
-            scroll,
-            Modifier.align(Alignment.TopCenter).safeDrawingPadding().onSizeChanged { headerHeight = it.height },
-        )
     }
 }
 
@@ -284,38 +324,61 @@ private fun SettingsScreen(
     onAppearance: () -> Unit,
     onServices: () -> Unit,
 ) {
-    val colors = LocalAppColors.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) onAvatarPicked(uri)
     }
     LaunchedEffect(Unit) { onRefreshAvatar() }
-    AppMiuixPage(stringResource(R.string.settings_title), onBack) {
-        AppMiuixProfileCard(
-            nickname = nickname,
-            avatarLabel = stringResource(R.string.settings_change_avatar),
-            avatar = avatar,
-            onAvatarClick = {
-                picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    Scaffold(topBar = {
+        SmallTopAppBar(
+            title = stringResource(R.string.settings_title),
+            modifier = Modifier.semantics(mergeDescendants = true) { heading() },
+            navigationIcon = {
+                IconButton(onBack, minWidth = 48.dp, minHeight = 48.dp) {
+                    Icon(MiuixIcons.Back, stringResource(UiR.string.app_back))
+                }
             },
         )
-        if (avatarSync == AvatarSync.Failed) {
-            Text(
-                stringResource(R.string.settings_avatar_failed),
-                style = AppTypography.small,
-                color = colors.textSecondary,
-            )
-        }
-        AppMiuixSettingsGroup {
-            AppMiuixSettingsRow(
-                title = stringResource(R.string.settings_appearance),
-                icon = AppIcons.Appearance,
-                onClick = onAppearance,
-            )
-            AppMiuixSettingsRow(
-                title = stringResource(R.string.settings_services),
-                icon = AppIcons.Cloud,
-                onClick = onServices,
-            )
+    }) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Card {
+                Row(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                        minWidth = 56.dp,
+                        minHeight = 56.dp,
+                    ) {
+                        val label = stringResource(R.string.settings_change_avatar)
+                        if (avatar == null) {
+                            Icon(MiuixIcons.ContactsCircle, label, modifier = Modifier.size(48.dp))
+                        } else {
+                            Image(avatar, label, Modifier.size(56.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+                        }
+                    }
+                    Text(nickname)
+                }
+            }
+            if (avatarSync == AvatarSync.Failed) {
+                Text(stringResource(R.string.settings_avatar_failed), color = MiuixTheme.colorScheme.error)
+            }
+            Card {
+                ArrowPreference(
+                    title = stringResource(R.string.settings_appearance),
+                    startAction = { Icon(MiuixIcons.Settings, null) },
+                    onClick = onAppearance,
+                )
+                ArrowPreference(
+                    title = stringResource(R.string.settings_services),
+                    startAction = { Icon(MiuixIcons.CloudFill, null) },
+                    onClick = onServices,
+                )
+            }
         }
     }
 }
@@ -329,8 +392,18 @@ private fun AppearanceSettingsScreen(
     val currentLocales = AppCompatDelegate.getApplicationLocales()
     val languageTags = listOf("", "en", "zh-CN")
     val currentLanguageTag = if (currentLocales.isEmpty) "" else currentLocales.toLanguageTags()
-    AppMiuixPage(stringResource(R.string.settings_appearance), onBack) {
-        AppMiuixCard {
+    Scaffold(topBar = {
+        SmallTopAppBar(
+            title = stringResource(R.string.settings_appearance),
+            modifier = Modifier.semantics(mergeDescendants = true) { heading() },
+            navigationIcon = {
+                IconButton(onBack, minWidth = 48.dp, minHeight = 48.dp) {
+                    Icon(MiuixIcons.Back, stringResource(UiR.string.app_back))
+                }
+            },
+        )
+    }) { padding ->
+        Card(Modifier.padding(padding).padding(16.dp)) {
             OverlayDropdownPreference(
                 items = listOf(
                     stringResource(R.string.settings_theme_system),

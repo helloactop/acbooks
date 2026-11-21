@@ -7,7 +7,11 @@ plugins {
 
 android {
     namespace = "app.acbooks"
-    compileSdk = libs.versions.compileSdk.get().toInt()
+    compileSdk {
+        version = release(libs.versions.compileSdk.get().toInt()) {
+            minorApiLevel = libs.versions.compileSdkMinor.get().toInt()
+        }
+    }
 
     defaultConfig {
         applicationId = "app.acbooks"
@@ -45,7 +49,6 @@ dependencies {
     implementation(libs.readium.navigator)
     implementation(libs.readium.streamer)
     implementation(libs.androidx.compose.foundation)
-    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.navigation.compose)

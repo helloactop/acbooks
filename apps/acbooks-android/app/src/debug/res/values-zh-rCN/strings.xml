@@ -7,27 +7,15 @@
     <string name="preview_invalid_hex">请输入 #RRGGBB 格式的颜色</string>
     <string name="preview_apply">应用</string>
     <string name="preview_reset">恢复默认</string>
-    <string name="preview_solid">实色</string>
-    <string name="preview_blur">模糊</string>
-    <string name="preview_auto">自动</string>
-    <string name="preview_refraction">折射</string>
-    <string name="preview_capability">材质：%1$s</string>
-    <string name="preview_less_transparency">减少透明效果</string>
-    <string name="preview_eink">墨水屏预览</string>
     <string name="preview_search">搜索</string>
-    <string name="preview_content">内容表面</string>
     <string name="preview_dialog">对话框</string>
     <string name="preview_sheet">底部浮层</string>
-    <string name="preview_danger">危险操作</string>
     <string name="preview_disabled">已禁用</string>
     <string name="preview_loading">加载中</string>
-    <string name="preview_menu">菜单</string>
-    <string name="preview_overlay_message">此浮层采样后方场景。</string>
     <string name="preview_close">关闭</string>
     <string name="preview_add_favorite">添加收藏</string>
     <string name="preview_remove_favorite">取消收藏</string>
     <string name="preview_add_bookmark">添加书签</string>
     <string name="preview_remove_bookmark">移除书签</string>
     <string name="preview_confirm">确定</string>
-    <string name="preview_library_all">全部</string>
 </resources>

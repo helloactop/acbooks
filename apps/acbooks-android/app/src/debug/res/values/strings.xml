@@ -7,27 +7,15 @@
     <string name="preview_invalid_hex">Enter a color in #RRGGBB format</string>
     <string name="preview_apply">Apply</string>
     <string name="preview_reset">Reset</string>
-    <string name="preview_solid">Solid</string>
-    <string name="preview_blur">Blur</string>
-    <string name="preview_auto">Auto</string>
-    <string name="preview_refraction">Refraction</string>
-    <string name="preview_capability">Material: %1$s</string>
-    <string name="preview_less_transparency">Reduce transparency</string>
-    <string name="preview_eink">E-ink preview</string>
     <string name="preview_search">Search</string>
-    <string name="preview_content">Content surface</string>
     <string name="preview_dialog">Dialog</string>
     <string name="preview_sheet">Sheet</string>
-    <string name="preview_danger">Destructive</string>
     <string name="preview_disabled">Disabled</string>
     <string name="preview_loading">Loading</string>
-    <string name="preview_menu">Menu</string>
-    <string name="preview_overlay_message">This panel samples the scene behind it.</string>
     <string name="preview_close">Close</string>
     <string name="preview_add_favorite">Add to favorites</string>
     <string name="preview_remove_favorite">Remove from favorites</string>
     <string name="preview_add_bookmark">Add bookmark</string>
     <string name="preview_remove_bookmark">Remove bookmark</string>
     <string name="preview_confirm">Confirm</string>
-    <string name="preview_library_all">All</string>
 </resources>
