@@ -14,13 +14,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.ContactsCircle
 
 @Composable
 fun HomeHeader(avatar: ImageBitmap?, onOpenSettings: () -> Unit) {
-    TopAppBar(
+    SmallTopAppBar(
         title = stringResource(R.string.home_title),
         modifier = Modifier.semantics(mergeDescendants = true) { heading() },
         defaultWindowInsetsPadding = false,

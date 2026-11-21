@@ -13,7 +13,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -53,7 +55,6 @@ import app.acbooks.core.datastore.ThemeMode
 import app.acbooks.core.designsystem.R as UiR
 import app.acbooks.feature.home.HomeHeader
 import app.acbooks.library.LibraryBookDetails
-import app.acbooks.library.LibraryImportPanel
 import app.acbooks.library.LibraryScreen
 import app.acbooks.library.LibraryViewModel
 import app.acbooks.profile.AvatarSync
@@ -68,8 +69,8 @@ import app.acbooks.settings.settingsGlassPanel
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
@@ -78,13 +79,14 @@ import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.glass.GlassNavigationBar
 import top.yukonga.miuix.kmp.glass.GlassNavigationItem
 import top.yukonga.miuix.kmp.glass.GlassNavigationRail
+import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.glass.Add
 import top.yukonga.miuix.kmp.icon.glass.BookOutline
 import top.yukonga.miuix.kmp.icon.glass.Cloud
 import top.yukonga.miuix.kmp.icon.glass.ContactsCircle
 import top.yukonga.miuix.kmp.icon.glass.DigitalStatistics
 import top.yukonga.miuix.kmp.icon.glass.HomeOutline
+import top.yukonga.miuix.kmp.icon.glass.Search
 import top.yukonga.miuix.kmp.icon.glass.SettingsOutline
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -215,10 +217,7 @@ private fun MainTabs(
 ) {
     val pagerState = rememberPagerState(pageCount = { dockRoutes.size })
     val scope = rememberCoroutineScope()
-    var showAdd by rememberSaveable { mutableStateOf(false) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        library.importBooks(uris)
-    }
+    var showSearch by rememberSaveable { mutableStateOf(false) }
     fun selectTab(index: Int) {
         if (pagerState.currentPage == index) return
         scope.launch { pagerState.animateScrollToPage(index) }
@@ -233,9 +232,23 @@ private fun MainTabs(
         GlassNavigationItem(MiuixIcons.Glass.BookOutline, stringResource(UiR.string.app_dock_library)),
         GlassNavigationItem(MiuixIcons.Glass.DigitalStatistics, stringResource(UiR.string.app_dock_statistics)),
     )
-    val addAction: @Composable () -> Unit = {
-        GlassFloatingActionButton(onClick = { showAdd = true }, backdrop = backdrop) {
-            Icon(MiuixIcons.Glass.Add, stringResource(UiR.string.app_dock_add))
+    val searchAction: @Composable () -> Unit = {
+        GlassFloatingActionButton(
+            onClick = {
+                scope.launch {
+                    pagerState.scrollToPage(dockRoutes.indexOf(LIBRARY_ROUTE))
+                    showSearch = true
+                }
+            },
+            backdrop = backdrop,
+            material = GlassTopAppBarDefaults.buttonMaterial(),
+            fill = GlassTopAppBarDefaults.buttonFill(),
+        ) {
+            Icon(
+                MiuixIcons.Glass.Search,
+                stringResource(UiR.string.app_library_search),
+                tint = MiuixTheme.colorScheme.onSurface,
+            )
         }
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -245,16 +258,21 @@ private fun MainTabs(
                 if (!wide) {
                     GlassNavigationBar(
                         items, pagerState.currentPage, ::selectTab, backdrop,
-                        trailingAction = addAction,
+                        trailingAction = searchAction,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     )
                 }
             },
         ) { padding ->
-            Row(Modifier.fillMaxSize().padding(padding).imePadding()) {
+            Row(
+                Modifier.fillMaxSize()
+                    .padding(padding)
+                    .consumeWindowInsets(PaddingValues(top = padding.calculateTopPadding()))
+                    .imePadding(),
+            ) {
                 if (wide) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        addAction()
+                        searchAction()
                         GlassNavigationRail(
                             items, pagerState.currentPage, ::selectTab, backdrop, showToggle = false,
                             defaultWindowInsetsPadding = false,
@@ -271,12 +289,13 @@ private fun MainTabs(
                         HOME_ROUTE -> HomeHeader(avatar, onOpenSettings)
                         LIBRARY_ROUTE -> LibraryScreen(
                             model = library,
-                            onImport = { showAdd = true },
+                            showSearch = showSearch,
+                            onDismissSearch = { showSearch = false },
                             onReadBook = onReadBook,
                             onOpenDetails = onOpenDetails,
                             backdrop = backdrop,
                         )
-                        else -> TopAppBar(
+                        else -> SmallTopAppBar(
                             title = stringResource(R.string.statistics_title),
                             modifier = Modifier.semantics(mergeDescendants = true) { heading() },
                             defaultWindowInsetsPadding = false,
@@ -284,19 +303,6 @@ private fun MainTabs(
                     }
                 }
             }
-            LibraryImportPanel(
-                visible = showAdd,
-                model = library,
-                backdrop = backdrop,
-                onChooseFiles = {
-                    picker.launch(arrayOf("application/epub+zip", "application/pdf", "application/octet-stream", "application/zip"))
-                },
-                onOpenLibrary = {
-                    showAdd = false
-                    selectTab(dockRoutes.indexOf(LIBRARY_ROUTE))
-                },
-                onDismiss = { showAdd = false },
-            )
         }
     }
 }

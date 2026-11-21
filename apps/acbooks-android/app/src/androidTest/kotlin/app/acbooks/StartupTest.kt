@@ -100,10 +100,11 @@ class StartupTest {
     }
 
     @Test
-    fun dockNavigatesAndAddKeepsTheCurrentTab() {
+    fun dockNavigatesAndSearchOpensTheLibrary() {
         val library = compose.activity.getString(app.acbooks.R.string.library_title)
         val statistics = compose.activity.getString(app.acbooks.R.string.statistics_title)
-        val add = compose.activity.getString(app.acbooks.core.designsystem.R.string.app_dock_add)
+        val search = compose.activity.getString(app.acbooks.core.designsystem.R.string.app_library_search)
+        val searchTitle = compose.activity.getString(app.acbooks.R.string.library_search)
         val settings = compose.activity.getString(R.string.home_open_settings)
         val appearance = compose.activity.getString(app.acbooks.R.string.settings_appearance)
         val settingsTitle = compose.activity.getString(app.acbooks.R.string.settings_title)
@@ -133,18 +134,18 @@ class StartupTest {
         compose.onNodeWithText(library).performTouchInput { click() }
         compose.onNode(pageTitle(library)).assertIsDisplayed()
         compose.onNodeWithContentDescription(settings).assertDoesNotExist()
-        val search = compose.activity.getString(app.acbooks.core.designsystem.R.string.app_library_search)
-        compose.onNodeWithText(search).performTouchInput { click() }
+        compose.onNodeWithText(search).assertDoesNotExist()
+        compose.onNodeWithContentDescription(search).performTouchInput { click() }
+        compose.onNodeWithText(searchTitle).assertIsDisplayed()
         val done = compose.activity.getString(app.acbooks.R.string.library_done)
         compose.onNodeWithText(done).performTouchInput { click() }
         compose.onNode(hasText(statistics) and !pageTitle(statistics)).performTouchInput { click() }
         compose.onNode(pageTitle(statistics)).assertIsDisplayed()
         compose.onNodeWithContentDescription(settings).assertDoesNotExist()
-        compose.onNodeWithContentDescription(add).performTouchInput { click() }
-        compose.onNodeWithText(compose.activity.getString(app.acbooks.R.string.add_books_title)).assertIsDisplayed()
+        compose.onNodeWithContentDescription(search).performTouchInput { click() }
+        compose.onNodeWithText(searchTitle).assertIsDisplayed()
         InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
-        compose.onNode(hasText(statistics) and !pageTitle(statistics)).assertIsSelected()
-        compose.onNodeWithText(library).performTouchInput { click() }
+        compose.onNode(hasText(library) and !pageTitle(library)).assertIsSelected()
         compose.onNode(pageTitle(library)).assertIsDisplayed()
         val homeTab = hasText(compose.activity.getString(R.string.home_title)) and
             !pageTitle(compose.activity.getString(R.string.home_title))
