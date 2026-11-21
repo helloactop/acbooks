@@ -44,7 +44,7 @@ acbooks 源码采用 [GPL-3.0-only](LICENSE)。以下为 Android 工程当前直
 | [Dagger Hilt](https://github.com/google/dagger/blob/dagger-2.60.1/LICENSE.txt) | 2.60.1 | Apache-2.0 |
 | [AndroidX Activity、AppCompat、Lifecycle](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 1.13.0 / 1.7.1 / 2.11.0 | Apache-2.0 |
 | [Jetpack Compose](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | BOM 2026.08.00 | Apache-2.0 |
-| [Miuix](https://github.com/compose-miuix-ui/miuix/tree/v0.9.5-beta03) | 0.9.5-beta03（`miuix-ui-android`、`miuix-preference-android`、`miuix-glass-android`、`miuix-icons-android`、`miuix-blur-android`、`miuix-squircle-android`、`miuix-nav-android`） | [Apache-2.0](https://github.com/compose-miuix-ui/miuix/blob/v0.9.5-beta03/LICENSE) |
+| [Miuix](https://github.com/compose-miuix-ui/miuix/tree/v0.9.5-beta03) | 0.9.5-beta03（`miuix-ui-android`、`miuix-preference-android`、`miuix-glass-android`、`miuix-glass-icons-android`、`miuix-blur-android`、`miuix-squircle-android`、`miuix-nav-android`） | [Apache-2.0](https://github.com/compose-miuix-ui/miuix/blob/v0.9.5-beta03/LICENSE) |
 | [Navigation Compose、Room、DataStore](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 2.10.2 / 2.8.4 / 1.1.7 | Apache-2.0 |
 | [AndroidX Test](https://github.com/android/android-test/blob/main/LICENSE) | JUnit 扩展 1.2.1 / Runner 1.6.2 | Apache-2.0 |
 | [JUnit 4](https://github.com/junit-team/junit4/blob/r4.13.2/LICENSE-junit.txt) | 4.13.2 | EPL-1.0 |

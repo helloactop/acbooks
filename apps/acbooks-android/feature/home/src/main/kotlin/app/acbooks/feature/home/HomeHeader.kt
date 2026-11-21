@@ -16,7 +16,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.ContactsCircle
+import top.yukonga.miuix.kmp.icon.glass.ContactsCircle
 
 @Composable
 fun HomeHeader(avatar: ImageBitmap?, onOpenSettings: () -> Unit) {
@@ -30,7 +30,7 @@ fun HomeHeader(avatar: ImageBitmap?, onOpenSettings: () -> Unit) {
                 if (avatar != null) {
                     Image(avatar, label, Modifier.size(40.dp).clip(CircleShape), contentScale = ContentScale.Crop)
                 } else {
-                    Icon(MiuixIcons.ContactsCircle, label)
+                    Icon(MiuixIcons.Glass.ContactsCircle, label)
                 }
             }
         },

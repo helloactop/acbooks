@@ -4,13 +4,10 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,7 +22,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -34,23 +30,19 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.acbooks.R
-import app.acbooks.core.designsystem.R as UiR
+import app.acbooks.settings.SettingsGlassPage
+import app.acbooks.settings.settingsGlassPanel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
-import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.glass.GlassDialogButton
+import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
+import top.yukonga.miuix.kmp.glass.GlassTextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.CloudFill
-import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.glass.Cloud
+import top.yukonga.miuix.kmp.icon.glass.Ok
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private enum class ServerAction { SignIn, Test, SignOut }
@@ -73,111 +65,96 @@ internal fun ServerSettingsScreen(
     val action = rememberServerAction()
     val connected = session != null && !session.isExpired()
 
-    Scaffold(topBar = {
-        SmallTopAppBar(
-            title = stringResource(R.string.server_title),
-            modifier = Modifier.semantics(mergeDescendants = true) { heading() },
-            navigationIcon = {
-                IconButton(onBack, minWidth = 48.dp, minHeight = 48.dp) {
-                    Icon(MiuixIcons.Back, stringResource(UiR.string.app_back))
-                }
-            },
-        )
-    }) { padding ->
+    SettingsGlassPage(stringResource(R.string.server_title), onBack) { background, _ ->
         Column(
-            Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.fillMaxWidth().settingsGlassPanel(background).padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Card {
-                Column(
-                    Modifier.fillMaxWidth().padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(
-                            if (connected) MiuixIcons.Ok else MiuixIcons.CloudFill,
-                            contentDescription = null,
-                            tint = if (connected) colors.primary else colors.onSurfaceVariantSummary,
-                        )
-                        Text(stringResource(R.string.server_status), style = MiuixTheme.textStyles.subtitle)
-                    }
-                    Text(
-                        stringResource(if (session == null) R.string.server_disconnected else serverStatusLabel(session)),
-                        color = colors.onSurfaceVariantSummary,
-                        style = MiuixTheme.textStyles.body1,
-                        textAlign = TextAlign.Center,
-                    )
-                    Text(
-                        session?.username ?: stringResource(R.string.server_not_configured),
-                        color = colors.onSurfaceVariantSummary,
-                        style = MiuixTheme.textStyles.body2,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-
-            if (!connected) {
-                TextButton(
-                    text = stringResource(R.string.server_configure),
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                    enabled = action.pending == null,
-                    onClick = onOpenLogin,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    if (connected) MiuixIcons.Glass.Ok else MiuixIcons.Glass.Cloud,
+                    contentDescription = null,
+                    tint = if (connected) colors.primary else colors.onSurfaceVariantSummary,
                 )
+                Text(stringResource(R.string.server_status), style = MiuixTheme.textStyles.subtitle)
             }
-            if (session != null) {
-                Card {
-                    Column(
-                        Modifier.fillMaxWidth().padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (connected) {
-                            TextButton(
-                                text = stringResource(R.string.server_test),
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = action.pending == null,
-                                onClick = {
-                                    action.run(ServerAction.Test) {
-                                        sessions.test(session.address.toASCIIString(), session)
-                                        action.feedback = R.string.server_verified
-                                    }
-                                },
-                            )
-                        }
-                        TextButton(
-                            text = stringResource(R.string.server_sign_out),
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.textButtonColors(color = colors.error, textColor = colors.onError),
-                            enabled = action.pending == null,
-                            onClick = {
-                                action.run(ServerAction.SignOut) {
-                                    sessions.signOut()
-                                    action.feedback = R.string.server_sign_out_done
-                                }
-                            },
-                        )
-                    }
-                }
-            }
-            if (action.pending != null) LinearProgressIndicator(Modifier.fillMaxWidth())
-            ServerFeedback(action)
+            Text(
+                stringResource(if (session == null) R.string.server_disconnected else serverStatusLabel(session)),
+                color = colors.onSurfaceVariantSummary,
+                style = MiuixTheme.textStyles.body1,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                session?.username ?: stringResource(R.string.server_not_configured),
+                color = colors.onSurfaceVariantSummary,
+                style = MiuixTheme.textStyles.body2,
+                textAlign = TextAlign.Center,
+            )
+        }
 
-            Card {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        if (!connected) {
+            GlassDialogButton(
+                modifier = Modifier.fillMaxWidth(),
+                role = GlassDialogButtonRole.Primary,
+                enabled = action.pending == null,
+                onClick = onOpenLogin,
+            ) {
+                Text(stringResource(R.string.server_configure), style = MiuixTheme.textStyles.button)
+            }
+        }
+        if (session != null) {
+            Column(
+                Modifier.fillMaxWidth().settingsGlassPanel(background).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (connected) {
+                    GlassDialogButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = action.pending == null,
+                        onClick = {
+                            action.run(ServerAction.Test) {
+                                sessions.test(session.address.toASCIIString(), session)
+                                action.feedback = R.string.server_verified
+                            }
+                        },
                     ) {
-                        Icon(MiuixIcons.CloudFill, contentDescription = null, tint = colors.onSurfaceVariantSummary)
-                        Text(stringResource(R.string.server_title), style = MiuixTheme.textStyles.subtitle)
+                        Text(stringResource(R.string.server_test), style = MiuixTheme.textStyles.button)
                     }
-                    Text(stringResource(R.string.server_help), color = colors.onSurfaceVariantSummary, style = MiuixTheme.textStyles.body2)
+                }
+                GlassDialogButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    role = GlassDialogButtonRole.Destructive,
+                    enabled = action.pending == null,
+                    onClick = {
+                        action.run(ServerAction.SignOut) {
+                            sessions.signOut()
+                            action.feedback = R.string.server_sign_out_done
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.server_sign_out), style = MiuixTheme.textStyles.button)
                 }
             }
+        }
+        if (action.pending != null) LinearProgressIndicator(Modifier.fillMaxWidth())
+        ServerFeedback(action)
+
+        Column(
+            Modifier.fillMaxWidth().settingsGlassPanel(background).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(MiuixIcons.Glass.Cloud, contentDescription = null, tint = colors.onSurfaceVariantSummary)
+                Text(stringResource(R.string.server_title), style = MiuixTheme.textStyles.subtitle)
+            }
+            Text(stringResource(R.string.server_help), color = colors.onSurfaceVariantSummary, style = MiuixTheme.textStyles.body2)
         }
     }
 }
@@ -198,104 +175,87 @@ internal fun ServerLoginScreen(
     val address = addressDraft ?: session?.address?.toASCIIString().orEmpty()
     val username = usernameDraft ?: session?.username.orEmpty()
 
-    Scaffold(topBar = {
-        SmallTopAppBar(
-            title = stringResource(R.string.server_login_title),
-            modifier = Modifier.semantics(mergeDescendants = true) { heading() },
-            navigationIcon = {
-                IconButton(onBack, minWidth = 48.dp, minHeight = 48.dp) {
-                    Icon(MiuixIcons.Back, stringResource(UiR.string.app_back))
-                }
-            },
-        )
-    }) { padding ->
+    SettingsGlassPage(stringResource(R.string.server_login_title), onBack) { background, _ ->
         Column(
-            Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.fillMaxWidth().settingsGlassPanel(background).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Card {
-                Column(
-                    Modifier.fillMaxWidth().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    val addressLabel = stringResource(R.string.server_address)
-                    val usernameLabel = stringResource(R.string.server_username)
-                    val passwordLabel = stringResource(R.string.server_password)
-                    val addressError = if (action.error == ServerError.Address) {
-                        stringResource(errorLabel(ServerError.Address))
-                    } else {
-                        null
+            val addressLabel = stringResource(R.string.server_address)
+            val usernameLabel = stringResource(R.string.server_username)
+            val passwordLabel = stringResource(R.string.server_password)
+            val addressError = if (action.error == ServerError.Address) {
+                stringResource(errorLabel(ServerError.Address))
+            } else {
+                null
+            }
+            GlassTextField(
+                address, { addressDraft = it; action.clearFeedback() },
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics {
+                    contentDescription = addressLabel
+                    addressError?.let { error(it) }
+                },
+                label = addressLabel,
+                singleLine = true,
+                enabled = action.pending == null,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
+            )
+            addressError?.let { Text(it, color = colors.error) }
+            GlassTextField(
+                username, { usernameDraft = it; action.clearFeedback() },
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { contentDescription = usernameLabel },
+                label = usernameLabel,
+                singleLine = true,
+                enabled = action.pending == null,
+                keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Next),
+            )
+            GlassTextField(
+                password, { password = it; action.clearFeedback() },
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { contentDescription = passwordLabel },
+                label = passwordLabel,
+                singleLine = true,
+                enabled = action.pending == null,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                visualTransformation = PasswordVisualTransformation(),
+            )
+            GlassDialogButton(
+                modifier = Modifier.fillMaxWidth(),
+                role = GlassDialogButtonRole.Primary,
+                enabled = action.pending == null &&
+                    address.isNotBlank() && username.isNotBlank() && password.isNotEmpty(),
+                onClick = {
+                    focus.clearFocus()
+                    action.run(ServerAction.SignIn) {
+                        sessions.signIn(address, username, password)
+                        password = ""
+                        onSignedIn()
                     }
-                    TextField(
-                        address, { addressDraft = it; action.clearFeedback() },
-                        Modifier.fillMaxWidth().semantics {
-                            contentDescription = addressLabel
-                            addressError?.let { error(it) }
-                        },
-                        label = addressLabel,
-                        singleLine = true,
-                        enabled = action.pending == null,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
-                    )
-                    addressError?.let { Text(it, color = colors.error) }
-                    TextField(
-                        username, { usernameDraft = it; action.clearFeedback() },
-                        Modifier.fillMaxWidth().semantics { contentDescription = usernameLabel },
-                        label = usernameLabel,
-                        singleLine = true,
-                        enabled = action.pending == null,
-                        keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Next),
-                    )
-                    TextField(
-                        password, { password = it; action.clearFeedback() },
-                        Modifier.fillMaxWidth().semantics { contentDescription = passwordLabel },
-                        label = passwordLabel,
-                        singleLine = true,
-                        enabled = action.pending == null,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                        visualTransformation = PasswordVisualTransformation(),
-                    )
-                    TextButton(
-                        text = stringResource(R.string.server_sign_in),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                        enabled = action.pending == null &&
-                            address.isNotBlank() && username.isNotBlank() && password.isNotEmpty(),
-                        onClick = {
-                            focus.clearFocus()
-                            action.run(ServerAction.SignIn) {
-                                sessions.signIn(address, username, password)
-                                password = ""
-                                onSignedIn()
-                            }
-                        },
-                    )
-                    TextButton(
-                        text = stringResource(R.string.server_test),
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = action.pending == null && address.isNotBlank(),
-                        onClick = {
-                            focus.clearFocus()
-                            action.run(ServerAction.Test) {
-                                sessions.test(address)
-                                action.feedback = R.string.server_reachable
-                            }
-                        },
-                    )
-                    if (action.pending != null) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    ServerFeedback(action, inlineAddressError = true)
-                }
+                },
+            ) {
+                Text(stringResource(R.string.server_sign_in), style = MiuixTheme.textStyles.button)
             }
-
-            Card {
-                Text(
-                    stringResource(R.string.server_help),
-                    modifier = Modifier.padding(16.dp),
-                    color = colors.onSurfaceVariantSummary,
-                    style = MiuixTheme.textStyles.body2,
-                )
+            GlassDialogButton(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = action.pending == null && address.isNotBlank(),
+                onClick = {
+                    focus.clearFocus()
+                    action.run(ServerAction.Test) {
+                        sessions.test(address)
+                        action.feedback = R.string.server_reachable
+                    }
+                },
+            ) {
+                Text(stringResource(R.string.server_test), style = MiuixTheme.textStyles.button)
             }
+            if (action.pending != null) LinearProgressIndicator(Modifier.fillMaxWidth())
+            ServerFeedback(action, inlineAddressError = true)
         }
+
+        Text(
+            stringResource(R.string.server_help),
+            modifier = Modifier.fillMaxWidth().settingsGlassPanel(background).padding(16.dp),
+            color = colors.onSurfaceVariantSummary,
+            style = MiuixTheme.textStyles.body2,
+        )
     }
 }
 

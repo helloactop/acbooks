@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
@@ -25,11 +26,14 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.core.os.LocaleListCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.acbooks.feature.home.R
@@ -112,7 +116,7 @@ class StartupTest {
         compose.onNodeWithText(appearance).performClick()
         compose.onNode(pageTitle(appearance)).assertIsDisplayed()
         compose.onNodeWithText(themeLabel).assertIsDisplayed()
-        compose.onNodeWithContentDescription(themeLabel).performClick()
+        compose.onNodeWithText(themeLabel).performClick()
         val light = compose.activity.getString(app.acbooks.R.string.settings_theme_light)
         compose.onNodeWithText(light).assertIsDisplayed()
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
@@ -150,6 +154,99 @@ class StartupTest {
             swipe(center, center + Offset(width.toFloat(), 0f))
         }
         compose.onNode(pageTitle(library)).assertIsDisplayed()
+    }
+
+    @Test
+    fun glassSettingsPersistAppearanceAndDismissTheLanguagePopupBeforeReturning() {
+        val activity = compose.activity
+        val preferences = activity.appearance
+        val originalMode = runBlocking { preferences.themeMode.first() }
+        val originalLocales = AppCompatDelegate.getApplicationLocales()
+        val back = activity.getString(app.acbooks.core.designsystem.R.string.app_back)
+        val avatar = activity.getString(app.acbooks.R.string.settings_change_avatar)
+        val title = activity.getString(app.acbooks.R.string.settings_appearance)
+        val theme = activity.getString(app.acbooks.R.string.settings_theme)
+        val language = activity.getString(app.acbooks.R.string.settings_language)
+
+        fun assertTouchSize(label: String) {
+            val bounds = compose.onNodeWithContentDescription(label).fetchSemanticsNode().boundsInRoot
+            val minimum = 48 * activity.resources.displayMetrics.density
+            assertTrue(bounds.width >= minimum - 1f && bounds.height >= minimum - 1f)
+        }
+
+        try {
+            runBlocking { preferences.setThemeMode(app.acbooks.core.datastore.ThemeMode.SYSTEM) }
+            compose.onNodeWithContentDescription(activity.getString(R.string.home_open_settings)).performClick()
+            assertTouchSize(avatar)
+            compose.onNodeWithText(title).performClick()
+            assertTouchSize(back)
+
+            compose.onNodeWithText(theme).performClick()
+            compose.onNodeWithText(activity.getString(app.acbooks.R.string.settings_theme_dark)).performClick()
+            compose.waitUntil(5_000) { runBlocking { preferences.themeMode.first() }.name == "DARK" }
+
+            compose.onNodeWithText(language).performClick()
+            val useEnglish = originalLocales.toLanguageTags().startsWith("zh")
+            val alternative = activity.getString(
+                if (useEnglish) app.acbooks.R.string.settings_language_english
+                else app.acbooks.R.string.settings_language_chinese,
+            )
+            compose.onNodeWithText(alternative).assertIsDisplayed()
+            compose.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
+            compose.onNodeWithText(alternative).assertDoesNotExist()
+            compose.onNode(pageTitle(title)).assertIsDisplayed()
+
+            compose.onNodeWithText(language).performClick()
+            compose.onNodeWithText(alternative).performClick()
+            val expectedLanguage = if (useEnglish) "en" else "zh-CN"
+            compose.waitUntil(5_000) {
+                AppCompatDelegate.getApplicationLocales().toLanguageTags() == expectedLanguage
+            }
+            val currentActivity = compose.activity
+            compose.onNodeWithContentDescription(currentActivity.getString(app.acbooks.core.designsystem.R.string.app_back))
+                .performClick()
+            compose.onNode(pageTitle(currentActivity.getString(app.acbooks.R.string.settings_title))).assertIsDisplayed()
+        } finally {
+            runBlocking { preferences.setThemeMode(originalMode) }
+            setLocales(originalLocales)
+        }
+    }
+
+    @Test
+    fun glassLoginUsesImeNavigationAndKeepsItsDraft() {
+        val activity = compose.activity
+        val address = compose.onNodeWithContentDescription(activity.getString(app.acbooks.R.string.server_address))
+        val username = compose.onNodeWithContentDescription(activity.getString(app.acbooks.R.string.server_username))
+        val password = compose.onNodeWithContentDescription(activity.getString(app.acbooks.R.string.server_password))
+        val signIn = compose.onNodeWithText(activity.getString(app.acbooks.R.string.server_sign_in))
+        val title = activity.getString(app.acbooks.R.string.server_login_title)
+
+        fun imeVisible(): Boolean = compose.runOnIdle {
+            ViewCompat.getRootWindowInsets(activity.window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+        }
+
+        compose.onNodeWithContentDescription(activity.getString(R.string.home_open_settings)).performClick()
+        compose.onNodeWithText(activity.getString(app.acbooks.R.string.settings_services)).performClick()
+        compose.onNodeWithText(activity.getString(app.acbooks.R.string.server_title)).performClick()
+        compose.onNodeWithText(activity.getString(app.acbooks.R.string.server_configure)).performClick()
+
+        address.performClick()
+        address.performTextInput("https://books.example.com")
+        address.performImeAction()
+        username.assertIsFocused()
+        username.performTextInput("reader")
+        username.performImeAction()
+        password.assertIsFocused()
+        password.performTextInput("test-password")
+        signIn.performScrollTo().assertIsDisplayed().assertIsEnabled()
+        compose.waitUntil(5_000) { imeVisible() }
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        compose.waitUntil(5_000) { !imeVisible() }
+        compose.onNode(pageTitle(title)).assertIsDisplayed()
+        signIn.performScrollTo().assertIsEnabled()
+
+        compose.onNodeWithContentDescription(activity.getString(app.acbooks.core.designsystem.R.string.app_back)).performClick()
+        compose.onNode(pageTitle(activity.getString(app.acbooks.R.string.server_title))).assertIsDisplayed()
     }
 
     @Test

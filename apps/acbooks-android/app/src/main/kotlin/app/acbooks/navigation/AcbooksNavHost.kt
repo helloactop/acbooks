@@ -16,14 +16,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,31 +63,30 @@ import app.acbooks.server.ServerLoginScreen
 import app.acbooks.server.ServerSessions
 import app.acbooks.server.ServerSettingsScreen
 import app.acbooks.server.serverStatusLabel
+import app.acbooks.settings.SettingsGlassPage
+import app.acbooks.settings.settingsGlassPanel
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
 import top.yukonga.miuix.kmp.glass.GlassFloatingActionButton
+import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.glass.GlassNavigationBar
 import top.yukonga.miuix.kmp.glass.GlassNavigationItem
 import top.yukonga.miuix.kmp.glass.GlassNavigationRail
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Add
-import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.CloudFill
-import top.yukonga.miuix.kmp.icon.extended.ContactsCircle
-import top.yukonga.miuix.kmp.icon.extended.Folder
-import top.yukonga.miuix.kmp.icon.extended.Home
-import top.yukonga.miuix.kmp.icon.extended.Settings
-import top.yukonga.miuix.kmp.icon.extended.Tasks
+import top.yukonga.miuix.kmp.icon.glass.Add
+import top.yukonga.miuix.kmp.icon.glass.BookOutline
+import top.yukonga.miuix.kmp.icon.glass.Cloud
+import top.yukonga.miuix.kmp.icon.glass.ContactsCircle
+import top.yukonga.miuix.kmp.icon.glass.DigitalStatistics
+import top.yukonga.miuix.kmp.icon.glass.HomeOutline
+import top.yukonga.miuix.kmp.icon.glass.SettingsOutline
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private const val HOME_ROUTE = "home"
@@ -173,22 +171,12 @@ internal fun AcbooksNavHost(
             AppearanceSettingsScreen(themeMode, onThemeModeChange) { navController.returnFrom(entry) }
         }
         composable(SERVICES_ROUTE) { entry ->
-            Scaffold(topBar = {
-                SmallTopAppBar(
-                    title = stringResource(R.string.settings_services),
-                    modifier = Modifier.semantics(mergeDescendants = true) { heading() },
-                    navigationIcon = {
-                        IconButton(onClick = { navController.returnFrom(entry) }, minWidth = 48.dp, minHeight = 48.dp) {
-                            Icon(MiuixIcons.Back, stringResource(UiR.string.app_back))
-                        }
-                    },
-                )
-            }) { padding ->
-                Card(Modifier.padding(padding).padding(16.dp)) {
+            SettingsGlassPage(stringResource(R.string.settings_services), { navController.returnFrom(entry) }) { background, _ ->
+                Column(Modifier.fillMaxWidth().settingsGlassPanel(background)) {
                     ArrowPreference(
                         title = stringResource(R.string.server_title),
                         summary = stringResource(serverStatusLabel(session)),
-                        startAction = { Icon(MiuixIcons.CloudFill, null) },
+                        startAction = { Icon(MiuixIcons.Glass.Cloud, null) },
                         onClick = { navController.navigate(SERVER_ROUTE) { launchSingleTop = true } },
                     )
                 }
@@ -241,13 +229,13 @@ private fun MainTabs(
 
     val backdrop = rememberLayerBackdrop()
     val items = listOf(
-        GlassNavigationItem(MiuixIcons.Home, stringResource(UiR.string.app_dock_home)),
-        GlassNavigationItem(MiuixIcons.Folder, stringResource(UiR.string.app_dock_library)),
-        GlassNavigationItem(MiuixIcons.Tasks, stringResource(UiR.string.app_dock_statistics)),
+        GlassNavigationItem(MiuixIcons.Glass.HomeOutline, stringResource(UiR.string.app_dock_home)),
+        GlassNavigationItem(MiuixIcons.Glass.BookOutline, stringResource(UiR.string.app_dock_library)),
+        GlassNavigationItem(MiuixIcons.Glass.DigitalStatistics, stringResource(UiR.string.app_dock_statistics)),
     )
     val addAction: @Composable () -> Unit = {
         GlassFloatingActionButton(onClick = { showAdd = true }, backdrop = backdrop) {
-            Icon(MiuixIcons.Add, stringResource(UiR.string.app_dock_add))
+            Icon(MiuixIcons.Glass.Add, stringResource(UiR.string.app_dock_add))
         }
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -328,57 +316,40 @@ private fun SettingsScreen(
         if (uri != null) onAvatarPicked(uri)
     }
     LaunchedEffect(Unit) { onRefreshAvatar() }
-    Scaffold(topBar = {
-        SmallTopAppBar(
-            title = stringResource(R.string.settings_title),
-            modifier = Modifier.semantics(mergeDescendants = true) { heading() },
-            navigationIcon = {
-                IconButton(onBack, minWidth = 48.dp, minHeight = 48.dp) {
-                    Icon(MiuixIcons.Back, stringResource(UiR.string.app_back))
-                }
-            },
-        )
-    }) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+    SettingsGlassPage(stringResource(R.string.settings_title), onBack) { background, _ ->
+        Row(
+            Modifier.fillMaxWidth().settingsGlassPanel(background).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Card {
-                Row(
-                    Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(
-                        onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                        minWidth = 56.dp,
-                        minHeight = 56.dp,
-                    ) {
-                        val label = stringResource(R.string.settings_change_avatar)
-                        if (avatar == null) {
-                            Icon(MiuixIcons.ContactsCircle, label, modifier = Modifier.size(48.dp))
-                        } else {
-                            Image(avatar, label, Modifier.size(56.dp).clip(CircleShape), contentScale = ContentScale.Crop)
-                        }
-                    }
-                    Text(nickname)
+            GlassIconButton(
+                onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                backdrop = background,
+                size = 56.dp,
+            ) {
+                val label = stringResource(R.string.settings_change_avatar)
+                if (avatar == null) {
+                    Icon(MiuixIcons.Glass.ContactsCircle, label, modifier = Modifier.size(40.dp))
+                } else {
+                    Image(avatar, label, Modifier.size(48.dp).clip(CircleShape), contentScale = ContentScale.Crop)
                 }
             }
-            if (avatarSync == AvatarSync.Failed) {
-                Text(stringResource(R.string.settings_avatar_failed), color = MiuixTheme.colorScheme.error)
-            }
-            Card {
-                ArrowPreference(
-                    title = stringResource(R.string.settings_appearance),
-                    startAction = { Icon(MiuixIcons.Settings, null) },
-                    onClick = onAppearance,
-                )
-                ArrowPreference(
-                    title = stringResource(R.string.settings_services),
-                    startAction = { Icon(MiuixIcons.CloudFill, null) },
-                    onClick = onServices,
-                )
-            }
+            Text(nickname)
+        }
+        if (avatarSync == AvatarSync.Failed) {
+            Text(stringResource(R.string.settings_avatar_failed), color = MiuixTheme.colorScheme.error)
+        }
+        Column(Modifier.fillMaxWidth().settingsGlassPanel(background)) {
+            ArrowPreference(
+                title = stringResource(R.string.settings_appearance),
+                startAction = { Icon(MiuixIcons.Glass.SettingsOutline, null) },
+                onClick = onAppearance,
+            )
+            ArrowPreference(
+                title = stringResource(R.string.settings_services),
+                startAction = { Icon(MiuixIcons.Glass.Cloud, null) },
+                onClick = onServices,
+            )
         }
     }
 }
@@ -392,19 +363,11 @@ private fun AppearanceSettingsScreen(
     val currentLocales = AppCompatDelegate.getApplicationLocales()
     val languageTags = listOf("", "en", "zh-CN")
     val currentLanguageTag = if (currentLocales.isEmpty) "" else currentLocales.toLanguageTags()
-    Scaffold(topBar = {
-        SmallTopAppBar(
-            title = stringResource(R.string.settings_appearance),
-            modifier = Modifier.semantics(mergeDescendants = true) { heading() },
-            navigationIcon = {
-                IconButton(onBack, minWidth = 48.dp, minHeight = 48.dp) {
-                    Icon(MiuixIcons.Back, stringResource(UiR.string.app_back))
-                }
-            },
-        )
-    }) { padding ->
-        Card(Modifier.padding(padding).padding(16.dp)) {
-            OverlayDropdownPreference(
+    SettingsGlassPage(stringResource(R.string.settings_appearance), onBack) { background, page ->
+        Column(Modifier.fillMaxWidth().settingsGlassPanel(background)) {
+            GlassDropdownPreference(
+                backdrop = page,
+                modifier = Modifier.heightIn(min = 48.dp),
                 items = listOf(
                     stringResource(R.string.settings_theme_system),
                     stringResource(R.string.settings_theme_light),
@@ -416,7 +379,9 @@ private fun AppearanceSettingsScreen(
                     ThemeMode.entries.getOrNull(index)?.let(onThemeModeChange)
                 },
             )
-            OverlayDropdownPreference(
+            GlassDropdownPreference(
+                backdrop = page,
+                modifier = Modifier.heightIn(min = 48.dp),
                 items = listOf(
                     stringResource(R.string.settings_language_system),
                     stringResource(R.string.settings_language_english),

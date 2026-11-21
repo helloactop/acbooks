@@ -31,7 +31,7 @@ dependencies {
     api(libs.miuix.ui)
     api(libs.miuix.preference)
     api(libs.miuix.glass)
-    api(libs.miuix.icons)
+    api(libs.miuix.glass.icons)
     api(libs.miuix.blur)
     implementation(libs.miuix.squircle)
     implementation(libs.miuix.nav)

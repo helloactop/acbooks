@@ -69,12 +69,12 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.glass.GlassBottomSheet
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.Clear
-import top.yukonga.miuix.kmp.icon.extended.Delete
-import top.yukonga.miuix.kmp.icon.extended.Folder
-import top.yukonga.miuix.kmp.icon.extended.More
-import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.glass.Back
+import top.yukonga.miuix.kmp.icon.glass.Clear
+import top.yukonga.miuix.kmp.icon.glass.Delete
+import top.yukonga.miuix.kmp.icon.glass.FolderOutline
+import top.yukonga.miuix.kmp.icon.glass.More
+import top.yukonga.miuix.kmp.icon.glass.Ok
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowListPopup
@@ -133,7 +133,7 @@ internal fun LibraryScreen(
                 actions = {
                     Box {
                         IconButton(onClick = { showMore = true }, minWidth = 48.dp, minHeight = 48.dp) {
-                            Icon(MiuixIcons.More, stringResource(UiR.string.app_library_more))
+                            Icon(MiuixIcons.Glass.More, stringResource(UiR.string.app_library_more))
                         }
                         WindowListPopup(show = showMore, onDismissRequest = { showMore = false }) {
                             ListPopupColumn {
@@ -191,7 +191,7 @@ internal fun LibraryScreen(
                                                         MiuixTheme.colorScheme.onBackground
                                                     },
                                                 ),
-                                                endActions = { if (checked) Icon(MiuixIcons.Ok, null) },
+                                                endActions = { if (checked) Icon(MiuixIcons.Glass.Ok, null) },
                                                 onClick = {
                                                     format = value
                                                     showFormats = false
@@ -202,7 +202,7 @@ internal fun LibraryScreen(
                                 }
                             }
                             IconButton(onClick = openShelves, minWidth = 48.dp, minHeight = 48.dp) {
-                                Icon(MiuixIcons.Folder, stringResource(UiR.string.app_library_categories))
+                                Icon(MiuixIcons.Glass.FolderOutline, stringResource(UiR.string.app_library_categories))
                             }
                         }
                         shelf?.let { Text(it.name, style = MiuixTheme.textStyles.title4) }
@@ -267,7 +267,7 @@ internal fun LibraryScreen(
                             label = stringResource(R.string.library_search_hint), singleLine = true,
                             trailingIcon = {
                                 if (query.isNotEmpty()) {
-                                    IconButton(onClick = { query = "" }) { Icon(MiuixIcons.Clear, stringResource(UiR.string.app_clear)) }
+                                    IconButton(onClick = { query = "" }) { Icon(MiuixIcons.Glass.Clear, stringResource(UiR.string.app_clear)) }
                                 }
                             },
                         )
@@ -288,7 +288,7 @@ internal fun LibraryScreen(
                                     colors = if (shelf == option) ButtonDefaults.textButtonColorsPrimary() else ButtonDefaults.textButtonColors(),
                                 )
                                 IconButton(onClick = { deleteId = option.id; panel = LibraryPanel.Delete }, minWidth = 48.dp, minHeight = 48.dp) {
-                                    Icon(MiuixIcons.Delete, stringResource(R.string.library_shelf_delete), tint = MiuixTheme.colorScheme.error)
+                                    Icon(MiuixIcons.Glass.Delete, stringResource(R.string.library_shelf_delete), tint = MiuixTheme.colorScheme.error)
                                 }
                             }
                         }
@@ -353,7 +353,7 @@ internal fun LibraryBookDetails(
             modifier = Modifier.semantics(mergeDescendants = true) { heading() },
             navigationIcon = {
                 IconButton(onBack, minWidth = 48.dp, minHeight = 48.dp) {
-                    Icon(MiuixIcons.Back, stringResource(UiR.string.app_back))
+                    Icon(MiuixIcons.Glass.Back, stringResource(UiR.string.app_back))
                 }
             },
         )

@@ -61,16 +61,16 @@ import top.yukonga.miuix.kmp.glass.GlassFloatingActionButton
 import top.yukonga.miuix.kmp.glass.GlassNavigationBar
 import top.yukonga.miuix.kmp.glass.GlassNavigationItem
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Add
-import top.yukonga.miuix.kmp.icon.extended.Edit
-import top.yukonga.miuix.kmp.icon.extended.Favorites
-import top.yukonga.miuix.kmp.icon.extended.FavoritesFill
-import top.yukonga.miuix.kmp.icon.extended.Folder
-import top.yukonga.miuix.kmp.icon.extended.Home
-import top.yukonga.miuix.kmp.icon.extended.More
-import top.yukonga.miuix.kmp.icon.extended.Notes
-import top.yukonga.miuix.kmp.icon.extended.NotesFill
-import top.yukonga.miuix.kmp.icon.extended.Tasks
+import top.yukonga.miuix.kmp.icon.glass.Add
+import top.yukonga.miuix.kmp.icon.glass.BookOutline
+import top.yukonga.miuix.kmp.icon.glass.BookmarkFill
+import top.yukonga.miuix.kmp.icon.glass.BookmarkOutline
+import top.yukonga.miuix.kmp.icon.glass.DigitalStatistics
+import top.yukonga.miuix.kmp.icon.glass.Edit
+import top.yukonga.miuix.kmp.icon.glass.FavoriteFill
+import top.yukonga.miuix.kmp.icon.glass.FavoriteOutline
+import top.yukonga.miuix.kmp.icon.glass.HomeOutline
+import top.yukonga.miuix.kmp.icon.glass.More
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
@@ -131,16 +131,16 @@ private fun ComponentPreview(appearance: AppearancePreferences, onTheme: (Boolea
             bottomBar = {
                 GlassNavigationBar(
                     items = listOf(
-                        GlassNavigationItem(MiuixIcons.Home, stringResource(UiR.string.app_dock_home)),
-                        GlassNavigationItem(MiuixIcons.Folder, stringResource(UiR.string.app_dock_library)),
-                        GlassNavigationItem(MiuixIcons.Tasks, stringResource(UiR.string.app_dock_statistics)),
+                        GlassNavigationItem(MiuixIcons.Glass.HomeOutline, stringResource(UiR.string.app_dock_home)),
+                        GlassNavigationItem(MiuixIcons.Glass.BookOutline, stringResource(UiR.string.app_dock_library)),
+                        GlassNavigationItem(MiuixIcons.Glass.DigitalStatistics, stringResource(UiR.string.app_dock_statistics)),
                     ),
                     selectedIndex = activeTab,
                     onSelect = { activeTab = it },
                     backdrop = backdrop,
                     trailingAction = {
                         GlassFloatingActionButton(onClick = { sheet = true }, backdrop = backdrop) {
-                            Icon(MiuixIcons.Add, stringResource(UiR.string.app_dock_add))
+                            Icon(MiuixIcons.Glass.Add, stringResource(UiR.string.app_dock_add))
                         }
                     },
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -154,11 +154,11 @@ private fun ComponentPreview(appearance: AppearancePreferences, onTheme: (Boolea
             ) {
                 Row {
                     IconButton(onClick = { dialog = true }, minWidth = 48.dp, minHeight = 48.dp) {
-                        Icon(MiuixIcons.Edit, stringResource(UiR.string.app_library_edit))
+                        Icon(MiuixIcons.Glass.Edit, stringResource(UiR.string.app_library_edit))
                     }
                     Box {
                         IconButton(onClick = { menu = true }, minWidth = 48.dp, minHeight = 48.dp) {
-                            Icon(MiuixIcons.More, stringResource(UiR.string.app_library_more))
+                            Icon(MiuixIcons.Glass.More, stringResource(UiR.string.app_library_more))
                         }
                         WindowListPopup(show = menu, onDismissRequest = { menu = false }) {
                             ListPopupColumn {
@@ -215,13 +215,13 @@ private fun ComponentPreview(appearance: AppearancePreferences, onTheme: (Boolea
                 Row {
                     IconButton(onClick = { favorite = !favorite }, minWidth = 48.dp, minHeight = 48.dp) {
                         Icon(
-                            if (favorite) MiuixIcons.FavoritesFill else MiuixIcons.Favorites,
+                            if (favorite) MiuixIcons.Glass.FavoriteFill else MiuixIcons.Glass.FavoriteOutline,
                             stringResource(if (favorite) R.string.preview_remove_favorite else R.string.preview_add_favorite),
                         )
                     }
                     IconButton(onClick = { bookmarked = !bookmarked }, minWidth = 48.dp, minHeight = 48.dp) {
                         Icon(
-                            if (bookmarked) MiuixIcons.NotesFill else MiuixIcons.Notes,
+                            if (bookmarked) MiuixIcons.Glass.BookmarkFill else MiuixIcons.Glass.BookmarkOutline,
                             stringResource(if (bookmarked) R.string.preview_remove_bookmark else R.string.preview_add_bookmark),
                         )
                     }

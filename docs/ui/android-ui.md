@@ -21,7 +21,7 @@
 | --- | --- |
 | 应用框架、顶栏、导航 | 直接使用 Miuix 的页面容器、顶栏与导航组件。Compose Navigation 管理路由，`HorizontalPager` 管理主 Tab |
 | 按钮、表单、搜索和选择 | 直接使用 Miuix 对应的按钮、输入、选择控件。加载时防止重复提交，错误与禁用状态须明确可见 |
-| 卡片与设置 | 使用 Miuix `Card`、`ArrowPreference`、`OverlayDropdownPreference` 等组件，沿用库的圆角、容器色和内边距 |
+| 卡片与设置 | 使用 Miuix `Card` 和 `ArrowPreference` 等组件。设置页面的玻璃组件见下文 |
 | 弹窗、底部浮层和菜单 | 直接使用 Miuix 的对话框、底部浮层和菜单组件。保留确认、取消、危险操作及返回语义 |
 | 反馈 | 直接使用 Miuix 的进度和反馈组件，业务逻辑提供真实的加载、空、失败、重试及完成状态 |
 
@@ -29,9 +29,16 @@
 
 确认和取消须有本地化文字。危险操作使用 Miuix 的错误语义色，状态同时用文字或图标表达。长文案允许换行，交互控件的触控区域至少为 48×48dp。
 
+### 设置页面
+
+- 设置首页、外观、服务、服务器状态和登录均使用 Miuix `0.9.5-beta03` 的 `GlassTopAppBar`。顶部返回与头像操作使用 `GlassIconButton`，触控区域至少为 48×48dp。
+- 设置分组、头像卡、连接状态卡和登录表单使用官方 `glassPanel`。外观与语言用 `GlassDropdownPreference`，服务器表单用 `GlassTextField`，操作使用 `GlassDialogButton`。应用内需要对话框或底部浮层时使用 `GlassDialog` 或 `GlassBottomSheet`，头像仍由系统照片选择器选择。
+- 每页分别通过 `rememberLayerBackdrop` 和 `layerBackdrop` 捕获底色与页面正文。卡片采样底色，顶栏和下拉浮层采样正文。卡片和顶栏不采样自身，滚动时内容可经过顶栏下方，键盘弹出时表单仍可滚动。
+- 浅色和深色均从当前 Miuix 主题取色。收起下拉浮层再返回上一级，保留主题、语言、服务器登录和头像同步的行为。
+
 ### 图标
 
-- 直接使用 Miuix 提供的功能图标，同一语义在各 Android 页面保持一致。原有 Fluent 图标随对应控件迁移退出。
+- 功能图标统一直接使用官方 `miuix-glass-icons-android` 的 `MiuixIcons.Glass`。同一语义在各 Android 页面使用同一图标。
 - 纯图标按钮提供中英文可访问名称。有可见文字的装饰图标由文字提供语义。收藏与书签切换时更新当前可执行操作的名称。
 
 ## 4. 页面、导航与阅读器
