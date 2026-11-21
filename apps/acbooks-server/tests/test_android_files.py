@@ -4,6 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from httpx import Response
 from test_book_management import management
 from test_books import create_book
 from test_files import PDF
@@ -24,14 +25,15 @@ def test_android_file_link_resume_and_sync(management: tuple[TestClient, Path, P
     assert token.status_code == 200, token.text
     headers = {"Authorization": f"Bearer {token.json()['accessToken']}"}
 
-    def upload(book_id: str, reuse: bool = True):
-        return client.post(
+    def upload(book_id: str, reuse: bool = True) -> Response:
+        response: Response = client.post(
             "/api/v1/uploads",
             params={"reuseExisting": reuse},
             headers=headers,
             data={"bookId": book_id},
             files={"file": ("book.pdf", PDF, "application/pdf")},
         )
+        return response
 
     with ThreadPoolExecutor(max_workers=2) as workers:
         uploads = list(workers.map(lambda _: upload(book), range(2)))
