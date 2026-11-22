@@ -31,10 +31,10 @@
 
 ### 设置页面
 
-- 设置首页、外观、服务、服务器状态和登录均使用 Miuix `0.9.5-beta03` 的可折叠 `GlassTopAppBar`。顶部返回与头像操作使用 `GlassIconButton`，触控区域至少为 48×48dp。
-- 设置分组、头像卡、连接状态卡和登录表单使用官方 `glassPanel`。普通设置入口使用 `ArrowPreference`，外观与语言使用 `GlassDropdownPreference`，服务器表单使用 `GlassTextField`。应用内对话框使用 `GlassDialog` 和 `GlassDialogButton`，底部浮层使用 `GlassBottomSheet`。
-- 玻璃卡片使用 Miuix 的深浅色样式。卡内设置项共用卡片的玻璃材质，设备无法渲染玻璃时使用当前主题的 `surfaceContainer` 填充卡片。
-- 每页分别通过 `rememberLayerBackdrop` 和 `layerBackdrop` 捕获底色与页面正文。卡片采样底色，顶栏和下拉浮层采样正文。卡片和顶栏不采样自身，滚动时内容可经过顶栏下方，键盘弹出时表单仍可滚动。
+- 设置首页、外观、服务、服务器状态和登录使用可折叠的 `GlassTopAppBar`。设置首页的返回按钮使用默认 44dp 的 `GlassIconButton`。
+- 设置列表使用 `LazyColumn` 和 `SmallTitle`。每组设置项以 `squircleSurface` 拼成一张连续卡片，使用主题的 `surfaceContainer` 和 `onSurfaceContainer`，外侧圆角 16dp，左右边距 12dp，组底间距 6dp。
+- 普通设置入口使用 `ArrowPreference`，开关使用 `SwitchPreference`，下拉使用 `GlassDropdownPreference`。服务器表单使用 `GlassTextField`。应用内对话框使用 `GlassDialog` 和 `GlassDialogButton`，底部浮层使用 `GlassBottomSheet`。
+- 设置页用一个 `rememberLayerBackdrop` 采样底色和列表。顶栏与下拉菜单共用该采样，浮层宿主与顶栏位于采样区域之外。滚动内容可经过顶栏下方。
 - 浅色和深色均从当前 Miuix 主题取色。收起下拉浮层再返回上一级，保留主题、语言、服务器登录和头像同步的行为。
 
 ### 图标
