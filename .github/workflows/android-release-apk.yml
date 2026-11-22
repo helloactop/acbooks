@@ -55,7 +55,7 @@ jobs:
             --ks-pass env:ANDROID_RELEASE_KEYSTORE_PASSWORD --out "$signed_apk" "$unsigned_apk"
           unset ANDROID_RELEASE_KEYSTORE_PASSWORD
 
-          expected_certificate=527fafcac94d7bee389deb61aab774fb0054dd98701b3b0dba180f3807b54dd3
+          expected_certificate=26fec1f524b916f6f9d713bfaca03956cac574a2823e3722e65788162025ac7a
           certificates=$("$apksigner" verify --print-certs "$signed_apk")
           actual_certificate=$(awk '/^(V[0-9.]+ )?Signer( #[0-9]+)?:? certificate SHA-256 digest: / {print $NF}' \
             <<< "$certificates" | sort -u)
