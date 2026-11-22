@@ -38,7 +38,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.acbooks.library.BookMenuTarget
+import app.acbooks.core.database.LocalBookCard
 import app.acbooks.library.LibraryCatalog
+import app.acbooks.library.LibraryDeleteDialog
 import app.acbooks.library.LibraryImportDialog
 import app.acbooks.library.LibraryMenu
 import app.acbooks.library.LibraryMenus
@@ -101,10 +103,16 @@ internal fun MainTabs(
     val moreAnchor = rememberGlassPopupAnchor()
     var libraryMenu by remember { mutableStateOf<LibraryMenu?>(null) }
     var bookMenuTarget by remember { mutableStateOf<BookMenuTarget?>(null) }
+    var deleteTarget by remember { mutableStateOf<LocalBookCard?>(null) }
+    var deleteDialogShown by remember { mutableStateOf(false) }
+    var deletingBook by remember { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments(), library::importBooks)
 
     LaunchedEffect(isCurrentDestination, pager.currentPage, searchExpanded) {
-        if (!isCurrentDestination || pager.currentPage != 1 || searchExpanded) libraryMenu = null
+        if (!isCurrentDestination || pager.currentPage != 1 || searchExpanded) {
+            libraryMenu = null
+            deleteDialogShown = false
+        }
     }
 
     fun selectTab(index: Int) {
@@ -240,6 +248,42 @@ internal fun MainTabs(
                 onImportMatches = library::importMatches,
                 onDismiss = library::dismissImport,
             )
+            LibraryDeleteDialog(
+                book = deleteTarget,
+                show = deleteDialogShown && isCurrentDestination,
+                busy = deletingBook,
+                backdrop = backdrop,
+                onDismiss = { if (!deletingBook) deleteDialogShown = false },
+                onDismissFinished = { if (!deleteDialogShown) deleteTarget = null },
+                onDeleteLocal = {
+                    val target = deleteTarget
+                    if (!deletingBook && target != null) {
+                        deletingBook = true
+                        scope.launch {
+                            try {
+                                if (library.deleteLocalBook(target.id)) deleteDialogShown = false
+                            } finally {
+                                deletingBook = false
+                            }
+                        }
+                    }
+                },
+                onDeleteEverywhere = {
+                    val target = deleteTarget
+                    if (!deletingBook && target != null) {
+                        deletingBook = true
+                        scope.launch {
+                            try {
+                                // The cloud gateway is currently a safe no-op. It is intentionally
+                                // called even when unconfigured, with no extra notice or UI disabling.
+                                if (library.deleteBookEverywhere(target.id)) deleteDialogShown = false
+                            } finally {
+                                deletingBook = false
+                            }
+                        }
+                    }
+                },
+            )
         }
         LibraryMenus(
             activeMenu = libraryMenu,
@@ -262,6 +306,12 @@ internal fun MainTabs(
             onDetails = { id ->
                 libraryMenu = null
                 onOpenBook(id)
+            },
+            onDelete = { book ->
+                libraryMenu = null
+                bookMenuTarget = null
+                deleteTarget = book
+                deleteDialogShown = true
             },
         )
         BookSearchOverlay(
