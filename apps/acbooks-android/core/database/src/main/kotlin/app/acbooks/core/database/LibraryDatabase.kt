@@ -67,6 +67,21 @@ data class LocalShelfBook(val shelfId: String, val bookId: String)
 )
 data class LocalReadingPosition(@PrimaryKey val fileId: String, val locator: String)
 
+@Entity(
+    tableName = "cloud_book_links",
+    foreignKeys = [ForeignKey(
+        entity = LocalBook::class,
+        parentColumns = ["id"],
+        childColumns = ["localBookId"],
+        onDelete = ForeignKey.CASCADE,
+    )],
+)
+data class CloudBookLink(
+    @PrimaryKey val localBookId: String,
+    val remoteBookId: String,
+    val serverOrigin: String,
+)
+
 data class LocalBookCard(
     val id: String,
     val title: String,
@@ -77,6 +92,13 @@ data class LocalBookCard(
 )
 
 enum class BookImportCommit { Added, Duplicate, MatchingContent }
+
+// Internal book copies are content-addressed and can be shared by several book records.
+// This plan lists only files no longer referenced after the database transaction.
+data class LocalBookRemoval(
+    val unreferencedObjects: List<LocalFileObject>,
+    val unreferencedCoverHashes: List<String>,
+)
 
 @Dao
 abstract class LibraryDao {
@@ -91,6 +113,45 @@ abstract class LibraryDao {
 
     @Query("SELECT * FROM book_files WHERE bookId = :bookId ORDER BY id LIMIT 1")
     abstract suspend fun firstBookFile(bookId: String): LocalBookFile?
+
+    @Query("SELECT remoteBookId FROM cloud_book_links WHERE localBookId = :bookId AND serverOrigin = :serverOrigin")
+    abstract suspend fun remoteBookId(bookId: String, serverOrigin: String): String?
+
+    /** Called by the future authenticated sync flow after confirming the remote book identity. */
+    @Upsert
+    abstract suspend fun bindCloudBook(link: CloudBookLink)
+
+    @Query("SELECT * FROM book_files WHERE bookId = :bookId")
+    abstract suspend fun allBookFiles(bookId: String): List<LocalBookFile>
+
+    @Query("DELETE FROM books WHERE id = :bookId")
+    abstract suspend fun deleteBookRow(bookId: String): Int
+
+    @Query("""
+        DELETE FROM file_objects WHERE sha256 = :sha256 AND format = :format
+        AND NOT EXISTS (
+            SELECT 1 FROM book_files WHERE sha256 = :sha256 AND format = :format
+        )
+    """)
+    abstract suspend fun deleteObjectIfUnreferenced(sha256: String, format: String): Int
+
+    @Query("SELECT EXISTS(SELECT 1 FROM book_files WHERE sha256 = :sha256)")
+    abstract suspend fun hasFileWithHash(sha256: String): Boolean
+
+    @Transaction
+    open suspend fun removeLocalBook(bookId: String): LocalBookRemoval? {
+        val files = allBookFiles(bookId)
+        if (deleteBookRow(bookId) == 0) return null
+
+        // Room foreign keys cascade to book_files, reading_positions and shelf_books.
+        val unreferencedObjects = files.distinctBy { it.sha256 to it.format }
+            .filter { deleteObjectIfUnreferenced(it.sha256, it.format) > 0 }
+            .map { LocalFileObject(it.sha256, it.format, 0L) }
+        val unreferencedCoverHashes = files.map { it.sha256 }.distinct()
+            .filterNot { hasFileWithHash(it) }
+
+        return LocalBookRemoval(unreferencedObjects, unreferencedCoverHashes)
+    }
 
     @Query("SELECT locator FROM reading_positions WHERE fileId = :fileId")
     abstract suspend fun readingPosition(fileId: String): String?
@@ -151,8 +212,9 @@ abstract class LibraryDao {
     entities = [
         LocalBook::class, LocalFileObject::class, LocalBookFile::class, LocalShelf::class, LocalShelfBook::class,
         LocalReadingPosition::class,
+        CloudBookLink::class,
     ],
-    version = 2,
+    version = 3,
 )
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun library(): LibraryDao
@@ -167,9 +229,20 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        internal val migration2To3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS cloud_book_links (" +
+                        "localBookId TEXT NOT NULL PRIMARY KEY, remoteBookId TEXT NOT NULL, " +
+                        "serverOrigin TEXT NOT NULL, FOREIGN KEY(localBookId) REFERENCES books(id) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE)",
+                )
+            }
+        }
+
         fun open(context: Context): LibraryDatabase =
             Room.databaseBuilder(context.applicationContext, LibraryDatabase::class.java, "acbooks-reader.db")
-                .addMigrations(migration1To2)
+                .addMigrations(migration1To2, migration2To3)
                 .build()
     }
 }

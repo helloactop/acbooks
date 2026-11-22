@@ -50,6 +50,26 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
     suspend fun saveReadingPosition(fileId: String, locator: String) =
         dao.saveReadingPosition(LocalReadingPosition(fileId, locator))
 
+    /** Remove the local book record and owned cached files, but never the source URI. */
+    suspend fun deleteLocalBook(bookId: String): Boolean = withContext(Dispatchers.IO) {
+        val removal = dao.removeLocalBook(bookId) ?: return@withContext false
+        // Different book records can share content-addressed objects; only unlink objects
+        // which no longer have a database reference after the transaction.
+        for (item in removal.unreferencedObjects) {
+            if (contentHash.matches(item.sha256) && (item.format == "epub" || item.format == "pdf")) {
+                val path = File(objects, "${item.sha256}.${item.format}")
+                if (path.exists() && !path.delete()) Log.w("LibraryDelete", "Could not remove cached book object")
+            }
+        }
+        for (hash in removal.unreferencedCoverHashes) {
+            if (contentHash.matches(hash)) {
+                val path = File(covers, "$hash.jpg")
+                if (path.exists() && !path.delete()) Log.w("LibraryDelete", "Could not remove cached book cover")
+            }
+        }
+        true
+    }
+
     suspend fun import(uri: Uri, allowMatchingContent: Boolean): ImportOutcome = withContext(Dispatchers.IO) {
         if (uri.scheme != ContentResolver.SCHEME_CONTENT) return@withContext ImportOutcome.Unsupported
         try {

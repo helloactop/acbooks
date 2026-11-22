@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import app.acbooks.R
+import app.acbooks.core.database.LocalBookCard
 import top.yukonga.miuix.kmp.basic.DropdownEntry
 import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
@@ -19,6 +20,7 @@ import top.yukonga.miuix.kmp.glass.glassPopupAnchor
 import top.yukonga.miuix.kmp.glass.glassPopupAnchorContent
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.More
+import top.yukonga.miuix.kmp.icon.glass.Delete
 import top.yukonga.miuix.kmp.icon.glass.Tune
 
 internal enum class LibraryMenu { Display, More, Book }
@@ -67,6 +69,7 @@ internal fun BoxScope.LibraryMenus(
     onAddBooks: () -> Unit,
     onRead: (String) -> Unit,
     onDetails: (String) -> Unit,
+    onDelete: (LocalBookCard) -> Unit,
 ) {
     GlassIconDropdownMenu(
         show = activeMenu == LibraryMenu.Display,
@@ -128,6 +131,11 @@ internal fun BoxScope.LibraryMenus(
             GlassPopupItem(
                 text = stringResource(R.string.library_book_details),
                 onClick = { onDetails(bookTarget.book.id) },
+            )
+            GlassPopupItem(
+                text = stringResource(R.string.library_delete_book),
+                icon = MiuixIcons.Glass.Delete,
+                onClick = { onDelete(bookTarget.book) },
             )
         }
     }
