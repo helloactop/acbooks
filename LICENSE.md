@@ -41,6 +41,7 @@ acbooks 源码采用 [GPL-3.0-only](LICENSE)。以下为 Android 工程当前直
 | [Android Gradle Plugin](https://android.googlesource.com/platform/tools/base/) | 9.3.2 | Apache-2.0 |
 | [Kotlin、Compose 编译插件](https://github.com/JetBrains/kotlin/blob/v2.4.10/license/LICENSE.txt) | 2.4.10 | Apache-2.0 |
 | [AndroidX Activity Compose](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 1.13.0 | Apache-2.0 |
+| [AndroidX Navigation Compose](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 2.10.2 | Apache-2.0 |
 | [Jetpack Compose](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | BOM 2026.08.00 | Apache-2.0 |
 | [Miuix](https://github.com/compose-miuix-ui/miuix/tree/v0.9.5-beta03) | 0.9.5-beta03（`miuix-ui-android`、`miuix-glass-android`、`miuix-glass-icons-android`） | [Apache-2.0](https://github.com/compose-miuix-ui/miuix/blob/v0.9.5-beta03/LICENSE) |
 

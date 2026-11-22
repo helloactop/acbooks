@@ -3,4 +3,12 @@
     <string name="tab_library">书库</string>
     <string name="tab_statistics">统计</string>
     <string name="tab_search">搜索</string>
+    <string name="home_open_settings">打开设置</string>
+    <string name="home_continue_reading">继续阅读</string>
+    <string name="home_no_reading_history">暂无阅读记录。</string>
+    <string name="home_open_library">前往书库</string>
+    <string name="settings_title">设置</string>
+    <string name="settings_back">返回</string>
+    <string name="settings_avatar">头像</string>
+    <string name="settings_change_avatar">更换头像</string>
 </resources>

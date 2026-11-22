@@ -19,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -46,7 +47,7 @@ import top.yukonga.miuix.kmp.utils.PagerNavigationSpringSpec
 import top.yukonga.miuix.kmp.utils.springAnimateToPage
 
 @Composable
-internal fun MainTabs() {
+internal fun MainTabs(avatar: ImageBitmap?, onOpenSettings: () -> Unit) {
     val items = listOf(
         GlassNavigationItem(MiuixIcons.Glass.HomeOutline, stringResource(R.string.tab_home)),
         GlassNavigationItem(MiuixIcons.Glass.BookOutline, stringResource(R.string.tab_library)),
@@ -57,6 +58,7 @@ internal fun MainTabs() {
     val scope = rememberCoroutineScope()
     val backdrop = rememberLayerBackdrop()
     var searchOpen by rememberSaveable { mutableStateOf(false) }
+    val showHome = !searchOpen && pager.currentPage == 0
 
     BackHandler(enabled = searchOpen || pager.currentPage != 0) {
         if (searchOpen) {
@@ -68,13 +70,17 @@ internal fun MainTabs() {
 
     Scaffold(
         topBar = {
-            GlassTopAppBar(
-                title = if (searchOpen) searchTitle else items[pager.currentPage].label.orEmpty(),
-                modifier = Modifier.semantics { heading() },
-                expandable = false,
-                isContentScrolled = false,
-                backdrop = backdrop,
-            )
+            if (showHome) {
+                HomeTopBar(avatar = avatar, backdrop = backdrop, onOpenSettings = onOpenSettings)
+            } else {
+                GlassTopAppBar(
+                    title = if (searchOpen) searchTitle else items[pager.currentPage].label.orEmpty(),
+                    modifier = Modifier.semantics { heading() },
+                    expandable = false,
+                    isContentScrolled = false,
+                    backdrop = backdrop,
+                )
+            }
         },
         bottomBar = {
             val indicator = GlassNavigationBarDefaults.indicatorColor()
@@ -131,8 +137,12 @@ internal fun MainTabs() {
                         state = pager,
                         snapAnimationSpec = PagerNavigationSpringSpec,
                     ),
-                ) {
-                    Box(Modifier.fillMaxSize())
+                ) { page ->
+                    if (page == 0) {
+                        HomeScreen(onOpenLibrary = { scope.launch { pager.springAnimateToPage(1) } })
+                    } else {
+                        Box(Modifier.fillMaxSize())
+                    }
                 }
             }
         }
