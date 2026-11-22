@@ -107,13 +107,10 @@ internal fun AcbooksNavigation(
             BookDetailsScreen(
                 book = book,
                 loading = !catalog.loaded,
-                cover = library.coverFile(book?.sha256),
-                onRead = {
-                    if (navController.backStack.lastOrNull() == route) {
-                        navController.push(AcbooksRoute.Reader(route.bookId))
-                    }
+                library = library,
+                onBack = {
+                    if (navController.backStack.lastOrNull() == route) navController.pop()
                 },
-                onBack = { navController.pop() },
             )
         }
         entry<AcbooksRoute.Reader> { route ->

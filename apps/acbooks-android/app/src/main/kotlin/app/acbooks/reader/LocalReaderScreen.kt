@@ -3,7 +3,6 @@ package app.acbooks.reader
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
-import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -168,15 +167,8 @@ private fun PdfBook(ready: ReaderState.Ready, model: LibraryViewModel) {
     }
 }
 
-private fun renderPdf(source: ReadableBookFile, requestedPage: Int): RenderedPdf {
-    val descriptor = ParcelFileDescriptor.open(source.file, ParcelFileDescriptor.MODE_READ_ONLY)
-    val renderer = try {
-        PdfRenderer(descriptor)
-    } catch (error: Exception) {
-        descriptor.close()
-        throw error
-    }
-    return renderer.use {
+private fun renderPdf(source: ReadableBookFile, requestedPage: Int): RenderedPdf =
+    readPdf(source.file) { renderer ->
         val count = renderer.pageCount
         if (count == 0) throw IOException("Empty PDF")
         val index = requestedPage.coerceIn(0, count - 1)
@@ -197,4 +189,3 @@ private fun renderPdf(source: ReadableBookFile, requestedPage: Int): RenderedPdf
             RenderedPdf(index, count, bitmap)
         }
     }
-}

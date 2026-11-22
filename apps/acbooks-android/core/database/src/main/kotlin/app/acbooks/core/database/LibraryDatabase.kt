@@ -67,6 +67,8 @@ data class LocalShelfBook(val shelfId: String, val bookId: String)
 )
 data class LocalReadingPosition(@PrimaryKey val fileId: String, val locator: String)
 
+data class LocalBookReadingPosition(val format: String, val locator: String?)
+
 @Entity(
     tableName = "cloud_book_links",
     foreignKeys = [ForeignKey(
@@ -155,6 +157,22 @@ abstract class LibraryDao {
 
     @Query("SELECT locator FROM reading_positions WHERE fileId = :fileId")
     abstract suspend fun readingPosition(fileId: String): String?
+
+    @Query("""
+        SELECT f.format, p.locator FROM book_files f
+        LEFT JOIN reading_positions p ON p.fileId = f.id
+        WHERE f.bookId = :bookId ORDER BY f.id LIMIT 1
+    """)
+    abstract fun observeBookReadingPosition(bookId: String): Flow<LocalBookReadingPosition?>
+
+    @Query("SELECT DISTINCT format FROM book_files WHERE bookId = :bookId ORDER BY format")
+    abstract fun observeBookFormats(bookId: String): Flow<List<String>>
+
+    @Query("""
+        SELECT s.name FROM shelves s JOIN shelf_books sb ON sb.shelfId = s.id
+        WHERE sb.bookId = :bookId ORDER BY s.nameKey, s.id
+    """)
+    abstract fun observeBookShelves(bookId: String): Flow<List<String>>
 
     @Upsert
     abstract suspend fun saveReadingPosition(position: LocalReadingPosition)

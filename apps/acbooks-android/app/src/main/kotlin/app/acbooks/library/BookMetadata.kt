@@ -1,5 +1,6 @@
 package app.acbooks.library
 
+import android.text.Html
 import android.util.Xml
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -11,6 +12,16 @@ import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 
 internal data class BookMetadata(val title: String, val author: String? = null, val cover: ByteArray? = null)
+
+internal data class BookBibliography(
+    val description: String? = null,
+    val translators: List<String> = emptyList(),
+    val isbn: String? = null,
+    val publisher: String? = null,
+    val publicationDate: String? = null,
+    val languages: List<String> = emptyList(),
+    val categories: List<String> = emptyList(),
+)
 
 internal fun readBookMetadata(file: File, format: String, fallback: String): BookMetadata = when (format) {
     "pdf" -> {
@@ -26,12 +37,7 @@ internal fun readBookMetadata(file: File, format: String, fallback: String): Boo
     }
     "epub" -> try {
         ZipFile(file).use { epub ->
-            requireEpub(epub.readEntry("mimetype", 64).toString(Charsets.US_ASCII).trim() == "application/epub+zip")
-            var packagePath: String? = null
-            parseXml(epub.readEntry("META-INF/container.xml")) {
-                if (name == "rootfile" && packagePath == null) packagePath = getAttributeValue(null, "full-path")
-            }
-            val rootfile = packagePath ?: throw IOException("Missing EPUB package")
+            val rootfile = epub.packagePath()
             var title: String? = null
             val authors = mutableListOf<String>()
             var legacyCoverId: String? = null
@@ -40,7 +46,7 @@ internal fun readBookMetadata(file: File, format: String, fallback: String): Boo
             var sawPackage = false
             parseXml(epub.readEntry(rootfile)) {
                 if (depth == 1 && name == "package") sawPackage = true
-                if (depth == 3 && namespace == "http://purl.org/dc/elements/1.1/") {
+                if (depth == 3 && namespace == DublinCore) {
                     when (name) {
                         "title" -> if (title == null) title = nextText().trim().take(512).ifEmpty { null }
                         "creator" -> if (authors.size < 12) nextText().trim().take(128)
@@ -69,6 +75,81 @@ internal fun readBookMetadata(file: File, format: String, fallback: String): Boo
         throw IOException("Invalid EPUB package", failure)
     }
     else -> throw IOException("Unsupported format")
+}
+
+internal fun readEpubBibliography(file: File): BookBibliography = ZipFile(file).use { epub ->
+    var description: String? = null
+    var isbn: String? = null
+    var publisher: String? = null
+    var publicationDate: String? = null
+    val translators = mutableListOf<String>()
+    val contributors = mutableMapOf<String, String>()
+    val translatorIds = mutableSetOf<String>()
+    val languages = mutableListOf<String>()
+    val categories = mutableListOf<String>()
+    parseXml(epub.readEntry(epub.packagePath())) {
+        if (depth != 3) return@parseXml
+        if (namespace == DublinCore) {
+            when (name) {
+                "description" -> if (description == null) {
+                    description = Html.fromHtml(nextText(), Html.FROM_HTML_MODE_COMPACT)
+                        .toString().trim().takeIf(String::isNotEmpty)
+                }
+                "creator", "contributor" -> {
+                    val id = getAttributeValue(null, "id")
+                    val role = getAttributeValue(Opf, "role")
+                    val contributor = nextText().trim()
+                    if (id != null) contributors[id] = contributor
+                    if (role == "trl" && contributor.isNotEmpty()) translators.add(contributor)
+                }
+                "identifier" -> if (isbn == null) {
+                    val scheme = getAttributeValue(Opf, "scheme")
+                    val identifier = nextText().trim()
+                    val prefix = "urn:isbn:"
+                    isbn = when {
+                        identifier.startsWith(prefix, ignoreCase = true) -> identifier.substring(prefix.length)
+                        scheme.equals("ISBN", ignoreCase = true) -> identifier
+                        else -> null
+                    }?.trim()?.takeIf(String::isNotEmpty)
+                }
+                "publisher" -> if (publisher == null) publisher = nextText().trim().takeIf(String::isNotEmpty)
+                "date" -> if (publicationDate == null) {
+                    val event = getAttributeValue(Opf, "event")
+                    if (event == null || event == "publication") {
+                        publicationDate = nextText().trim().takeIf(String::isNotEmpty)
+                    }
+                }
+                "language" -> nextText().trim().takeIf(String::isNotEmpty)?.let(languages::add)
+                "subject" -> nextText().trim().takeIf(String::isNotEmpty)?.let(categories::add)
+            }
+        } else if (namespace == Opf && name == "meta" && getAttributeValue(null, "property") == "role") {
+            val refines = getAttributeValue(null, "refines")
+            if (refines?.startsWith("#") == true && nextText().trim() == "trl") {
+                translatorIds.add(refines.substring(1))
+            }
+        }
+    }
+    BookBibliography(
+        description = description,
+        translators = (translators + translatorIds.mapNotNull(contributors::get)).filter(String::isNotBlank).distinct(),
+        isbn = isbn,
+        publisher = publisher,
+        publicationDate = publicationDate,
+        languages = languages.distinct(),
+        categories = categories.distinct(),
+    )
+}
+
+private const val DublinCore = "http://purl.org/dc/elements/1.1/"
+private const val Opf = "http://www.idpf.org/2007/opf"
+
+private fun ZipFile.packagePath(): String {
+    requireEpub(readEntry("mimetype", 64).toString(Charsets.US_ASCII).trim() == "application/epub+zip")
+    var packagePath: String? = null
+    parseXml(readEntry("META-INF/container.xml")) {
+        if (name == "rootfile" && packagePath == null) packagePath = getAttributeValue(null, "full-path")
+    }
+    return packagePath ?: throw IOException("Missing EPUB package")
 }
 
 private fun requireEpub(valid: Boolean) {

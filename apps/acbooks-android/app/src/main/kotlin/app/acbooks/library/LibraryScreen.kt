@@ -64,11 +64,16 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 internal val BookCoverCorner = 10.dp
 
 @Composable
-internal fun BookCover(file: File?, modifier: Modifier = Modifier, title: String? = null) {
+internal fun BookCover(
+    file: File?,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    aspectRatio: Float = 3f / 4f,
+) {
     var loaded by remember(file) { mutableStateOf(false) }
     val colors = MiuixTheme.colorScheme
     Box(
-        modifier = modifier.aspectRatio(3f / 4f).clip(RoundedCornerShape(BookCoverCorner)),
+        modifier = modifier.aspectRatio(aspectRatio).clip(RoundedCornerShape(BookCoverCorner)),
         contentAlignment = Alignment.Center,
     ) {
         if (!loaded) {

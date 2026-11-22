@@ -21,6 +21,9 @@ import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 
 internal enum class ImportOutcome { Added, Duplicate, MatchingContent, Unsupported, Failed }
@@ -46,6 +49,20 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
     }
 
     suspend fun readingPosition(fileId: String) = dao.readingPosition(fileId)
+
+    fun observeBookDetails(bookId: String) = combine(
+        dao.observeBookFormats(bookId).distinctUntilChanged(),
+        dao.observeBookShelves(bookId).distinctUntilChanged(),
+        dao.observeBookReadingPosition(bookId).distinctUntilChanged(),
+        flow { emit(readBookDetailsFile(openBook(bookId))) },
+    ) { formats, shelves, position, detailsFile ->
+        BookDetailsData(
+            metadata = detailsFile?.metadata,
+            formats = formats,
+            shelves = shelves,
+            readingLocation = readBookLocation(position, detailsFile?.pdfPageCount),
+        )
+    }
 
     suspend fun saveReadingPosition(fileId: String, locator: String) =
         dao.saveReadingPosition(LocalReadingPosition(fileId, locator))

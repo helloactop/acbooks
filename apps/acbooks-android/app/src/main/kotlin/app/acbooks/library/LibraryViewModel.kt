@@ -136,6 +136,12 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
 
     fun coverFile(sha256: String?) = repository.coverFile(sha256)
 
+    fun observeBookDetails(bookId: String) = repository.observeBookDetails(bookId).catch { failure ->
+        if (failure !is SQLException) throw failure
+        Log.w("Library", "Could not read local book details", failure)
+        emit(BookDetailsData())
+    }
+
     /**
      * Server-login and sync will use these integration hooks. Never treat a local UUID
      * as a remote UUID without an explicit verified server association.
