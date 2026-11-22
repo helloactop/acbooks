@@ -50,4 +50,5 @@ dependencies {
     implementation(libs.miuix.glass)
     implementation(libs.miuix.glass.icons)
     implementation(libs.miuix.nav)
+    implementation(libs.miuix.preference)
 }

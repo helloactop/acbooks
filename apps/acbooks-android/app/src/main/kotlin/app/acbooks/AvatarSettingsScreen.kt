@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -19,7 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -32,14 +35,15 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import top.yukonga.miuix.kmp.glass.GlassDialogButton
 import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.glass.GlassTopAppBar
 import top.yukonga.miuix.kmp.glass.glassPanel
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.Back
 import top.yukonga.miuix.kmp.icon.glass.ContactsCircle
+import top.yukonga.miuix.kmp.material.GlassDefaults
 import top.yukonga.miuix.kmp.material.GlassShape
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -60,7 +64,9 @@ internal fun AvatarSettingsScreen(
     val surfaceBackdrop = rememberLayerBackdrop()
     val pageBackdrop = rememberLayerBackdrop()
     val scrollBehavior = MiuixScrollBehavior()
+    val colors = MiuixTheme.colorScheme
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             GlassTopAppBar(
                 title = stringResource(R.string.settings_title),
@@ -80,7 +86,7 @@ internal fun AvatarSettingsScreen(
         Box(Modifier.fillMaxSize().layerBackdrop(pageBackdrop)) {
             Box(
                 Modifier.matchParentSize().layerBackdrop(surfaceBackdrop)
-                    .background(MiuixTheme.colorScheme.surface),
+                    .background(colors.surface),
             )
             Box(
                 modifier = Modifier.fillMaxSize()
@@ -90,7 +96,7 @@ internal fun AvatarSettingsScreen(
                     .verticalScroll(rememberScrollState()),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                val shape = GlassShape(24.dp)
+                val shape = GlassShape(GlassDefaults.CornerRadius)
                 Column(
                     modifier = Modifier.widthIn(max = 840.dp)
                         .fillMaxWidth()
@@ -98,12 +104,12 @@ internal fun AvatarSettingsScreen(
                         .glassPanel(
                             backdrop = surfaceBackdrop,
                             shape = shape,
-                            fallback = Modifier.clip(shape).background(MiuixTheme.colorScheme.surfaceContainer),
-                        )
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                            style = GlassDefaults.style(isDark = colors.background.luminance() < 0.5f),
+                            fallback = Modifier.clip(shape).background(colors.surfaceContainer),
+                        ),
                 ) {
                     Row(
+                        modifier = Modifier.padding(16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -111,9 +117,11 @@ internal fun AvatarSettingsScreen(
                         Text(stringResource(R.string.settings_avatar), style = MiuixTheme.textStyles.title2)
                     }
                     onChangeAvatar?.let { changeAvatar ->
-                        GlassDialogButton(onClick = changeAvatar, minHeight = 48.dp) {
-                            Text(stringResource(R.string.settings_change_avatar))
-                        }
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_change_avatar),
+                            modifier = Modifier.heightIn(min = 48.dp),
+                            onClick = changeAvatar,
+                        )
                     }
                 }
             }
