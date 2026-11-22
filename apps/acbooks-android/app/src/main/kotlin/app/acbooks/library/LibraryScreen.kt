@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -29,11 +30,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,10 +51,6 @@ import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.glass.GlassPopupAnchor
-import top.yukonga.miuix.kmp.glass.glassPopupAnchor
-import top.yukonga.miuix.kmp.glass.glassPopupAnchorContent
-import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.BookOutline
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -56,7 +58,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 internal val BookCoverCorner = 10.dp
 
 @Composable
-internal fun BookCover(file: File?, modifier: Modifier = Modifier) {
+internal fun BookCover(file: File?, modifier: Modifier = Modifier, title: String? = null) {
     var loaded by remember(file) { mutableStateOf(false) }
     val colors = MiuixTheme.colorScheme
     Box(
@@ -65,12 +67,24 @@ internal fun BookCover(file: File?, modifier: Modifier = Modifier) {
     ) {
         if (!loaded) {
             Box(Modifier.matchParentSize().background(colors.surfaceContainer), contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = MiuixIcons.Glass.BookOutline,
-                    contentDescription = null,
-                    modifier = Modifier.size(28.dp),
-                    tint = colors.onSurfaceVariantSummary,
-                )
+                if (!title.isNullOrBlank()) {
+                    Text(
+                        text = title,
+                        color = colors.onSurfaceVariantSummary,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(10.dp),
+                    )
+                } else {
+                    Icon(
+                        imageVector = MiuixIcons.Glass.BookOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp),
+                        tint = colors.onSurfaceVariantSummary,
+                    )
+                }
             }
         }
         if (file != null) {
@@ -87,7 +101,7 @@ internal fun BookCover(file: File?, modifier: Modifier = Modifier) {
     }
 }
 
-internal data class BookMenuTarget(val book: LocalBookCard, val cover: File?, val anchor: GlassPopupAnchor)
+internal data class BookMenuTarget(val book: LocalBookCard, val anchorBounds: Rect)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -98,31 +112,35 @@ internal fun BookGridItem(
     onDetails: () -> Unit,
     onShowMenu: (BookMenuTarget) -> Unit,
 ) {
-    val anchor = rememberGlassPopupAnchor()
+    val coverCoordinates = remember(book.id) { arrayOfNulls<LayoutCoordinates>(1) }
     val read = stringResource(R.string.reader_open_book, book.title)
     val actions = stringResource(R.string.library_book_actions)
     Column {
         BookCover(
             file = cover,
+            title = book.title,
             modifier = Modifier.fillMaxWidth()
-                .glassPopupAnchor(anchor, cornerRadius = BookCoverCorner)
-                .glassPopupAnchorContent(anchor)
+                .onGloballyPositioned { coverCoordinates[0] = it }
                 .semantics { contentDescription = book.title }
                 .combinedClickable(
                     role = Role.Button,
                     onClickLabel = read,
                     onLongClickLabel = actions,
                     onClick = onRead,
-                    onLongClick = { onShowMenu(BookMenuTarget(book, cover, anchor)) },
+                    onLongClick = {
+                        coverCoordinates[0]?.let { onShowMenu(BookMenuTarget(book, it.boundsInWindow())) }
+                    },
                 ),
         )
         Column(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            modifier = Modifier.fillMaxWidth()
+                .heightIn(min = 48.dp)
                 .clickable(
                     role = Role.Button,
                     onClickLabel = stringResource(R.string.library_book_details),
                     onClick = onDetails,
-                ),
+                )
+                .padding(top = 8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(book.title, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)

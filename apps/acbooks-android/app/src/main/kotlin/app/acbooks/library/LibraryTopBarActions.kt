@@ -1,7 +1,6 @@
 package app.acbooks.library
 
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -12,6 +11,8 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.glass.GlassIconDropdownMenu
+import top.yukonga.miuix.kmp.glass.GlassPopup
+import top.yukonga.miuix.kmp.glass.GlassPopupItem
 import top.yukonga.miuix.kmp.glass.GlassPopupAnchor
 import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
 import top.yukonga.miuix.kmp.glass.glassPopupAnchor
@@ -114,26 +115,20 @@ internal fun BoxScope.LibraryMenus(
         backdrop = backdrop,
     )
     if (bookTarget != null) {
-        GlassIconDropdownMenu(
+        GlassPopup(
             show = activeMenu == LibraryMenu.Book,
             onDismissRequest = { onDismiss(LibraryMenu.Book) },
-            anchor = bookTarget.anchor,
-            anchorContent = { BookCover(bookTarget.cover, Modifier.fillMaxSize()) },
-            entries = listOf(
-                DropdownEntry(
-                    items = listOf(
-                        DropdownItem(
-                            text = stringResource(R.string.library_read_book),
-                            onClick = { onRead(bookTarget.book.id) },
-                        ),
-                        DropdownItem(
-                            text = stringResource(R.string.library_book_details),
-                            onClick = { onDetails(bookTarget.book.id) },
-                        ),
-                    ),
-                ),
-            ),
+            anchorBounds = bookTarget.anchorBounds,
             backdrop = backdrop,
-        )
+        ) {
+            GlassPopupItem(
+                text = stringResource(R.string.library_read_book),
+                onClick = { onRead(bookTarget.book.id) },
+            )
+            GlassPopupItem(
+                text = stringResource(R.string.library_book_details),
+                onClick = { onDetails(bookTarget.book.id) },
+            )
+        }
     }
 }
