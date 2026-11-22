@@ -61,9 +61,9 @@ internal fun HomeTopBar(
         modifier = Modifier.semantics { heading() },
         contentModifier = modifier,
         expandable = true,
+        progressiveBlur = true,
         backdrop = backdrop,
         scrollBehavior = scrollBehavior,
-        buttonSize = 48.dp,
         actions = {
             GlassIconButton(onClick = onOpenSettings) {
                 ProfileAvatar(
@@ -77,13 +77,21 @@ internal fun HomeTopBar(
 }
 
 @Composable
-internal fun HomeScreen(scrollBehavior: ScrollBehavior, onOpenLibrary: () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+internal fun HomeScreen(
+    scrollBehavior: ScrollBehavior,
+    scaffoldPadding: PaddingValues,
+    onOpenLibrary: () -> Unit,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection)
+            .verticalScroll(rememberScrollState())
+            .padding(scaffoldPadding),
+        contentAlignment = Alignment.TopCenter,
+    ) {
         Column(
             modifier = Modifier.widthIn(max = 840.dp)
-                .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection)
-                .verticalScroll(rememberScrollState())
+                .fillMaxWidth()
                 .padding(16.dp),
         ) {
             Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {

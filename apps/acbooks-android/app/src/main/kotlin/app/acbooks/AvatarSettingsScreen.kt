@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.luminance
@@ -72,9 +73,9 @@ internal fun AvatarSettingsScreen(
                 title = stringResource(R.string.settings_title),
                 modifier = Modifier.semantics { heading() },
                 expandable = true,
+                progressiveBlur = true,
                 scrollBehavior = scrollBehavior,
                 backdrop = pageBackdrop,
-                buttonSize = 48.dp,
                 navigationIcon = {
                     GlassIconButton(onClick = onBack) {
                         Icon(MiuixIcons.Glass.Back, stringResource(R.string.navigate_back))
@@ -86,14 +87,14 @@ internal fun AvatarSettingsScreen(
         Box(Modifier.fillMaxSize().layerBackdrop(pageBackdrop)) {
             Box(
                 Modifier.matchParentSize().layerBackdrop(surfaceBackdrop)
-                    .background(colors.surface),
+                    .background(Brush.verticalGradient(listOf(colors.surfaceContainer, colors.surface))),
             )
             Box(
                 modifier = Modifier.fillMaxSize()
-                    .padding(padding)
-                    .consumeWindowInsets(padding)
                     .nestedScroll(scrollBehavior.nestedScrollConnection)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .padding(padding)
+                    .consumeWindowInsets(padding),
                 contentAlignment = Alignment.TopCenter,
             ) {
                 val shape = GlassShape(GlassDefaults.CornerRadius)

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,15 +49,19 @@ internal fun LibraryTopBarActions(
     moreAnchor: GlassPopupAnchor,
     onOpenMenu: (LibraryMenu) -> Unit,
 ) {
+    val buttonSize = GlassTopAppBarDefaults.ButtonSize
     GlassIconButton(
         onClick = { onOpenMenu(LibraryMenu.Display) },
-        modifier = Modifier.glassPopupAnchor(displayAnchor, GlassTopAppBarDefaults.ButtonSize / 2),
+        modifier = Modifier.glassPopupAnchor(displayAnchor, buttonSize / 2),
+        size = buttonSize,
     ) {
         LibraryMenuIcon(LibraryMenu.Display, Modifier.glassPopupAnchorContent(displayAnchor))
     }
+    Spacer(Modifier.width(8.dp))
     GlassIconButton(
         onClick = { onOpenMenu(LibraryMenu.More) },
-        modifier = Modifier.glassPopupAnchor(moreAnchor, GlassTopAppBarDefaults.ButtonSize / 2),
+        modifier = Modifier.glassPopupAnchor(moreAnchor, buttonSize / 2),
+        size = buttonSize,
     ) {
         LibraryMenuIcon(LibraryMenu.More, Modifier.glassPopupAnchorContent(moreAnchor))
     }

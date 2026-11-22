@@ -11,15 +11,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -63,10 +67,13 @@ internal fun LocalReaderScreen(
     }
     // Keep system bar visibility stable across navigation transitions. Toggling bars here
     // relayouts the still-visible library and resizes the EPUB WebView during its first paint.
+    val readerInsets = WindowInsets.systemBarsIgnoringVisibility
+        .union(WindowInsets.displayCutout)
+        .union(WindowInsets.ime)
     Box(
         Modifier.fillMaxSize()
             .background(colors.background)
-            .windowInsetsPadding(WindowInsets.safeDrawing),
+            .windowInsetsPadding(readerInsets),
         contentAlignment = Alignment.Center,
     ) {
         when (val reader = state) {
@@ -88,38 +95,61 @@ private data class RenderedPdf(val index: Int, val count: Int, val bitmap: Bitma
 @Composable
 private fun PdfBook(ready: ReaderState.Ready, model: LibraryViewModel) {
     val source = ready.file
-    var requestedPage by rememberSaveable(source.id) {
+    var lastReadPage by rememberSaveable(source.id) {
         mutableIntStateOf(runCatching { JSONObject(ready.initialPosition.orEmpty()).optInt("page") }.getOrDefault(0))
     }
-    val rendered by produceState<Result<RenderedPdf>?>(null, source.id, requestedPage) {
-        value = withContext(Dispatchers.IO) {
-            try {
-                Result.success(renderPdf(source, requestedPage))
-            } catch (failure: IOException) {
-                Result.failure(failure)
-            } catch (failure: SecurityException) {
-                Result.failure(failure)
-            } catch (failure: IllegalArgumentException) {
-                Result.failure(failure)
+    var requestedPage by remember(source.id) { mutableIntStateOf(lastReadPage) }
+    var displayedPage by remember(source.id) { mutableStateOf<RenderedPdf?>(null) }
+    var renderFailed by remember(source.id) { mutableStateOf(false) }
+
+    LaunchedEffect(source.id, requestedPage) {
+        val index = requestedPage
+        if (displayedPage?.index == index) return@LaunchedEffect
+        renderFailed = false
+        var undelivered: RenderedPdf? = null
+        try {
+            val page = withContext(Dispatchers.IO) {
+                renderPdf(source, index).also { undelivered = it }
             }
+            // A displayed bitmap may still be in use by Compose's render thread after replacement.
+            displayedPage = page
+            undelivered = null
+            lastReadPage = page.index
+            requestedPage = page.index
+            model.saveReadingPosition(source.id, JSONObject().put("page", page.index).toString())
+        } catch (failure: Exception) {
+            if (failure !is IOException && failure !is SecurityException && failure !is IllegalArgumentException) {
+                throw failure
+            }
+            renderFailed = true
+            displayedPage?.let { requestedPage = it.index }
+        } finally {
+            // withContext may discard the result if the reader is closed while rendering.
+            undelivered?.bitmap?.recycle()
         }
     }
-    val result = rendered
-    val page = result?.getOrNull()
+
+    val page = displayedPage
     if (page == null) {
-        if (result == null) CircularProgressIndicator() else Text(stringResource(R.string.reader_open_failed))
+        if (renderFailed) Text(stringResource(R.string.reader_open_failed)) else CircularProgressIndicator()
         return
     }
-    LaunchedEffect(source.id, page.index) {
-        model.saveReadingPosition(source.id, JSONObject().put("page", page.index).toString())
-    }
+    val canTurnPage = requestedPage == page.index
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Image(
-            bitmap = page.bitmap.asImageBitmap(),
-            contentDescription = stringResource(R.string.reader_page, page.index + 1, page.count),
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            contentScale = ContentScale.Fit,
-        )
+        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+            Image(
+                bitmap = remember(page.bitmap) { page.bitmap.asImageBitmap() },
+                contentDescription = stringResource(R.string.reader_page, page.index + 1, page.count),
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+            )
+            if (renderFailed) {
+                Text(
+                    stringResource(R.string.reader_open_failed),
+                    modifier = Modifier.background(MiuixTheme.colorScheme.surface).padding(8.dp),
+                )
+            }
+        }
         Row(
             Modifier.fillMaxWidth().padding(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -127,12 +157,12 @@ private fun PdfBook(ready: ReaderState.Ready, model: LibraryViewModel) {
         ) {
             TextButton(
                 stringResource(R.string.reader_previous), { requestedPage = page.index - 1 },
-                enabled = page.index > 0,
+                enabled = canTurnPage && page.index > 0,
             )
             Text(stringResource(R.string.reader_page, page.index + 1, page.count))
             TextButton(
                 stringResource(R.string.reader_next), { requestedPage = page.index + 1 },
-                enabled = page.index + 1 < page.count,
+                enabled = canTurnPage && page.index + 1 < page.count,
             )
         }
     }
@@ -157,8 +187,13 @@ private fun renderPdf(source: ReadableBookFile, requestedPage: Int): RenderedPdf
                 (page.height * scale).toInt().coerceAtLeast(1),
                 Bitmap.Config.ARGB_8888,
             )
-            bitmap.eraseColor(Color.WHITE)
-            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            try {
+                bitmap.eraseColor(Color.WHITE)
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            } catch (failure: Throwable) {
+                bitmap.recycle()
+                throw failure
+            }
             RenderedPdf(index, count, bitmap)
         }
     }

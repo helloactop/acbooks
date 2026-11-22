@@ -165,6 +165,7 @@ internal fun MainTabs(
                             modifier = Modifier.semantics { heading() },
                             contentModifier = topBarTransition,
                             expandable = true,
+                            progressiveBlur = page == 1,
                             scrollBehavior = scrollBehavior,
                             backdrop = backdrop,
                             actions = {
@@ -207,7 +208,7 @@ internal fun MainTabs(
             ) {
                 HorizontalPager(
                     state = pager,
-                    modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding),
+                    modifier = Modifier.fillMaxSize().consumeWindowInsets(padding),
                     userScrollEnabled = !searchExpanded,
                     flingBehavior = PagerDefaults.flingBehavior(
                         state = pager,
@@ -218,6 +219,7 @@ internal fun MainTabs(
                     when (page) {
                         0 -> HomeScreen(
                             scrollBehavior = scrollBehavior,
+                            scaffoldPadding = padding,
                             onOpenLibrary = { selectTab(1) },
                         )
                         1 -> LibraryScreen(
@@ -225,6 +227,7 @@ internal fun MainTabs(
                             mode = displayMode,
                             gridState = libraryGrid,
                             scrollBehavior = scrollBehavior,
+                            scaffoldPadding = padding,
                             coverFile = library::coverFile,
                             onRead = onReadBook,
                             onDetails = onOpenBook,
@@ -235,6 +238,7 @@ internal fun MainTabs(
                         )
                         else -> Box(
                             Modifier.fillMaxSize()
+                                .padding(padding)
                                 .nestedScroll(scrollBehavior.nestedScrollConnection)
                                 .verticalScroll(rememberScrollState()),
                         )
@@ -317,10 +321,7 @@ internal fun MainTabs(
             expanded = searchExpanded,
             books = catalog.books,
             onDismiss = { searchExpanded = false },
-            onOpenBook = { id ->
-                searchExpanded = false
-                onOpenBook(id)
-            },
+            onOpenBook = onOpenBook,
         )
     }
 }

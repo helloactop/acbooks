@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -37,6 +39,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -193,6 +196,7 @@ internal fun LibraryScreen(
     mode: LibraryDisplayMode,
     gridState: LazyGridState,
     scrollBehavior: ScrollBehavior,
+    scaffoldPadding: PaddingValues,
     coverFile: (String?) -> File?,
     onRead: (String) -> Unit,
     onDetails: (String) -> Unit,
@@ -203,14 +207,26 @@ internal fun LibraryScreen(
     val verticalGap = if (compact) 20.dp else 24.dp
     val phoneColumns = if (compact) 3 else 2
     val wideCellWidth = if (compact) 132.dp else 168.dp
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    val layoutDirection = LocalLayoutDirection.current
+    val gridPadding = PaddingValues(
+        start = 16.dp,
+        top = scaffoldPadding.calculateTopPadding() + 16.dp,
+        end = 16.dp,
+        bottom = scaffoldPadding.calculateBottomPadding() + 16.dp,
+    )
+    BoxWithConstraints(
+        Modifier.fillMaxSize().padding(
+            start = scaffoldPadding.calculateStartPadding(layoutDirection),
+            end = scaffoldPadding.calculateEndPadding(layoutDirection),
+        ),
+    ) {
         val cols = if (maxWidth < 480.dp) phoneColumns else
             gridColumns(maxWidth - 32.dp, horizontalGap, wideCellWidth, phoneColumns)
         LazyVerticalGrid(
             columns = GridCells.Fixed(cols),
             state = gridState,
             modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+            contentPadding = gridPadding,
             horizontalArrangement = Arrangement.spacedBy(horizontalGap),
             verticalArrangement = Arrangement.spacedBy(verticalGap),
         ) {
@@ -225,7 +241,10 @@ internal fun LibraryScreen(
             }
         }
         if (catalog.books.isEmpty()) {
-            Box(Modifier.matchParentSize().padding(16.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.matchParentSize().padding(gridPadding),
+                contentAlignment = Alignment.Center,
+            ) {
                 when {
                     !catalog.loaded -> CircularProgressIndicator()
                     catalog.failed -> Text(stringResource(R.string.library_load_failed))

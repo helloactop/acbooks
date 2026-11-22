@@ -13,8 +13,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.acbooks.R
 import app.acbooks.core.database.LocalBookCard
@@ -44,9 +47,12 @@ internal fun BookDetailsScreen(
     val backdrop = rememberLayerBackdrop()
     val scrollBehavior = MiuixScrollBehavior()
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             GlassTopAppBar(
                 title = stringResource(R.string.library_book_details),
+                modifier = Modifier.semantics { heading() },
+                progressiveBlur = true,
                 scrollBehavior = scrollBehavior,
                 backdrop = backdrop,
                 navigationIcon = {
@@ -61,10 +67,10 @@ internal fun BookDetailsScreen(
             modifier = Modifier.fillMaxSize()
                 .layerBackdrop(backdrop)
                 .background(MiuixTheme.colorScheme.surface)
-                .padding(padding)
-                .consumeWindowInsets(padding)
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
+                .padding(padding)
+                .consumeWindowInsets(padding)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),

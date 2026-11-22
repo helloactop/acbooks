@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 internal data class LibraryCatalog(
     val books: List<LocalBookCard> = emptyList(),
@@ -171,17 +173,26 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
 
     suspend fun openBook(bookId: String) = repository.openBook(bookId)
 
-    suspend fun readingPosition(fileId: String): String? = try {
-        repository.readingPosition(fileId)
-    } catch (_: SQLException) {
-        null
+    private val readingPositionLock = Mutex()
+
+    suspend fun readingPosition(fileId: String): String? = readingPositionLock.withLock {
+        try {
+            repository.readingPosition(fileId)
+        } catch (_: SQLException) {
+            null
+        }
     }
 
-    suspend fun saveReadingPosition(fileId: String, locator: String) {
-        try {
-            repository.saveReadingPosition(fileId, locator)
-        } catch (_: SQLException) {
-            android.util.Log.w("Reader", "Could not save the reading position")
+    fun saveReadingPosition(fileId: String, locator: String) {
+        // Finish writes after the reader's view is gone; reopening waits for queued positions.
+        viewModelScope.launch {
+            readingPositionLock.withLock {
+                try {
+                    repository.saveReadingPosition(fileId, locator)
+                } catch (_: SQLException) {
+                    Log.w("Reader", "Could not save the reading position")
+                }
+            }
         }
     }
 
