@@ -59,7 +59,7 @@ internal data class ImportProgress(
 internal class LibraryViewModel(application: Application) : AndroidViewModel(application) {
     private val database = LibraryDatabase.open(application)
     private val repository = LibraryRepository(application, database.library())
-    private val cloudDeletion: CloudBookDeletionGateway = UnavailableCloudBookDeletionGateway
+    private val cloudDeletion: CloudBookDeletionGateway = HttpCloudBookDeletionGateway(PendingCloudBookConnection)
     private val preferences = application.libraryDisplayPreferences
     val catalog = repository.books
         .map { books -> LibraryCatalog(books, loaded = true) }
