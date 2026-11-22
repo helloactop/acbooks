@@ -1,8 +1,5 @@
 package app.acbooks.reader
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
@@ -13,11 +10,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -30,12 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.compose.AndroidFragment
 import app.acbooks.R
 import app.acbooks.library.LibraryViewModel
@@ -66,9 +61,14 @@ internal fun LocalReaderScreen(
         value = if (source == null) ReaderState.Unavailable
         else ReaderState.Ready(source, if (source.format == "pdf") model.readingPosition(source.id) else null)
     }
-    ImmersiveReader()
-
-    Box(Modifier.fillMaxSize().background(colors.background), contentAlignment = Alignment.Center) {
+    // Keep system bar visibility stable across navigation transitions. Toggling bars here
+    // relayouts the still-visible library and resizes the EPUB WebView during its first paint.
+    Box(
+        Modifier.fillMaxSize()
+            .background(colors.background)
+            .windowInsetsPadding(WindowInsets.safeDrawing),
+        contentAlignment = Alignment.Center,
+    ) {
         when (val reader = state) {
             ReaderState.Loading -> CircularProgressIndicator()
             ReaderState.Unavailable -> Text(stringResource(R.string.reader_open_failed))
@@ -81,24 +81,6 @@ internal fun LocalReaderScreen(
             }
         }
     }
-}
-
-@Composable
-private fun ImmersiveReader() {
-    val view = LocalView.current
-    DisposableEffect(view) {
-        val controller = view.context.findActivity()?.window
-            ?.let { WindowCompat.getInsetsController(it, view) }
-        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        controller?.hide(WindowInsetsCompat.Type.systemBars())
-        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
-    }
-}
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }
 
 private data class RenderedPdf(val index: Int, val count: Int, val bitmap: Bitmap)
