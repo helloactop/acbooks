@@ -158,7 +158,8 @@ private fun BoxScope.BookContextMenu(
     val anchor = rememberGlassPopupAnchor()
     var hostCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var placedTarget by remember { mutableStateOf<BookMenuTarget?>(null) }
-    val anchorSize = 1.dp
+    // Leave room for the closing spring to overshoot without producing negative geometry.
+    val anchorSize = 12.dp
 
     Box(Modifier.matchParentSize().onGloballyPositioned { hostCoordinates = it }) {
         val host = hostCoordinates
@@ -171,7 +172,7 @@ private fun BoxScope.BookContextMenu(
                         IntOffset((point.x - halfSize).roundToInt(), (point.y - halfSize).roundToInt())
                     }
                     .size(anchorSize)
-                    .glassPopupAnchor(anchor, cornerRadius = 0.dp)
+                    .glassPopupAnchor(anchor, cornerRadius = anchorSize / 2)
                     .onGloballyPositioned { placedTarget = target },
             )
         }
