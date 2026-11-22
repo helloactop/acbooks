@@ -2,6 +2,7 @@ package app.acbooks.library
 
 import java.net.HttpURLConnection
 import java.net.URL
+import app.acbooks.core.database.LibraryDao
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,7 +19,7 @@ internal data class CloudBookConnection(
 /** Login and sync supply these values; local-only books must not guess a remote id. */
 internal interface CloudBookConnectionProvider {
     fun activeConnection(): CloudBookConnection?
-    suspend fun remoteBookId(localBookId: String): String?
+    suspend fun remoteBookId(localBookId: String, serverOrigin: String): String?
 }
 
 internal interface CloudBookDeletionGateway {
@@ -35,7 +36,8 @@ internal class HttpCloudBookDeletionGateway(
 ) : CloudBookDeletionGateway {
     override suspend fun deleteRemoteBook(localBookId: String): Boolean = withContext(Dispatchers.IO) {
         val connection = connectionProvider.activeConnection() ?: return@withContext false
-        val remoteId = connectionProvider.remoteBookId(localBookId) ?: return@withContext false
+        val remoteId = connectionProvider.remoteBookId(localBookId, connection.serverOrigin)
+            ?: return@withContext false
         val validatedId = runCatching { UUID.fromString(remoteId) }.getOrNull() ?: return@withContext false
         val origin = runCatching { URL(connection.serverOrigin.trimEnd('/')) }.getOrNull()
             ?: return@withContext false
@@ -63,11 +65,25 @@ internal class HttpCloudBookDeletionGateway(
 }
 
 /**
- * Until Android login and sync supply an authenticated session and remote book mapping,
- * this provider returns no connection. The dialog action remains enabled and invokes the
- * real gateway, but cannot delete a server book without verified identifiers.
+ * Android login supplies the active session; credentials are intentionally memory-only.
+ * Remote book association is persisted by the sync flow in Room.
  */
-internal object PendingCloudBookConnection : CloudBookConnectionProvider {
-    override fun activeConnection(): CloudBookConnection? = null
-    override suspend fun remoteBookId(localBookId: String): String? = null
+internal object CloudBookSessions {
+    @Volatile
+    private var active: CloudBookConnection? = null
+
+    fun setAuthenticatedConnection(connection: CloudBookConnection?) {
+        active = connection
+    }
+
+    fun current(): CloudBookConnection? = active
+}
+
+internal class RoomCloudBookConnectionProvider(
+    private val dao: LibraryDao,
+) : CloudBookConnectionProvider {
+    override fun activeConnection(): CloudBookConnection? = CloudBookSessions.current()
+
+    override suspend fun remoteBookId(localBookId: String, serverOrigin: String): String? =
+        dao.remoteBookId(localBookId, serverOrigin)
 }
