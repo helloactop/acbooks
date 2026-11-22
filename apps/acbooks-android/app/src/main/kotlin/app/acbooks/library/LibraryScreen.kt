@@ -37,7 +37,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -105,7 +104,7 @@ internal fun BookCover(file: File?, modifier: Modifier = Modifier, title: String
     }
 }
 
-internal data class BookMenuTarget(val book: LocalBookCard, val anchorBounds: Rect)
+internal data class BookMenuTarget(val book: LocalBookCard, val anchorPoint: Offset)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -135,6 +134,13 @@ internal fun BookGridItem(
                             pass = PointerEventPass.Initial,
                         )
                         pressPosition.value = down.position
+                        try {
+                            do {
+                                val event = awaitPointerEvent(PointerEventPass.Final)
+                            } while (event.changes.any { it.id == down.id && it.pressed })
+                        } finally {
+                            pressPosition.value = null
+                        }
                     }
                 }
                 .semantics { contentDescription = book.title }
@@ -148,20 +154,11 @@ internal fun BookGridItem(
                     },
                     onLongClick = {
                         coverCoordinates[0]?.takeIf { it.isAttached }?.let { coordinates ->
-                            // GlassPopup aligns to the anchor's end/top edges; a whole-book
-                            // rectangle incorrectly positions it at the cover's corner.
-                            // Anchor to the finger in window coordinates instead.
                             val local = pressPosition.value ?: Offset(
                                 coordinates.size.width / 2f,
                                 coordinates.size.height / 2f,
                             )
-                            val point = coordinates.localToWindow(local)
-                            onShowMenu(
-                                BookMenuTarget(
-                                    book,
-                                    Rect(point.x, point.y, point.x + 1f, point.y + 1f),
-                                ),
-                            )
+                            onShowMenu(BookMenuTarget(book, coordinates.localToWindow(local)))
                         }
                         pressPosition.value = null
                     },

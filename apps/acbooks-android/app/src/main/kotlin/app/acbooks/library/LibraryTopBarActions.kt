@@ -1,26 +1,43 @@
 package app.acbooks.library
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import app.acbooks.R
 import app.acbooks.core.database.LocalBookCard
+import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.DropdownEntry
 import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.glass.GlassIconDropdownMenu
-import top.yukonga.miuix.kmp.glass.GlassPopup
-import top.yukonga.miuix.kmp.glass.GlassPopupItem
 import top.yukonga.miuix.kmp.glass.GlassPopupAnchor
+import top.yukonga.miuix.kmp.glass.GlassPopupItem
 import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
+import top.yukonga.miuix.kmp.glass.GlassTransformPopup
 import top.yukonga.miuix.kmp.glass.glassPopupAnchor
 import top.yukonga.miuix.kmp.glass.glassPopupAnchorContent
+import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.glass.More
+import top.yukonga.miuix.kmp.icon.glass.BookOutline
 import top.yukonga.miuix.kmp.icon.glass.Delete
+import top.yukonga.miuix.kmp.icon.glass.Info
+import top.yukonga.miuix.kmp.icon.glass.More
 import top.yukonga.miuix.kmp.icon.glass.Tune
 
 internal enum class LibraryMenu { Display, More, Book }
@@ -117,25 +134,71 @@ internal fun BoxScope.LibraryMenus(
         ),
         backdrop = backdrop,
     )
-    if (bookTarget != null) {
-        GlassPopup(
-            show = activeMenu == LibraryMenu.Book,
-            onDismissRequest = { onDismiss(LibraryMenu.Book) },
-            anchorBounds = bookTarget.anchorBounds,
+    BookContextMenu(
+        target = bookTarget,
+        show = activeMenu == LibraryMenu.Book,
+        backdrop = backdrop,
+        onDismiss = { onDismiss(LibraryMenu.Book) },
+        onRead = onRead,
+        onDetails = onDetails,
+        onDelete = onDelete,
+    )
+}
+
+@Composable
+private fun BoxScope.BookContextMenu(
+    target: BookMenuTarget?,
+    show: Boolean,
+    backdrop: Backdrop,
+    onDismiss: () -> Unit,
+    onRead: (String) -> Unit,
+    onDetails: (String) -> Unit,
+    onDelete: (LocalBookCard) -> Unit,
+) {
+    val anchor = rememberGlassPopupAnchor()
+    var hostCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var placedTarget by remember { mutableStateOf<BookMenuTarget?>(null) }
+    val anchorSize = 1.dp
+
+    Box(Modifier.matchParentSize().onGloballyPositioned { hostCoordinates = it }) {
+        val host = hostCoordinates
+        if (target != null && host?.isAttached == true) {
+            Spacer(
+                Modifier.align(AbsoluteAlignment.TopLeft)
+                    .absoluteOffset {
+                        val point = host.windowToLocal(target.anchorPoint)
+                        val halfSize = anchorSize.roundToPx() / 2f
+                        IntOffset((point.x - halfSize).roundToInt(), (point.y - halfSize).roundToInt())
+                    }
+                    .size(anchorSize)
+                    .glassPopupAnchor(anchor, cornerRadius = 0.dp)
+                    .onGloballyPositioned { placedTarget = target },
+            )
+        }
+        // Compose the closed popup before the anchor is placed so the first open animates too.
+        GlassTransformPopup(
+            show = show && target != null && placedTarget == target,
+            onDismissRequest = onDismiss,
+            anchor = anchor,
             backdrop = backdrop,
+            anchorContent = {},
+            simplified = true,
         ) {
+            val book = target?.book ?: return@GlassTransformPopup
             GlassPopupItem(
                 text = stringResource(R.string.library_read_book),
-                onClick = { onRead(bookTarget.book.id) },
+                icon = MiuixIcons.Glass.BookOutline,
+                onClick = { onRead(book.id) },
             )
             GlassPopupItem(
                 text = stringResource(R.string.library_book_details),
-                onClick = { onDetails(bookTarget.book.id) },
+                icon = MiuixIcons.Glass.Info,
+                onClick = { onDetails(book.id) },
             )
             GlassPopupItem(
                 text = stringResource(R.string.library_delete_book),
                 icon = MiuixIcons.Glass.Delete,
-                onClick = { onDelete(bookTarget.book) },
+                onClick = { onDelete(book) },
             )
         }
     }

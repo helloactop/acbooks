@@ -309,7 +309,6 @@ internal fun MainTabs(
             },
             onDelete = { book ->
                 libraryMenu = null
-                bookMenuTarget = null
                 deleteTarget = book
                 deleteDialogShown = true
             },
