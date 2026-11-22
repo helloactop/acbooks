@@ -4,6 +4,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -28,10 +30,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.stringResource
@@ -113,6 +117,7 @@ internal fun BookGridItem(
     onShowMenu: (BookMenuTarget) -> Unit,
 ) {
     val coverCoordinates = remember(book.id) { arrayOfNulls<LayoutCoordinates>(1) }
+    val pressPosition = remember(book.id) { mutableStateOf<Offset?>(null) }
     val read = stringResource(R.string.reader_open_book, book.title)
     val actions = stringResource(R.string.library_book_actions)
     Column {
@@ -121,14 +126,44 @@ internal fun BookGridItem(
             title = book.title,
             modifier = Modifier.fillMaxWidth()
                 .onGloballyPositioned { coverCoordinates[0] = it }
+                // Record the touch location without consuming pointer events. CombinedClickable
+                // still handles taps, long presses, haptics and accessibility semantics.
+                .pointerInput(book.id) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(
+                            requireUnconsumed = false,
+                            pass = PointerEventPass.Initial,
+                        )
+                        pressPosition.value = down.position
+                    }
+                }
                 .semantics { contentDescription = book.title }
                 .combinedClickable(
                     role = Role.Button,
                     onClickLabel = read,
                     onLongClickLabel = actions,
-                    onClick = onRead,
+                    onClick = {
+                        pressPosition.value = null
+                        onRead()
+                    },
                     onLongClick = {
-                        coverCoordinates[0]?.let { onShowMenu(BookMenuTarget(book, it.boundsInWindow())) }
+                        coverCoordinates[0]?.takeIf { it.isAttached }?.let { coordinates ->
+                            // GlassPopup aligns to the anchor's end/top edges; a whole-book
+                            // rectangle incorrectly positions it at the cover's corner.
+                            // Anchor to the finger in window coordinates instead.
+                            val local = pressPosition.value ?: Offset(
+                                coordinates.size.width / 2f,
+                                coordinates.size.height / 2f,
+                            )
+                            val point = coordinates.localToWindow(local)
+                            onShowMenu(
+                                BookMenuTarget(
+                                    book,
+                                    Rect(point.x, point.y, point.x + 1f, point.y + 1f),
+                                ),
+                            )
+                        }
+                        pressPosition.value = null
                     },
                 ),
         )
