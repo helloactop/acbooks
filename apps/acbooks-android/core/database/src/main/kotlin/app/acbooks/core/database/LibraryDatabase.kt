@@ -78,6 +78,13 @@ data class LocalBookCard(
 
 enum class BookImportCommit { Added, Duplicate, MatchingContent }
 
+// Internal book copies are content-addressed and can be shared by several book records.
+// This plan lists only files no longer referenced after the database transaction.
+data class LocalBookRemoval(
+    val unreferencedObjects: List<LocalFileObject>,
+    val unreferencedCoverHashes: List<String>,
+)
+
 @Dao
 abstract class LibraryDao {
     @Query("""
@@ -91,6 +98,38 @@ abstract class LibraryDao {
 
     @Query("SELECT * FROM book_files WHERE bookId = :bookId ORDER BY id LIMIT 1")
     abstract suspend fun firstBookFile(bookId: String): LocalBookFile?
+
+    @Query("SELECT * FROM book_files WHERE bookId = :bookId")
+    abstract suspend fun allBookFiles(bookId: String): List<LocalBookFile>
+
+    @Query("DELETE FROM books WHERE id = :bookId")
+    abstract suspend fun deleteBookRow(bookId: String): Int
+
+    @Query("""
+        DELETE FROM file_objects WHERE sha256 = :sha256 AND format = :format
+        AND NOT EXISTS (
+            SELECT 1 FROM book_files WHERE sha256 = :sha256 AND format = :format
+        )
+    """)
+    abstract suspend fun deleteObjectIfUnreferenced(sha256: String, format: String): Int
+
+    @Query("SELECT EXISTS(SELECT 1 FROM book_files WHERE sha256 = :sha256)")
+    abstract suspend fun hasFileWithHash(sha256: String): Boolean
+
+    @Transaction
+    open suspend fun removeLocalBook(bookId: String): LocalBookRemoval? {
+        val files = allBookFiles(bookId)
+        if (deleteBookRow(bookId) == 0) return null
+
+        // Room foreign keys cascade to book_files, reading_positions and shelf_books.
+        val unreferencedObjects = files.distinctBy { it.sha256 to it.format }
+            .filter { deleteObjectIfUnreferenced(it.sha256, it.format) > 0 }
+            .map { LocalFileObject(it.sha256, it.format, 0L) }
+        val unreferencedCoverHashes = files.map { it.sha256 }.distinct()
+            .filterNot { hasFileWithHash(it) }
+
+        return LocalBookRemoval(unreferencedObjects, unreferencedCoverHashes)
+    }
 
     @Query("SELECT locator FROM reading_positions WHERE fileId = :fileId")
     abstract suspend fun readingPosition(fileId: String): String?
