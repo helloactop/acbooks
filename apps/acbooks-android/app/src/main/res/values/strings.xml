@@ -40,6 +40,11 @@
     <string name="library_add_books">Add books</string>
     <string name="library_book_actions">Book actions</string>
     <string name="library_read_book">Read book</string>
+    <string name="library_delete_book">Delete</string>
+    <string name="library_delete_title">Delete book?</string>
+    <string name="library_delete_summary">Choose how to delete “%1$s”.</string>
+    <string name="library_delete_local">Delete locally</string>
+    <string name="library_delete_everywhere">Delete everywhere</string>
     <string name="library_empty">Your library is empty.</string>
     <string name="library_load_failed">Could not load the local library.</string>
     <string name="library_unknown_author">Unknown author</string>
