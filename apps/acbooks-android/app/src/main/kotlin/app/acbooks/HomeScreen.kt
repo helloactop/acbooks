@@ -17,16 +17,15 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
+import java.time.LocalTime
 import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.Backdrop
@@ -35,29 +34,33 @@ import top.yukonga.miuix.kmp.glass.GlassTopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-internal fun HomeTopBar(avatar: ImageBitmap?, backdrop: Backdrop, onOpenSettings: () -> Unit) {
-    val now by produceState(initialValue = LocalDateTime.now()) {
+internal fun HomeTopBar(
+    avatar: ImageBitmap?,
+    backdrop: Backdrop,
+    scrollBehavior: ScrollBehavior,
+    onOpenSettings: () -> Unit,
+) {
+    val hour by produceState(initialValue = LocalTime.now().hour) {
         while (true) {
-            val time = LocalDateTime.now()
-            value = time
+            val time = LocalTime.now()
+            value = time.hour
             delay(60_000L - time.second * 1_000L - time.nano / 1_000_000L)
         }
     }
-    val greeting = when {
-        now.hour < 12 -> R.string.home_good_morning
-        now.hour < 18 -> R.string.home_good_afternoon
+    val greetingResource = when {
+        hour < 12 -> R.string.home_good_morning
+        hour < 18 -> R.string.home_good_afternoon
         else -> R.string.home_good_evening
     }
-    val locale = LocalConfiguration.current.locales[0]
-    val date = now.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale))
+    val greeting = stringResource(greetingResource)
 
     GlassTopAppBar(
-        title = stringResource(greeting),
-        subtitle = date,
+        title = greeting,
+        largeTitle = greeting,
         modifier = Modifier.semantics { heading() },
-        expandable = false,
-        isContentScrolled = false,
+        expandable = true,
         backdrop = backdrop,
+        scrollBehavior = scrollBehavior,
         buttonSize = 48.dp,
         actions = {
             GlassIconButton(onClick = onOpenSettings) {
@@ -72,11 +75,12 @@ internal fun HomeTopBar(avatar: ImageBitmap?, backdrop: Backdrop, onOpenSettings
 }
 
 @Composable
-internal fun HomeScreen(onOpenLibrary: () -> Unit) {
+internal fun HomeScreen(scrollBehavior: ScrollBehavior, onOpenLibrary: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(
             modifier = Modifier.widthIn(max = 840.dp)
-                .fillMaxWidth()
+                .fillMaxSize()
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         ) {

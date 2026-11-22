@@ -24,9 +24,9 @@ bash ./gradlew :app:installDebug
 
 ## 重建基线
 
-当前工程只有 `:app` 模块。入口为包名 `app.acbooks` 下的 `MainActivity`，保留品牌启动图标。界面使用官方 `MiuixTheme`、`Scaffold` 和紧凑 `GlassTopAppBar`，默认跟随系统浅色与深色。首页、书库与统计共用 `GlassNavigationBar`，右侧圆形 `GlassIconButton` 打开独立搜索页。
+当前工程只有 `:app` 模块。入口为包名 `app.acbooks` 下的 `MainActivity`，保留品牌启动图标。界面使用官方 `MiuixTheme`、`Scaffold` 和 `GlassTopAppBar`，默认跟随系统浅色与深色。首页、书库与统计共用 `GlassNavigationBar`，右侧圆形 `GlassIconButton` 打开独立搜索页。
 
-首页标题按设备本地时间在 `Good morning`、`Good afternoon` 和 `Good evening` 之间切换。标题下方显示日期，正文提供阅读历史空状态和书库入口。右上角头像按钮打开独立的设置页。`AcbooksNavigation` 接收头像图片和更换头像回调，供后续头像选择与上传接入。
+首页使用可折叠的 `GlassTopAppBar`，通过 `MiuixScrollBehavior` 与正文滚动联动。展开和折叠均显示问候语，按设备本地时间在 `Good morning`、`Good afternoon` 和 `Good evening` 之间切换。正文提供阅读历史空状态和书库入口。右上角头像按钮打开独立的设置页。`AcbooksNavigation` 接收头像图片和更换头像回调，供后续头像选择与上传接入。
 
 `:app` 直接依赖官方 `miuix-ui-android`、`miuix-glass-android` 和 `miuix-glass-icons-android`，统一锁定 [Miuix 0.9.5-beta03](https://github.com/compose-miuix-ui/miuix/releases/tag/v0.9.5-beta03)。业务页面、本地书库、阅读器、登录和同步按后续阶段重建。数据文件由原安装和 Android 系统管理，当前入口不会打开旧数据库或清理应用私有目录。
 

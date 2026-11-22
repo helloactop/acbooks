@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
@@ -57,6 +58,7 @@ internal fun MainTabs(avatar: ImageBitmap?, onOpenSettings: () -> Unit) {
     val pager = rememberPagerState { items.size }
     val scope = rememberCoroutineScope()
     val backdrop = rememberLayerBackdrop()
+    val homeScrollBehavior = MiuixScrollBehavior()
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     val showHome = !searchOpen && pager.currentPage == 0
 
@@ -71,7 +73,12 @@ internal fun MainTabs(avatar: ImageBitmap?, onOpenSettings: () -> Unit) {
     Scaffold(
         topBar = {
             if (showHome) {
-                HomeTopBar(avatar = avatar, backdrop = backdrop, onOpenSettings = onOpenSettings)
+                HomeTopBar(
+                    avatar = avatar,
+                    backdrop = backdrop,
+                    scrollBehavior = homeScrollBehavior,
+                    onOpenSettings = onOpenSettings,
+                )
             } else {
                 GlassTopAppBar(
                     title = if (searchOpen) searchTitle else items[pager.currentPage].label.orEmpty(),
@@ -139,7 +146,10 @@ internal fun MainTabs(avatar: ImageBitmap?, onOpenSettings: () -> Unit) {
                     ),
                 ) { page ->
                     if (page == 0) {
-                        HomeScreen(onOpenLibrary = { scope.launch { pager.springAnimateToPage(1) } })
+                        HomeScreen(
+                            scrollBehavior = homeScrollBehavior,
+                            onOpenLibrary = { scope.launch { pager.springAnimateToPage(1) } },
+                        )
                     } else {
                         Box(Modifier.fillMaxSize())
                     }
