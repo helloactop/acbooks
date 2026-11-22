@@ -1,0 +1,190 @@
+package app.acbooks.library
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.acbooks.R
+import app.acbooks.core.database.LocalBookCard
+import coil3.compose.AsyncImage
+import java.io.File
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.glass.GlassPopupAnchor
+import top.yukonga.miuix.kmp.glass.glassPopupAnchor
+import top.yukonga.miuix.kmp.glass.glassPopupAnchorContent
+import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.glass.BookOutline
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+internal val BookCoverCorner = 10.dp
+
+@Composable
+internal fun BookCover(file: File?, modifier: Modifier = Modifier) {
+    var loaded by remember(file) { mutableStateOf(false) }
+    val colors = MiuixTheme.colorScheme
+    Box(
+        modifier = modifier.aspectRatio(3f / 4f).clip(RoundedCornerShape(BookCoverCorner)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!loaded) {
+            Box(Modifier.matchParentSize().background(colors.surfaceContainer), contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = MiuixIcons.Glass.BookOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = colors.onSurfaceVariantSummary,
+                )
+            }
+        }
+        if (file != null) {
+            AsyncImage(
+                model = file,
+                contentDescription = null,
+                modifier = Modifier.matchParentSize(),
+                contentScale = ContentScale.Fit,
+                onLoading = { loaded = false },
+                onSuccess = { loaded = true },
+                onError = { loaded = false },
+            )
+        }
+    }
+}
+
+internal data class BookMenuTarget(val book: LocalBookCard, val cover: File?, val anchor: GlassPopupAnchor)
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun BookGridItem(
+    book: LocalBookCard,
+    cover: File?,
+    onRead: () -> Unit,
+    onDetails: () -> Unit,
+    onShowMenu: (BookMenuTarget) -> Unit,
+) {
+    val anchor = rememberGlassPopupAnchor()
+    val read = stringResource(R.string.reader_open_book, book.title)
+    val actions = stringResource(R.string.library_book_actions)
+    Column {
+        BookCover(
+            file = cover,
+            modifier = Modifier.fillMaxWidth()
+                .glassPopupAnchor(anchor, cornerRadius = BookCoverCorner)
+                .glassPopupAnchorContent(anchor)
+                .semantics { contentDescription = book.title }
+                .combinedClickable(
+                    role = Role.Button,
+                    onClickLabel = read,
+                    onLongClickLabel = actions,
+                    onClick = onRead,
+                    onLongClick = { onShowMenu(BookMenuTarget(book, cover, anchor)) },
+                ),
+        )
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                .clickable(
+                    role = Role.Button,
+                    onClickLabel = stringResource(R.string.library_book_details),
+                    onClick = onDetails,
+                ),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(book.title, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(
+                book.author ?: stringResource(R.string.library_unknown_author),
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun LibraryScreen(
+    catalog: LibraryCatalog,
+    mode: LibraryDisplayMode,
+    gridState: LazyGridState,
+    scrollBehavior: ScrollBehavior,
+    coverFile: (String?) -> File?,
+    onRead: (String) -> Unit,
+    onDetails: (String) -> Unit,
+    onShowMenu: (BookMenuTarget) -> Unit,
+) {
+    val compact = mode == LibraryDisplayMode.Compact
+    val horizontalGap = if (compact) 12.dp else 16.dp
+    val verticalGap = if (compact) 20.dp else 24.dp
+    val phoneColumns = if (compact) 3 else 2
+    val wideCellWidth = if (compact) 132.dp else 168.dp
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val cols = if (maxWidth < 480.dp) phoneColumns else
+            gridColumns(maxWidth - 32.dp, horizontalGap, wideCellWidth, phoneColumns)
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(cols),
+            state = gridState,
+            modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(horizontalGap),
+            verticalArrangement = Arrangement.spacedBy(verticalGap),
+        ) {
+            items(catalog.books, key = { it.id }) { book ->
+                BookGridItem(
+                    book = book,
+                    cover = coverFile(book.sha256),
+                    onRead = { onRead(book.id) },
+                    onDetails = { onDetails(book.id) },
+                    onShowMenu = onShowMenu,
+                )
+            }
+        }
+        if (catalog.books.isEmpty()) {
+            Box(Modifier.matchParentSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                when {
+                    !catalog.loaded -> CircularProgressIndicator()
+                    catalog.failed -> Text(stringResource(R.string.library_load_failed))
+                    else -> Text(stringResource(R.string.library_empty))
+                }
+            }
+        }
+    }
+}
+
+private fun gridColumns(width: Dp, gap: Dp, cellWidth: Dp, minimum: Int): Int =
+    ((width + gap) / (cellWidth + gap)).toInt().coerceAtLeast(minimum)

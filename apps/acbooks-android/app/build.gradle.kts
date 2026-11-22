@@ -31,6 +31,7 @@ android {
     buildFeatures.compose = true
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
@@ -41,8 +42,14 @@ kotlin {
 }
 
 dependencies {
+    coreLibraryDesugaring(libs.desugar.jdk)
+    implementation(project(":core:database"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.fragment.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.ui)
@@ -51,4 +58,7 @@ dependencies {
     implementation(libs.miuix.glass.icons)
     implementation(libs.miuix.nav)
     implementation(libs.miuix.preference)
+    implementation(libs.readium.navigator)
+    implementation(libs.readium.streamer)
+    implementation(libs.coil.compose)
 }

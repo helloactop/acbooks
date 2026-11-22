@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "acbooks-android"
 include(":app")
+include(":core:database")

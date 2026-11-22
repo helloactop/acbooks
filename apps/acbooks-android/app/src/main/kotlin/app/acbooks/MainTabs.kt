@@ -1,6 +1,8 @@
 package app.acbooks
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -9,15 +11,18 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -31,6 +36,15 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.acbooks.library.BookMenuTarget
+import app.acbooks.library.LibraryCatalog
+import app.acbooks.library.LibraryImportDialog
+import app.acbooks.library.LibraryMenu
+import app.acbooks.library.LibraryMenus
+import app.acbooks.library.LibraryScreen
+import app.acbooks.library.LibraryTopBarActions
+import app.acbooks.library.LibraryViewModel
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
@@ -45,6 +59,7 @@ import top.yukonga.miuix.kmp.glass.GlassNavigationItem
 import top.yukonga.miuix.kmp.glass.GlassTopAppBar
 import top.yukonga.miuix.kmp.glass.glassSearchBarTransition
 import top.yukonga.miuix.kmp.glass.rememberGlassSearchBarAlpha
+import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.BookOutline
 import top.yukonga.miuix.kmp.icon.glass.DigitalStatistics
@@ -57,8 +72,12 @@ import top.yukonga.miuix.kmp.utils.springAnimateToPage
 @Composable
 internal fun MainTabs(
     avatar: ImageBitmap?,
+    catalog: LibraryCatalog,
+    library: LibraryViewModel,
     isCurrentDestination: Boolean,
     onOpenSettings: () -> Unit,
+    onOpenBook: (String) -> Unit,
+    onReadBook: (String) -> Unit,
 ) {
     val items = listOf(
         GlassNavigationItem(MiuixIcons.Glass.HomeOutline, stringResource(R.string.tab_home)),
@@ -68,12 +87,25 @@ internal fun MainTabs(
     val pager = rememberPagerState { items.size }
     val scope = rememberCoroutineScope()
     val backdrop = rememberLayerBackdrop()
+    val menuBackdrop = rememberLayerBackdrop()
     val tabScrollBehaviors = List(items.size) { page ->
         key(page) { MiuixScrollBehavior() }
     }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     val searchBarAlpha = rememberGlassSearchBarAlpha(searchExpanded)
     val topBarTransition = Modifier.glassSearchBarTransition(searchExpanded) { 1f }
+    val libraryGrid = rememberLazyGridState()
+    val displayMode by library.displayMode.collectAsStateWithLifecycle()
+    val importProgress by library.progress.collectAsStateWithLifecycle()
+    val displayAnchor = rememberGlassPopupAnchor()
+    val moreAnchor = rememberGlassPopupAnchor()
+    var libraryMenu by remember { mutableStateOf<LibraryMenu?>(null) }
+    var bookMenuTarget by remember { mutableStateOf<BookMenuTarget?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments(), library::importBooks)
+
+    LaunchedEffect(isCurrentDestination, pager.currentPage, searchExpanded) {
+        if (!isCurrentDestination || pager.currentPage != 1 || searchExpanded) libraryMenu = null
+    }
 
     fun selectTab(index: Int) {
         scope.launch {
@@ -92,7 +124,8 @@ internal fun MainTabs(
     }
 
     BackHandler(
-        enabled = isCurrentDestination && !searchExpanded && (pager.settledPage != 0 || pager.targetPage != 0),
+        enabled = isCurrentDestination && !searchExpanded && libraryMenu == null && importProgress == null &&
+            (pager.settledPage != 0 || pager.targetPage != 0),
     ) {
         selectTab(0)
     }
@@ -100,6 +133,7 @@ internal fun MainTabs(
     Box(Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize()
+                .layerBackdrop(menuBackdrop)
                 .graphicsLayer { alpha = searchBarAlpha.value }
                 .then(
                     if (searchExpanded) Modifier.clearAndSetSemantics { hideFromAccessibility() }
@@ -125,6 +159,11 @@ internal fun MainTabs(
                             expandable = true,
                             scrollBehavior = scrollBehavior,
                             backdrop = backdrop,
+                            actions = {
+                                if (page == 1) {
+                                    LibraryTopBarActions(displayAnchor, moreAnchor) { libraryMenu = it }
+                                }
+                            },
                         )
                     }
                 }
@@ -168,13 +207,25 @@ internal fun MainTabs(
                     ),
                 ) { page ->
                     val scrollBehavior = tabScrollBehaviors[page]
-                    if (page == 0) {
-                        HomeScreen(
+                    when (page) {
+                        0 -> HomeScreen(
                             scrollBehavior = scrollBehavior,
                             onOpenLibrary = { selectTab(1) },
                         )
-                    } else {
-                        Box(
+                        1 -> LibraryScreen(
+                            catalog = catalog,
+                            mode = displayMode,
+                            gridState = libraryGrid,
+                            scrollBehavior = scrollBehavior,
+                            coverFile = library::coverFile,
+                            onRead = onReadBook,
+                            onDetails = onOpenBook,
+                            onShowMenu = { target ->
+                                bookMenuTarget = target
+                                libraryMenu = LibraryMenu.Book
+                            },
+                        )
+                        else -> Box(
                             Modifier.fillMaxSize()
                                 .nestedScroll(scrollBehavior.nestedScrollConnection)
                                 .verticalScroll(rememberScrollState()),
@@ -182,7 +233,45 @@ internal fun MainTabs(
                     }
                 }
             }
+            LibraryImportDialog(
+                progress = importProgress.takeIf { isCurrentDestination },
+                backdrop = backdrop,
+                onStop = library::cancelImport,
+                onImportMatches = library::importMatches,
+                onDismiss = library::dismissImport,
+            )
         }
-        BookSearchOverlay(expanded = searchExpanded, onDismiss = { searchExpanded = false })
+        LibraryMenus(
+            activeMenu = libraryMenu,
+            displayAnchor = displayAnchor,
+            moreAnchor = moreAnchor,
+            bookTarget = bookMenuTarget,
+            backdrop = menuBackdrop,
+            mode = displayMode,
+            importing = importProgress?.running == true,
+            onDismiss = { menu -> if (libraryMenu == menu) libraryMenu = null },
+            onDisplayMode = library::setDisplayMode,
+            onAddBooks = {
+                libraryMenu = null
+                picker.launch(arrayOf("application/epub+zip", "application/pdf"))
+            },
+            onRead = { id ->
+                libraryMenu = null
+                onReadBook(id)
+            },
+            onDetails = { id ->
+                libraryMenu = null
+                onOpenBook(id)
+            },
+        )
+        BookSearchOverlay(
+            expanded = searchExpanded,
+            books = catalog.books,
+            onDismiss = { searchExpanded = false },
+            onOpenBook = { id ->
+                searchExpanded = false
+                onOpenBook(id)
+            },
+        )
     }
 }
