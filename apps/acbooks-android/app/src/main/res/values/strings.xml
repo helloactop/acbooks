@@ -3,7 +3,10 @@
     <string name="tab_home">Home</string>
     <string name="tab_library">Library</string>
     <string name="tab_statistics">Statistics</string>
-    <string name="tab_search">Search</string>
+    <string name="search_title">Search</string>
+    <string name="search_query_hint">Search by title or author</string>
+    <string name="search_clear_query">Clear search</string>
+    <string name="search_no_books">No books to search yet.</string>
     <string name="home_good_morning" translatable="false">Good morning</string>
     <string name="home_good_afternoon" translatable="false">Good afternoon</string>
     <string name="home_good_evening" translatable="false">Good evening</string>
@@ -12,7 +15,7 @@
     <string name="home_no_reading_history">No reading history yet.</string>
     <string name="home_open_library">Open library</string>
     <string name="settings_title">Settings</string>
-    <string name="settings_back">Back</string>
+    <string name="navigate_back">Back</string>
     <string name="settings_avatar">Avatar</string>
     <string name="settings_change_avatar">Change avatar</string>
 </resources>

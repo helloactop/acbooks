@@ -73,7 +73,7 @@ internal fun AvatarSettingsScreen(
                 buttonSize = 48.dp,
                 navigationIcon = {
                     GlassIconButton(onClick = onBack) {
-                        Icon(MiuixIcons.Glass.Back, stringResource(R.string.settings_back))
+                        Icon(MiuixIcons.Glass.Back, stringResource(R.string.navigate_back))
                     }
                 },
             )
