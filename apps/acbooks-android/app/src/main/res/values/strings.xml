@@ -5,7 +5,6 @@
     <string name="tab_statistics">Statistics</string>
     <string name="search_title">Search</string>
     <string name="search_query_hint">Search by title or author</string>
-    <string name="search_clear_query">Clear search</string>
     <string name="search_no_books">No books to search yet.</string>
     <string name="home_good_morning" translatable="false">Good morning</string>
     <string name="home_good_afternoon" translatable="false">Good afternoon</string>

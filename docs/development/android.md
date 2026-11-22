@@ -2,7 +2,7 @@
 
 Android 工程位于 `apps/acbooks-android/`，在 Android Studio 中直接打开该目录。命令行构建使用仓库内的 Gradle Wrapper。
 
-- 使用 JDK 17 或 21，将 `JAVA_HOME` 或 Android Studio 的 Gradle JDK 指向该 JDK。Java 和 Kotlin 字节码目标均为 17。
+- 使用 JDK 21，将 `JAVA_HOME` 或 Android Studio 的 Gradle JDK 指向该 JDK。Java 和 Kotlin 字节码目标均为 21，以便调用 Miuix Nav 的内联 API。
 - 通过 SDK Manager 安装 Android SDK Platform 37.2 及 Android SDK Platform-Tools。将 `ANDROID_HOME` 指向 SDK，或由 Android Studio 写入本机 `local.properties`。
 - 最低系统版本是 Android 13（API 33），编译 API 为 37.2，目标 API 为 36。最低版本由 Miuix 的模糊模块（`miuix-blur-android` 声明 minSdk 33，基于 `RenderEffect` 运行时着色器）决定。
 - 首次构建需要访问 Gradle 分发站、Google Maven、Maven Central 和 Gradle Plugin Portal。工具链与库版本见 [Version Catalog](../../apps/acbooks-android/gradle/libs.versions.toml) 和 [开源依赖说明](../../LICENSE.md#android-开源依赖)。
@@ -24,12 +24,12 @@ bash ./gradlew :app:installDebug
 
 ## 重建基线
 
-当前工程只有 `:app` 模块。入口为包名 `app.acbooks` 下的 `MainActivity`，保留品牌启动图标。界面使用官方 `MiuixTheme`、`Scaffold` 和 `GlassTopAppBar`，默认跟随系统浅色与深色。首页、书库与统计共用 `GlassNavigationBar`，右侧圆形 `GlassIconButton` 打开独立搜索页。
+当前工程只有 `:app` 模块。入口为包名 `app.acbooks` 下的 `MainActivity`，保留品牌启动图标。界面使用官方 `MiuixTheme`、`Scaffold` 和 `GlassTopAppBar`，默认跟随系统浅色与深色。首页、书库与统计共用 `GlassNavigationBar`，右侧圆形 `GlassIconButton` 打开搜索浮层。
 
-首页使用可折叠的 `GlassTopAppBar`，通过 `MiuixScrollBehavior` 与正文滚动联动。展开和折叠均显示问候语，按设备本地时间在 `Good morning`、`Good afternoon` 和 `Good evening` 之间切换。正文提供阅读历史空状态和书库入口。右上角头像按钮打开独立的设置页。`AcbooksNavigation` 接收头像图片和更换头像回调，供后续头像选择与上传接入。
+首页、书库、统计和设置均使用可折叠的 `GlassTopAppBar`，通过各自的 `MiuixScrollBehavior` 与正文滚动联动。首页展开和折叠均显示问候语，按设备本地时间在 `Good morning`、`Good afternoon` 和 `Good evening` 之间切换。正文提供阅读历史空状态和书库入口。右上角头像按钮打开独立的设置页。`AcbooksNavigation` 接收头像图片和更换头像回调，供后续头像选择与上传接入。
 
-搜索使用根 `NavHost` 中的独立路由。该页面包含玻璃顶栏和可清除的搜索输入框，并在退出后回到原先的主 Tab。本地书库接入前，页面显示书库空状态。
+搜索使用官方 `GlassSearchOverlay`，支持输入、清除和键盘提交。浮层直接覆盖主页面，关闭后恢复原先的 Tab 与页面状态。本地书库接入前，结果区显示书库空状态。
 
-`:app` 直接依赖官方 `miuix-ui-android`、`miuix-glass-android` 和 `miuix-glass-icons-android`，统一锁定 [Miuix 0.9.5-beta03](https://github.com/compose-miuix-ui/miuix/releases/tag/v0.9.5-beta03)。业务页面、本地书库、阅读器、登录和同步按后续阶段重建。数据文件由原安装和 Android 系统管理，当前入口不会打开旧数据库或清理应用私有目录。
+`:app` 直接依赖官方 `miuix-ui-android`、`miuix-glass-android`、`miuix-glass-icons-android` 和 `miuix-nav-android`，统一锁定 [Miuix 0.9.5-beta03](https://github.com/compose-miuix-ui/miuix/releases/tag/v0.9.5-beta03)。设置等独立页面由 `NavDisplay` 管理，使用 `NavTransitions.MiuixDefault` 和可恢复的返回栈。业务页面、本地书库、阅读器、登录和同步按后续阶段重建。数据文件由原安装和 Android 系统管理，当前入口不会打开旧数据库或清理应用私有目录。
 
 后续页面遵循 [Android UI 规范](../ui/android-ui.md) 和 [Android 阅读器架构](../architecture/android-reader.md)。当前检查命令见 [Android 测试说明](../testing/android.md)。

@@ -4,18 +4,18 @@
 > 上位规范：[android-ui.md](android-ui.md)、[android-reader.md](../architecture/android-reader.md)<br>
 > 本文规定页面结构、组件职责与交互。应用控件直接使用 Miuix，样式和动效遵循 Android UI 规范。
 
-当前重建基线提供首页阅读历史空状态、头像设置入口、独立搜索页，以及书库和统计页面占位。业务布局按以下规范逐步实现，当前可运行内容见 [Android 开发环境](../development/android.md)。
+当前重建基线提供首页阅读历史空状态、头像设置入口、玻璃搜索浮层，以及书库和统计页面占位。业务布局按以下规范逐步实现，当前可运行内容见 [Android 开发环境](../development/android.md)。
 
 ## 1. 主导航与标题
 
-- 默认启动首页，无需登录。三个 Tab：**首页 / 书库 / 统计**（Home / Library / Statistics）。使用 `HorizontalPager` 承载三页，底栏选中项跟随 `currentPage`；切换保留各页滚动、搜索及布局状态，支持横向滑动，不与内部横向列表手势冲突。系统返回在非首页 Tab 时先回到首页。
-- 首页、书库、统计共用 Miuix 玻璃底栏。右侧圆形玻璃搜索按钮打开独立的搜索路由。搜索页显示返回按钮和输入框，退出后回到此前的主 Tab。
+- 默认启动首页，无需登录。三个 Tab：**首页 / 书库 / 统计**（Home / Library / Statistics）。使用 `HorizontalPager` 承载三页，标题跟随 `currentPage`，底栏在正文拖动期间显示已停靠页，松手后跟随目标页。切换保留各页滚动、搜索及布局状态，支持横向滑动，不与内部横向列表手势冲突。系统返回在非首页 Tab 时先回到首页。
+- 首页、书库、统计共用 Miuix 玻璃底栏。右侧圆形玻璃搜索按钮打开 `GlassSearchOverlay`。浮层使用玻璃输入栏和取消按钮，退出后回到此前的主 Tab。
 - 宽屏使用左侧纵向导航，搜索按钮独立置于上方。根据可用窗口宽度适配横竖屏。
-- 首页使用可折叠 `GlassTopAppBar`，通过 `MiuixScrollBehavior` 与正文的嵌套滚动联动。书库、统计和搜索使用紧凑 `GlassTopAppBar`。顶栏负责状态栏避让，正文根据 `Scaffold` 提供的内边距避开顶底栏。书目计数等辅助信息放在标题下方，有内容时才占位。
+- 首页、书库和统计使用 `GlassTopAppBar` 的可折叠大标题。每个 Tab 使用独立的 `MiuixScrollBehavior`，与本页正文的嵌套滚动联动。顶栏负责状态栏避让，正文根据 `Scaffold` 提供的内边距避开顶底栏。书目计数等辅助信息放在标题下方，有内容时才占位。
 - 首页顶栏右上角的设置头像按钮位于 `actions`，点击进入设置。使用 Miuix 图标按钮，有头像时显示服务器同步的图片，否则显示 Miuix 人像图标。可访问名称为「打开设置」。书库和统计顶栏右侧可放各自的页面操作。
 - 使用 WindowInsets 和内容留白，确保最后一项可完整显示。阅读器隐藏主导航。
 - 设置作为独立页面由首页头像打开。路由转场与浮层动效见 [Android 动画规范](android-motion.md)。
-- 设置层级使用 `GlassTopAppBar`，左侧使用玻璃返回按钮，页面名称居中。
+- 设置页使用可折叠 `GlassTopAppBar`，左侧使用玻璃返回按钮。展开和折叠状态都显示当前页名称。
 
 ## 2. 首页 Home
 
@@ -67,7 +67,7 @@ Good morning
 
 ### 3.1 标题与搜索
 
-- 书库主页面显示紧凑顶栏和书籍网格。独立搜索页用于匹配书名与作者，支持清除和修改查询。
+- 书库主页面使用可折叠大标题和书籍网格。搜索浮层用于匹配书名与作者，支持清除和修改查询。
 
 ### 3.2 书籍展示
 
@@ -100,7 +100,7 @@ Good morning
 
 | 页面 | 结构 |
 | --- | --- |
-| 统计 | 紧凑顶栏；时长、次数、间隔；趋势、月度热力日历、时间线；点击日期查看各书时长与记录 |
+| 统计 | 可折叠大标题；时长、次数、间隔；趋势、月度热力日历、时间线；点击日期查看各书时长与记录 |
 | 书籍详情 | 封面、书名/作者、继续阅读、书目信息、文件、阅读记录、笔记/书签；宽屏可双栏 |
 | 阅读器 | 沉浸式正文，隐藏状态栏/导航栏且不显示顶栏；PDF 底部保留上一页、页码和下一页。翻页控件及目录、进度、笔记、书签与阅读设置浮层直接使用 Miuix。正文纸色独立 |
 | 设置 | 首页头像进入设置目录。顶部头像卡片只显示头像和昵称，点击 56dp 头像打开照片选择器并上传/本地保存；不显示说明、箭头或昵称编辑入口。头像卡与下方分组使用官方 `glassPanel`，多行入口共用一个分组并使用 `ArrowPreference`。外观页使用 `GlassDropdownPreference` 设置主题和语言 |
@@ -116,10 +116,6 @@ Good morning
 - 首页和书库各自持有 ViewModel，通过 Repository 读取本地数据；不在 UI 执行文件扫描或同步。所有文本同时提供中英资源；放大字体时允许布局换行，不压缩触控区。
 - 验收：未登录能搜索和阅读本地书籍；切换 Tab 保留状态；小屏、横屏、平板和深色模式均可用，阅读器和浮层保留原有操作。滑动和阅读过渡必须真机验证。
 
-## 7. 参考源码
+## 7. 组件参考
 
-Lumi Books 当前基线 `66c6d9df36db3b96d73af634bcd34835edff9fb7`，只借鉴结构与交互，不复制整套页面或旧版三主题逻辑。
-
-- [HomeScreen.kt](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/home/HomeScreen.kt)、[RecentBooksRow.kt](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/home/RecentBooksRow.kt)
-- [BookshelfScreen.kt](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/bookshelf/BookshelfScreen.kt)、[BookshelfSearchOverlay.kt](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/bookshelf/BookshelfSearchOverlay.kt)
-- [MainTabHeader.kt](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/components/MainTabHeader.kt)、[NavGraph.kt](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/navigation/NavGraph.kt)
+[Miuix 0.9.5-beta03 官方源码与示例](https://github.com/compose-miuix-ui/miuix/tree/v0.9.5-beta03)

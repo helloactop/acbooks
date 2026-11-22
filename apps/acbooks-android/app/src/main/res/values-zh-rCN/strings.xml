@@ -4,7 +4,6 @@
     <string name="tab_statistics">统计</string>
     <string name="search_title">搜索</string>
     <string name="search_query_hint">搜索书名或作者</string>
-    <string name="search_clear_query">清除搜索内容</string>
     <string name="search_no_books">暂无可搜索的书籍。</string>
     <string name="home_open_settings">打开设置</string>
     <string name="home_continue_reading">继续阅读</string>

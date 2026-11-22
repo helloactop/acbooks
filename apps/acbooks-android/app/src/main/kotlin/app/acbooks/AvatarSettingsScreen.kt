@@ -16,19 +16,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -60,15 +59,14 @@ internal fun AvatarSettingsScreen(
 ) {
     val surfaceBackdrop = rememberLayerBackdrop()
     val pageBackdrop = rememberLayerBackdrop()
-    val scroll = rememberScrollState()
-    val isContentScrolled by remember { derivedStateOf { scroll.value > 0 } }
+    val scrollBehavior = MiuixScrollBehavior()
     Scaffold(
         topBar = {
             GlassTopAppBar(
                 title = stringResource(R.string.settings_title),
                 modifier = Modifier.semantics { heading() },
-                expandable = false,
-                isContentScrolled = isContentScrolled,
+                expandable = true,
+                scrollBehavior = scrollBehavior,
                 backdrop = pageBackdrop,
                 buttonSize = 48.dp,
                 navigationIcon = {
@@ -85,14 +83,17 @@ internal fun AvatarSettingsScreen(
                     .background(MiuixTheme.colorScheme.surface),
             )
             Box(
-                modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding),
+                modifier = Modifier.fillMaxSize()
+                    .padding(padding)
+                    .consumeWindowInsets(padding)
+                    .nestedScroll(scrollBehavior.nestedScrollConnection)
+                    .verticalScroll(rememberScrollState()),
                 contentAlignment = Alignment.TopCenter,
             ) {
                 val shape = GlassShape(24.dp)
                 Column(
                     modifier = Modifier.widthIn(max = 840.dp)
                         .fillMaxWidth()
-                        .verticalScroll(scroll)
                         .padding(16.dp)
                         .glassPanel(
                             backdrop = surfaceBackdrop,

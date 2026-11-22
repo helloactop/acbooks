@@ -473,7 +473,7 @@
 
 ## 13. 参考（仅借鉴机制，不复制实现）
 
-- [Readest DESIGN.md](https://github.com/readest/readest/blob/main/apps/readest-app/DESIGN.md)、[Lumi UI 规范](https://github.com/huangder/Lumi_Books/blob/main/devdocs/lumi-ui-motion-design-system.md)（不采用玻璃及复杂形变）、[Radix Colors](https://www.radix-ui.com/colors/docs/palette-composition/understanding-the-scale)、[Mantine 按钮](https://mantine.dev/core/button/)、[Stump 共享组件](https://github.com/stumpapp/stump/tree/main/packages/components)、[Tome ShellFrame](https://github.com/bndct-devops/tome/blob/main/frontend/src/components/ShellFrame.tsx)。
+- [Readest DESIGN.md](https://github.com/readest/readest/blob/main/apps/readest-app/DESIGN.md)、[Radix Colors](https://www.radix-ui.com/colors/docs/palette-composition/understanding-the-scale)、[Mantine 按钮](https://mantine.dev/core/button/)、[Stump 共享组件](https://github.com/stumpapp/stump/tree/main/packages/components)、[Tome ShellFrame](https://github.com/bndct-devops/tome/blob/main/frontend/src/components/ShellFrame.tsx)。
 - [二猫书库 ermao-library](https://github.com/GMD170629/ermao-library)（提交 `21b5715`）：借鉴全局导航、详情页布局与响应式、设置中心的信息层级；不照搬其暖色主题、橙色按钮或多用户权限体系。
 - [Lucide](https://lucide.dev/guide/packages/lucide-react)、[Radix Primitives](https://www.radix-ui.com/primitives/docs/overview/accessibility)、[shadcn/ui](https://github.com/shadcn-ui/ui)。
 

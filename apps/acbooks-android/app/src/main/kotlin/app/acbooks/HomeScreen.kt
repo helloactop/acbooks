@@ -39,6 +39,7 @@ internal fun HomeTopBar(
     backdrop: Backdrop,
     scrollBehavior: ScrollBehavior,
     onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val hour by produceState(initialValue = LocalTime.now().hour) {
         while (true) {
@@ -58,6 +59,7 @@ internal fun HomeTopBar(
         title = greeting,
         largeTitle = greeting,
         modifier = Modifier.semantics { heading() },
+        contentModifier = modifier,
         expandable = true,
         backdrop = backdrop,
         scrollBehavior = scrollBehavior,

@@ -19,7 +19,6 @@ acbooks Android 是 acbooks 生态的独立、本地优先阅读器。
 | 项目 | 参考内容 |
 | --- | --- |
 | [mybooks-android](https://github.com/helloactop/mybooks-android) | 主要参考：账号登录、设备 Token、API 请求、增量同步、冲突处理、断点续传 |
-| [Lumi Books](https://github.com/huangder/Lumi_Books) | Android 工程、本地书库、授权文件夹、阅读界面和交互 |
 | [Readest](https://github.com/readest/readest) | 阅读功能、阅读引擎隔离和多端体验 |
 | [Readium Kotlin](https://github.com/readium/kotlin-toolkit) | EPUB 阅读引擎、阅读定位 |
 | [KOReader](https://github.com/koreader/koreader) | 离线阅读和文件管理 |
