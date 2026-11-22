@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "acbooks-android"
-include(":app", ":core:database", ":core:datastore", ":core:designsystem", ":feature:home")
+include(":app")

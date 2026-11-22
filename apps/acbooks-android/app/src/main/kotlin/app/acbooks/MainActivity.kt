@@ -1,79 +1,23 @@
 package app.acbooks
 
 import android.os.Bundle
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.graphics.Color
-import androidx.core.graphics.toColorInt
-import androidx.core.view.WindowCompat
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.acbooks.core.datastore.AppearancePreferences
-import app.acbooks.core.datastore.ProfilePreferences
-import app.acbooks.core.datastore.ThemeMode
-import app.acbooks.library.LibraryViewModel
-import app.acbooks.navigation.AcbooksNavHost
-import app.acbooks.profile.ProfileAvatars
-import app.acbooks.server.ServerSessions
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
-import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
 
-@AndroidEntryPoint
-class MainActivity : AppCompatActivity() {
-    @Inject lateinit var appearance: AppearancePreferences
-    @Inject lateinit var profile: ProfilePreferences
-    private val serverSessions by lazy { ServerSessions(applicationContext) }
-    private val profileAvatars by lazy { ProfileAvatars(applicationContext, profile, serverSessions) }
-    private val library: LibraryViewModel by viewModels()
-
+class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         setContent {
-            val scope = rememberCoroutineScope()
-            val themeMode by appearance.themeMode.collectAsStateWithLifecycle(ThemeMode.SYSTEM)
-            val accent by appearance.accent.collectAsStateWithLifecycle(null)
-            val nickname by profile.nickname.collectAsStateWithLifecycle(null)
-            val darkTheme = when (themeMode) {
-                ThemeMode.SYSTEM -> isSystemInDarkTheme()
-                ThemeMode.LIGHT -> false
-                ThemeMode.DARK -> true
-            }
-            SideEffect {
-                WindowCompat.getInsetsController(window, window.decorView).apply {
-                    isAppearanceLightStatusBars = !darkTheme
-                    isAppearanceLightNavigationBars = !darkTheme
-                }
-            }
-
-            val theme = remember(themeMode, accent) {
-                val scheme = when (themeMode) {
-                    ThemeMode.SYSTEM -> if (accent == null) ColorSchemeMode.System else ColorSchemeMode.MonetSystem
-                    ThemeMode.LIGHT -> if (accent == null) ColorSchemeMode.Light else ColorSchemeMode.MonetLight
-                    ThemeMode.DARK -> if (accent == null) ColorSchemeMode.Dark else ColorSchemeMode.MonetDark
-                }
-                ThemeController(colorSchemeMode = scheme, keyColor = accent?.let { Color(it.toColorInt()) })
-            }
+            val theme = remember { ThemeController(colorSchemeMode = ColorSchemeMode.System) }
             MiuixTheme(theme) {
-                AcbooksNavHost(
-                    themeMode = themeMode,
-                    nickname = nickname,
-                    serverSessions = serverSessions,
-                    profileAvatars = profileAvatars,
-                    library = library,
-                    onThemeModeChange = { mode -> scope.launch { appearance.setThemeMode(mode) } },
-                )
+                MainTabs()
             }
         }
     }

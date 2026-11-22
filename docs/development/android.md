@@ -14,42 +14,18 @@ bash ./gradlew :app:assembleDebug
 bash ./gradlew :app:installDebug
 ```
 
-安装需要启动模拟器或连接已启用 USB 调试的设备。安装后可从启动器打开 acbooks，或执行 `adb shell am start -n app.acbooks/.MainActivity`。调试 APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。初次启动直接进入首页，无需账号、服务器或网络。
+在 Android 13 或更新的设备上安装并从启动器打开 acbooks。调试 APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。
 
-## 模块
+## GitHub Release APK
 
-| 模块 | 本阶段职责 |
-| --- | --- |
-| `:app` | Application、Activity、Hilt 组装、Compose Navigation 和应用语言声明 |
-| `:feature:home` | 免登录启动占位页和中英文资源 |
-| `:core:designsystem` | 提供 Miuix 依赖和共享的中英文资源 |
-| `:core:datastore` | 独立的外观偏好，默认跟随系统，支持持久化浅色和深色选项 |
-| `:core:database` | Room/KSP 和 schema 输出配置，以仪器测试验证 DAO；正式书库表随本地书库模块引入 |
+从 GitHub Actions 手动运行 **Android Release APK**。工作流构建 Release APK，只打包 `arm64-v8a` 原生库，并上传签名后的 `ACBooks-android-arm64-v8a-release.apk`。纯 Kotlin/Compose 构建可能没有原生库。
 
-`:app` 依赖首页、设计系统和偏好模块。Room 模块独立构建，正式数据层接入时再依赖。目录边界遵循 [Android 架构规范](../architecture/android-reader.md)。
+仓库通过 Actions Secrets 提供 `ANDROID_RELEASE_KEYSTORE_BASE64` 和 `ANDROID_RELEASE_KEYSTORE_PASSWORD`。前者是长期 PKCS#12 签名库的 Base64，后者是其密码。签名别名为 `acbooks-release`，工作流在上传前用 `apksigner` 验证 APK 并核对固定的证书 SHA-256 指纹。签名库与密码需在 GitHub 之外保留私密备份。
 
-## 国际化
+## 重建基线
 
-默认资源为英文，简体中文资源位于 `values-zh-rCN`。Compose 使用 `stringResource` 读取文案。Android 13 及以上支持从系统设置选择应用语言，AppCompat 为后续应用内语言设置提供 API 和旧系统持久化支持。调用 `AppCompatDelegate.setApplicationLocales` 时可使用 `en`、`zh-CN` 或空语言列表（跟随系统）。
+当前工程只有 `:app` 模块。入口为包名 `app.acbooks` 下的 `MainActivity`，保留品牌启动图标。界面使用官方 `MiuixTheme`、`Scaffold` 和紧凑 `GlassTopAppBar`，默认跟随系统浅色与深色。首页、书库与统计共用 `GlassNavigationBar`，右侧圆形 `GlassIconButton` 打开独立搜索页。四页目前只提供标题和页面切换。
 
-构建检查与设备测试见 [Android 测试说明](../testing/android.md)。
+`:app` 直接依赖官方 `miuix-ui-android`、`miuix-glass-android` 和 `miuix-glass-icons-android`，统一锁定 [Miuix 0.9.5-beta03](https://github.com/compose-miuix-ui/miuix/releases/tag/v0.9.5-beta03)。业务页面、本地书库、阅读器、登录和同步按后续阶段重建。数据文件由原安装和 Android 系统管理，当前入口不会打开旧数据库或清理应用私有目录。
 
-## Miuix 迁移
-
-Android 全部应用界面以 [Android UI 设计规范](../ui/android-ui.md) 为准。直接使用 Miuix 组件和默认主题，范围包括阅读器控件、导航与浮层。
-
-当前代码锁定 Miuix `0.9.5-beta03`。`:core:designsystem` 提供官方 `miuix-glass-android`，供 Android 页面直接使用。[Miuix 发布说明](https://github.com/compose-miuix-ui/miuix/releases/tag/v0.9.5-beta03)
-
-页面直接使用官方 Miuix 组件。导航、导入浮层和组件预览使用 `miuix-glass`。主题使用 `MiuixTheme` 和 `ThemeController`，已有自定义颜色作为 Miuix 动态色种子，沿用 DataStore 偏好。
-
-## 组件预览
-
-安装 Debug APK 后运行：
-
-```sh
-adb shell am start -n app.acbooks/.preview.ComponentPreviewActivity
-```
-
-预览可切换中英文、跟随系统/浅色/深色、预设或自定义主题色。语言和主题设置通过正常应用偏好持久化。
-
-账号资料：昵称和头像修订/待同步标记保存在 `ProfilePreferences`，头像文件缓存在应用私有目录。设置页点击 56dp 头像通过系统照片选择器选择图片，客户端居中裁剪为 512×512 JPEG；未登录时本地保存并在登录后上传，已登录时直接调用 `/api/v1/auth/me/avatar`；应用启动、登录状态变化和进入设置页时按 `avatarUpdatedAt` 拉取。首页头像入口读取同一缓存。昵称编辑暂只保留本地显示，后续以弹窗接入。
+后续页面遵循 [Android UI 规范](../ui/android-ui.md) 和 [Android 阅读器架构](../architecture/android-reader.md)。当前检查命令见 [Android 测试说明](../testing/android.md)。

@@ -3,35 +3,16 @@
 从 `apps/acbooks-android/` 运行。Windows PowerShell 上将 `bash ./gradlew` 换成 `.\gradlew.bat`。
 
 ```sh
-bash ./gradlew assembleDebug testDebugUnitTest lintDebug
-bash ./gradlew :app:connectedDebugAndroidTest :core:database:connectedDebugAndroidTest
+bash ./gradlew :app:assembleDebug :app:lintDebug
 ```
 
-连接一个 API 33 或更新的设备运行设备测试。手势、取消和状态恢复验收见 [Android 动画规范](../ui/android-motion.md)。构建和安装步骤见 [Android 开发环境](../development/android.md)。
+将安装包安装到 API 33 或更新的设备。启动后确认进入首页，底栏可点击或横滑切换首页、书库和统计，标题无遮挡。点击右侧搜索按钮确认进入独立搜索页，系统返回后回到原 Tab。切换系统浅色和深色，确认应用跟随系统。构建和安装步骤见 [Android 开发环境](../development/android.md)。
 
-| 检查 | 覆盖范围 |
-| --- | --- |
-| DataStore JVM 测试 | 默认跟随系统，显式主题跨 DataStore 实例持久化，未知存储值回退；昵称、头像修订与待同步标记持久化 |
-| 启动仪器测试 | 启动 Activity、Hilt 注入、导航默认进入首页，中英文切换与 Activity 重建，其他语言回退英文 |
-| 导航仪器测试 | 验证边缘手势松手前当前页面保持原位、左右边缘提交返回，以及重建后的路由恢复。验证连续设置导航、下拉菜单和原生底部浮层优先消费返回 |
-| Room 仪器测试 | 测试内存库的生成 DAO 写入和查询 |
-| 本地书库 Room 仪器测试 | 同一来源重复导入、相同内容的独立书目确认，以及移出和删除书架时保留书目 |
-| Android Lint | Android 清单、资源、平台 API 和源码静态检查 |
-| 组件预览仪器测试 | 语言与主题切换、导航与独立添加入口、收藏和书签切换及双语可访问名称、菜单和浮层 |
+## 旧实现的历史验收
 
-报告位于各模块的 `build/reports/`。启动测试可在未配置账号和服务器的设备上运行。
+以下记录对应重建前的实现。
 
-## Miuix 迁移验收
-
-以下为迁移后的验收要求。初始化验收保留历史测试结果。
-
-- 组件预览验证直接使用 Miuix 的主导航、顶栏、表单、按钮、菜单、对话框和底部浮层。覆盖跟随系统、浅色、深色、中英文、字体缩放与 TalkBack。
-- 设备测试覆盖 API 33 及以上、小屏、横屏、平板、Tab 状态保留和逐级返回。验证导入浮层、设置、服务器登录，以及 EPUB/PDF 的翻页、目录、书签和阅读设置。
-- 代码检查确认应用可见控件使用 Miuix 默认样式，旧设计令牌、主题映射和已无引用的视觉依赖已清理。
-
-## 初始化验收
-
-基于 `ffe9310` 的 Android 初始化工作区在 Windows、JDK 21 和 Android 16（API 36）模拟器上通过上述检查。DataStore JVM 测试 2 项、设备测试 4 项全部通过。Lint 无错误，保留依赖更新、目标 API 和启动图标等警告。低版本设备与实体设备尚未验证。
+基于 `ffe9310` 的 Android 初始化工作区在 Windows、JDK 21 和 Android 16（API 36）模拟器上通过当时的构建、Lint 和测试。DataStore JVM 测试 2 项、设备测试 4 项全部通过。Lint 无错误，保留依赖更新、目标 API 和启动图标等警告。低版本设备与实体设备尚未验证。
 
 公共设计系统在同一环境通过 Debug、未签名 Release 构建、Lint、5 项 JVM 测试与 5 项设备测试。能力分级由单元测试覆盖，模糊和实色路径在 API 36 预览中验证。墨水屏及渲染帧耗时尚未验证。
 

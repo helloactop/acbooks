@@ -1,0 +1,87 @@
+name: Android Release APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out Android source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: platform-tools platforms;android-37.2 build-tools;37.0.0
+
+      - name: Build arm64-v8a Release APK
+        working-directory: apps/acbooks-android
+        run: bash ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Sign and verify APK
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+        working-directory: apps/acbooks-android
+        shell: bash
+        run: |
+          : "${ANDROID_RELEASE_KEYSTORE_BASE64:?Missing ANDROID_RELEASE_KEYSTORE_BASE64 repository secret}"
+          : "${ANDROID_RELEASE_KEYSTORE_PASSWORD:?Missing ANDROID_RELEASE_KEYSTORE_PASSWORD repository secret}"
+
+          umask 077
+          keystore=$(mktemp "$RUNNER_TEMP/acbooks-release.XXXXXX")
+          trap 'rm -f -- "$keystore"' EXIT
+          printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          unset ANDROID_RELEASE_KEYSTORE_BASE64
+
+          apksigner="$ANDROID_HOME/build-tools/37.0.0/apksigner"
+          unsigned_apk=app/build/outputs/apk/release/app-release-unsigned.apk
+          signed_apk=app/build/outputs/apk/release/ACBooks-android-arm64-v8a-release.apk
+          "$apksigner" sign --ks "$keystore" --ks-type PKCS12 --ks-key-alias acbooks-release \
+            --ks-pass env:ANDROID_RELEASE_KEYSTORE_PASSWORD --out "$signed_apk" "$unsigned_apk"
+          unset ANDROID_RELEASE_KEYSTORE_PASSWORD
+
+          expected_certificate=527fafcac94d7bee389deb61aab774fb0054dd98701b3b0dba180f3807b54dd3
+          certificates=$("$apksigner" verify --print-certs "$signed_apk")
+          actual_certificate=$(awk '/^(V[0-9.]+ )?Signer( #[0-9]+)?:? certificate SHA-256 digest: / {print $NF}' \
+            <<< "$certificates" | sort -u)
+          if [[ "$actual_certificate" != "$expected_certificate" ]]; then
+            echo 'APK signing certificate does not match the pinned Release certificate.' >&2
+            exit 1
+          fi
+
+          python3 - "$signed_apk" <<'PY'
+          from pathlib import PurePosixPath
+          from sys import argv
+          from zipfile import ZipFile
+
+          with ZipFile(argv[1]) as apk:
+              entries = (PurePosixPath(name).parts for name in apk.namelist())
+              abis = {parts[1] for parts in entries if len(parts) >= 3 and parts[0] == "lib"}
+          unexpected = abis - {"arm64-v8a"}
+          if unexpected:
+              raise SystemExit(f"Unexpected native ABIs in APK: {', '.join(sorted(unexpected))}")
+          PY
+
+      - name: Upload signed Release APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ACBooks-android-arm64-v8a-release
+          path: apps/acbooks-android/app/build/outputs/apk/release/ACBooks-android-arm64-v8a-release.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

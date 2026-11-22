@@ -33,21 +33,16 @@ MIT（Expat）、ISC 和 Apache-2.0 均兼容 GPL 第 3 版。[GNU 许可证兼�
 
 ## Android 开源依赖
 
-acbooks 源码采用 [GPL-3.0-only](LICENSE)。以下为 Android 工程当前直接使用的第三方依赖和构建工具。Apache-2.0 与 GPLv3 兼容。JUnit 4 及其测试依赖仅用于运行测试，不进入应用 APK。
+acbooks 源码采用 [GPL-3.0-only](LICENSE)。以下为 Android 工程当前直接使用的第三方依赖和构建工具。Apache-2.0 与 GPLv3 兼容。
 
 | 依赖 | 版本 | 许可证 |
 | --- | --- | --- |
 | [Gradle Wrapper](https://github.com/gradle/gradle/blob/v9.7.1/LICENSE) | 9.7.1 | Apache-2.0 |
 | [Android Gradle Plugin](https://android.googlesource.com/platform/tools/base/) | 9.3.2 | Apache-2.0 |
 | [Kotlin、Compose 编译插件](https://github.com/JetBrains/kotlin/blob/v2.4.10/license/LICENSE.txt) | 2.4.10 | Apache-2.0 |
-| [KSP](https://github.com/google/ksp/blob/2.3.14/LICENSE) | 2.3.14 | Apache-2.0 |
-| [Dagger Hilt](https://github.com/google/dagger/blob/dagger-2.60.1/LICENSE.txt) | 2.60.1 | Apache-2.0 |
-| [AndroidX Activity、AppCompat、Lifecycle](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 1.13.0 / 1.7.1 / 2.11.0 | Apache-2.0 |
+| [AndroidX Activity Compose](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 1.13.0 | Apache-2.0 |
 | [Jetpack Compose](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | BOM 2026.08.00 | Apache-2.0 |
-| [Miuix](https://github.com/compose-miuix-ui/miuix/tree/v0.9.5-beta03) | 0.9.5-beta03（`miuix-ui-android`、`miuix-preference-android`、`miuix-glass-android`、`miuix-glass-icons-android`、`miuix-blur-android`、`miuix-squircle-android`、`miuix-nav-android`） | [Apache-2.0](https://github.com/compose-miuix-ui/miuix/blob/v0.9.5-beta03/LICENSE) |
-| [Navigation Compose、Room、DataStore](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 2.10.2 / 2.8.4 / 1.1.7 | Apache-2.0 |
-| [AndroidX Test](https://github.com/android/android-test/blob/main/LICENSE) | JUnit 扩展 1.2.1 / Runner 1.6.2 | Apache-2.0 |
-| [JUnit 4](https://github.com/junit-team/junit4/blob/r4.13.2/LICENSE-junit.txt) | 4.13.2 | EPL-1.0 |
+| [Miuix](https://github.com/compose-miuix-ui/miuix/tree/v0.9.5-beta03) | 0.9.5-beta03（`miuix-ui-android`、`miuix-glass-android`、`miuix-glass-icons-android`） | [Apache-2.0](https://github.com/compose-miuix-ui/miuix/blob/v0.9.5-beta03/LICENSE) |
 
 [Version Catalog](apps/acbooks-android/gradle/libs.versions.toml) 是直接依赖版本的来源。
 
@@ -55,11 +50,11 @@ Miuix Android 模块会传递引入同项目的 `miuix-core-android` 与 `miuix-
 
 ## 第三方版权与许可声明
 
-Android 书库顶栏的操作布局参考 Lumi Books 的 [BookshelfScreen](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/bookshelf/BookshelfScreen.kt) 和 [MainTabHeader](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/components/MainTabHeader.kt)。acbooks 使用官方 Miuix 组件实现。
+重建前的 Android 书库顶栏操作布局参考 Lumi Books 的 [BookshelfScreen](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/bookshelf/BookshelfScreen.kt) 和 [MainTabHeader](https://github.com/huangder/Lumi_Books/blob/66c6d9df36db3b96d73af634bcd34835edff9fb7/app/src/main/java/com/huangder/lumibooks/ui/components/MainTabHeader.kt)。acbooks 使用官方 Miuix 组件实现。
 
-Android 服务器设置的连接状态和操作分组参考 mybooks-android（GPL-3.0）的 [MyBooksSettingsScreen](https://github.com/helloactop/mybooks-android/blob/78888d0bcd3e9201dd2021986334b3b19bd11b9e/app/src/main/java/com/huangder/lumibooks/ui/settings/MyBooksSettingsScreen.kt)。登录和验证使用 acbooks 设备认证接口。
+重建前的 Android 服务器设置连接状态和操作分组参考 mybooks-android（GPL-3.0）的 [MyBooksSettingsScreen](https://github.com/helloactop/mybooks-android/blob/78888d0bcd3e9201dd2021986334b3b19bd11b9e/app/src/main/java/com/huangder/lumibooks/ui/settings/MyBooksSettingsScreen.kt)。登录和验证使用 acbooks 设备认证接口。
 
-Android EPUB 阅读使用 [Readium Kotlin Toolkit 3.4.0](https://github.com/readium/kotlin-toolkit/tree/3.4.0) 的 Streamer 和 Navigator，遵循其 [BSD-3-Clause 许可证](https://github.com/readium/kotlin-toolkit/blob/3.4.0/LICENSE)。Compose 中托管阅读器使用 AndroidX Fragment Compose（Apache-2.0）。
+重建前的 Android EPUB 阅读使用 [Readium Kotlin Toolkit 3.4.0](https://github.com/readium/kotlin-toolkit/tree/3.4.0) 的 Streamer 和 Navigator，遵循其 [BSD-3-Clause 许可证](https://github.com/readium/kotlin-toolkit/blob/3.4.0/LICENSE)。Compose 中托管阅读器使用 AndroidX Fragment Compose（Apache-2.0）。
 
 ### shadcn-calendar-heatmap
 
