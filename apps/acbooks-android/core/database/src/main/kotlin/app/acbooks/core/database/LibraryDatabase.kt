@@ -67,6 +67,21 @@ data class LocalShelfBook(val shelfId: String, val bookId: String)
 )
 data class LocalReadingPosition(@PrimaryKey val fileId: String, val locator: String)
 
+@Entity(
+    tableName = "cloud_book_links",
+    foreignKeys = [ForeignKey(
+        entity = LocalBook::class,
+        parentColumns = ["id"],
+        childColumns = ["localBookId"],
+        onDelete = ForeignKey.CASCADE,
+    )],
+)
+data class CloudBookLink(
+    @PrimaryKey val localBookId: String,
+    val remoteBookId: String,
+    val serverOrigin: String,
+)
+
 data class LocalBookCard(
     val id: String,
     val title: String,
@@ -98,6 +113,13 @@ abstract class LibraryDao {
 
     @Query("SELECT * FROM book_files WHERE bookId = :bookId ORDER BY id LIMIT 1")
     abstract suspend fun firstBookFile(bookId: String): LocalBookFile?
+
+    @Query("SELECT remoteBookId FROM cloud_book_links WHERE localBookId = :bookId AND serverOrigin = :serverOrigin")
+    abstract suspend fun remoteBookId(bookId: String, serverOrigin: String): String?
+
+    /** Called by the future authenticated sync flow after confirming the remote book identity. */
+    @Upsert
+    abstract suspend fun bindCloudBook(link: CloudBookLink)
 
     @Query("SELECT * FROM book_files WHERE bookId = :bookId")
     abstract suspend fun allBookFiles(bookId: String): List<LocalBookFile>
@@ -190,8 +212,9 @@ abstract class LibraryDao {
     entities = [
         LocalBook::class, LocalFileObject::class, LocalBookFile::class, LocalShelf::class, LocalShelfBook::class,
         LocalReadingPosition::class,
+        CloudBookLink::class,
     ],
-    version = 2,
+    version = 3,
 )
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun library(): LibraryDao
@@ -206,9 +229,20 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        internal val migration2To3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS cloud_book_links (" +
+                        "localBookId TEXT NOT NULL PRIMARY KEY, remoteBookId TEXT NOT NULL, " +
+                        "serverOrigin TEXT NOT NULL, FOREIGN KEY(localBookId) REFERENCES books(id) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE)",
+                )
+            }
+        }
+
         fun open(context: Context): LibraryDatabase =
             Room.databaseBuilder(context.applicationContext, LibraryDatabase::class.java, "acbooks-reader.db")
-                .addMigrations(migration1To2)
+                .addMigrations(migration1To2, migration2To3)
                 .build()
     }
 }
