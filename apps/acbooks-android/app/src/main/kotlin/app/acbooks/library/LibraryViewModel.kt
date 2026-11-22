@@ -13,6 +13,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.acbooks.core.database.LibraryDatabase
 import app.acbooks.core.database.LocalBookCard
+import app.acbooks.core.database.CloudBookLink
 import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,8 +59,10 @@ internal data class ImportProgress(
 
 internal class LibraryViewModel(application: Application) : AndroidViewModel(application) {
     private val database = LibraryDatabase.open(application)
-    private val repository = LibraryRepository(application, database.library())
-    private val cloudDeletion: CloudBookDeletionGateway = HttpCloudBookDeletionGateway(PendingCloudBookConnection)
+    private val dao = database.library()
+    private val repository = LibraryRepository(application, dao)
+    private val cloudDeletion: CloudBookDeletionGateway =
+        HttpCloudBookDeletionGateway(RoomCloudBookConnectionProvider(dao))
     private val preferences = application.libraryDisplayPreferences
     val catalog = repository.books
         .map { books -> LibraryCatalog(books, loaded = true) }
@@ -131,6 +134,23 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
 
     fun coverFile(sha256: String?) = repository.coverFile(sha256)
 
+    /**
+     * Server-login and sync will use these integration hooks. Never treat a local UUID
+     * as a remote UUID without an explicit verified server association.
+     */
+    fun onCloudSessionChanged(origin: String?, bearerToken: String?) {
+        CloudBookSessions.setAuthenticatedConnection(
+            if (origin.isNullOrBlank() || bearerToken.isNullOrBlank()) null
+            else CloudBookConnection(origin.trimEnd('/'), bearerToken),
+        )
+    }
+
+    suspend fun bindCloudBook(localId: String, remoteId: String, serverOrigin: String) {
+        // The association is only supplied by an authenticated sync operation.
+        val remoteUuid = java.util.UUID.fromString(remoteId).toString()
+        dao.bindCloudBook(CloudBookLink(localId, remoteUuid, serverOrigin.trimEnd('/')))
+    }
+
     suspend fun deleteLocalBook(bookId: String): Boolean = try {
         repository.deleteLocalBook(bookId)
     } catch (failure: Exception) {
@@ -166,6 +186,7 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     }
 
     override fun onCleared() {
+        CloudBookSessions.setAuthenticatedConnection(null)
         database.close()
     }
 }
