@@ -59,6 +59,7 @@ internal data class ImportProgress(
 internal class LibraryViewModel(application: Application) : AndroidViewModel(application) {
     private val database = LibraryDatabase.open(application)
     private val repository = LibraryRepository(application, database.library())
+    private val cloudDeletion: CloudBookDeletionGateway = UnavailableCloudBookDeletionGateway
     private val preferences = application.libraryDisplayPreferences
     val catalog = repository.books
         .map { books -> LibraryCatalog(books, loaded = true) }
@@ -129,6 +130,24 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     }
 
     fun coverFile(sha256: String?) = repository.coverFile(sha256)
+
+    suspend fun deleteLocalBook(bookId: String): Boolean = try {
+        repository.deleteLocalBook(bookId)
+    } catch (failure: Exception) {
+        if (failure is kotlinx.coroutines.CancellationException) throw failure
+        Log.e("LibraryDelete", "Local book deletion failed", failure)
+        false
+    }
+
+    /** Remote deletion must succeed before removing the local copy. */
+    suspend fun deleteBookEverywhere(bookId: String): Boolean = try {
+        if (!cloudDeletion.deleteRemoteBook(bookId)) false
+        else deleteLocalBook(bookId)
+    } catch (failure: Exception) {
+        if (failure is kotlinx.coroutines.CancellationException) throw failure
+        Log.e("LibraryDelete", "Cloud book deletion failed", failure)
+        false
+    }
 
     suspend fun openBook(bookId: String) = repository.openBook(bookId)
 
