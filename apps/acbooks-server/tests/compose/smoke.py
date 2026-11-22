@@ -346,7 +346,11 @@ def verify_worker_readiness(deploy: Deployment) -> None:
         "unready-worker",
         {
             "migrate": {"command": ["true"]},
-            "worker": {"command": ["sleep", "120"]},
+            "worker": {
+                "command": ["sleep", "120"],
+                # Compose 2.38.2 can return success when --wait times out.
+                "healthcheck": {"interval": "1s", "retries": 2, "start_period": "0s"},
+            },
         },
     )
     deploy.compose(
@@ -362,7 +366,7 @@ def verify_worker_readiness(deploy: Deployment) -> None:
         expected=1,
     )
     assert deploy.inspect("worker", "{{.State.Status}}") == "running"
-    assert deploy.inspect("worker", "{{.State.Health.Status}}") in {"starting", "unhealthy"}
+    assert deploy.inspect("worker", "{{.State.Health.Status}}") == "unhealthy"
     print("Compose wait rejects a running Worker that has not initialized", flush=True)
 
 
