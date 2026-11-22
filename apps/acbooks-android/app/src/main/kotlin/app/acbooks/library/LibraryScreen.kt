@@ -20,9 +20,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -199,34 +199,33 @@ internal fun BookGridItem(
 internal fun LibraryScreen(
     catalog: LibraryCatalog,
     mode: LibraryDisplayMode,
-    gridState: LazyGridState,
     scrollBehavior: ScrollBehavior,
-    scaffoldPadding: PaddingValues,
+    pagePadding: PaddingValues,
     coverFile: (String?) -> File?,
     onRead: (String) -> Unit,
     onDetails: (String) -> Unit,
     onShowMenu: (BookMenuTarget) -> Unit,
 ) {
+    val gridState = rememberLazyGridState()
     val compact = mode == LibraryDisplayMode.Compact
     val horizontalGap = if (compact) 12.dp else 16.dp
     val verticalGap = if (compact) 20.dp else 24.dp
     val phoneColumns = if (compact) 3 else 2
     val wideCellWidth = if (compact) 132.dp else 168.dp
     val layoutDirection = LocalLayoutDirection.current
+    val startInset = pagePadding.calculateStartPadding(layoutDirection)
+    val endInset = pagePadding.calculateEndPadding(layoutDirection)
+    val gridMargin = 16.dp
     val gridPadding = PaddingValues(
-        start = 16.dp,
-        top = scaffoldPadding.calculateTopPadding() + 16.dp,
-        end = 16.dp,
-        bottom = scaffoldPadding.calculateBottomPadding() + 16.dp,
+        start = startInset + gridMargin,
+        top = pagePadding.calculateTopPadding() + gridMargin,
+        end = endInset + gridMargin,
+        bottom = pagePadding.calculateBottomPadding() + gridMargin,
     )
-    BoxWithConstraints(
-        Modifier.fillMaxSize().padding(
-            start = scaffoldPadding.calculateStartPadding(layoutDirection),
-            end = scaffoldPadding.calculateEndPadding(layoutDirection),
-        ),
-    ) {
-        val cols = if (maxWidth < 480.dp) phoneColumns else
-            gridColumns(maxWidth - 32.dp, horizontalGap, wideCellWidth, phoneColumns)
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val safeWidth = maxWidth - startInset - endInset
+        val cols = if (safeWidth < 480.dp) phoneColumns else
+            gridColumns(safeWidth - gridMargin * 2, horizontalGap, wideCellWidth, phoneColumns)
         LazyVerticalGrid(
             columns = GridCells.Fixed(cols),
             state = gridState,

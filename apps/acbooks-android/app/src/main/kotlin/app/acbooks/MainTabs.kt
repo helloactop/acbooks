@@ -7,11 +7,14 @@ import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
@@ -20,16 +23,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
@@ -37,8 +41,8 @@ import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.acbooks.library.BookMenuTarget
 import app.acbooks.core.database.LocalBookCard
+import app.acbooks.library.BookMenuTarget
 import app.acbooks.library.LibraryCatalog
 import app.acbooks.library.LibraryDeleteDialog
 import app.acbooks.library.LibraryImportDialog
@@ -52,6 +56,8 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassIconButton
@@ -60,8 +66,8 @@ import top.yukonga.miuix.kmp.glass.GlassNavigationBarDefaults
 import top.yukonga.miuix.kmp.glass.GlassNavigationItem
 import top.yukonga.miuix.kmp.glass.GlassTopAppBar
 import top.yukonga.miuix.kmp.glass.glassSearchBarTransition
-import top.yukonga.miuix.kmp.glass.rememberGlassSearchBarAlpha
 import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
+import top.yukonga.miuix.kmp.glass.rememberGlassSearchBarAlpha
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.BookOutline
 import top.yukonga.miuix.kmp.icon.glass.DigitalStatistics
@@ -88,15 +94,11 @@ internal fun MainTabs(
     )
     val pager = rememberPagerState { items.size }
     val scope = rememberCoroutineScope()
-    val backdrop = rememberLayerBackdrop()
+    val navigationBackdrop = rememberLayerBackdrop()
     val menuBackdrop = rememberLayerBackdrop()
-    val tabScrollBehaviors = List(items.size) { page ->
-        key(page) { MiuixScrollBehavior() }
-    }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     val searchBarAlpha = rememberGlassSearchBarAlpha(searchExpanded)
     val topBarTransition = Modifier.glassSearchBarTransition(searchExpanded) { 1f }
-    val libraryGrid = rememberLazyGridState()
     val displayMode by library.displayMode.collectAsStateWithLifecycle()
     val importProgress by library.progress.collectAsStateWithLifecycle()
     val displayAnchor = rememberGlassPopupAnchor()
@@ -147,49 +149,19 @@ internal fun MainTabs(
                     if (searchExpanded) Modifier.clearAndSetSemantics { hideFromAccessibility() }
                     else Modifier,
                 ),
-            topBar = {
-                val page = pager.currentPage
-                val scrollBehavior = tabScrollBehaviors[page]
-                key(page) {
-                    if (page == 0) {
-                        HomeTopBar(
-                            avatar = avatar,
-                            backdrop = backdrop,
-                            scrollBehavior = scrollBehavior,
-                            onOpenSettings = onOpenSettings,
-                            modifier = topBarTransition,
-                        )
-                    } else {
-                        GlassTopAppBar(
-                            title = items[page].label.orEmpty(),
-                            modifier = Modifier.semantics { heading() },
-                            contentModifier = topBarTransition,
-                            expandable = true,
-                            progressiveBlur = page == 1,
-                            scrollBehavior = scrollBehavior,
-                            backdrop = backdrop,
-                            actions = {
-                                if (page == 1) {
-                                    LibraryTopBarActions(displayAnchor, moreAnchor) { libraryMenu = it }
-                                }
-                            },
-                        )
-                    }
-                }
-            },
             bottomBar = {
                 val isPagerDragged by pager.interactionSource.collectIsDraggedAsState()
                 GlassNavigationBar(
                     items = items,
                     selectedIndex = if (isPagerDragged) pager.settledPage else pager.targetPage,
                     onSelect = ::selectTab,
-                    backdrop = backdrop,
+                    backdrop = navigationBackdrop,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     trailingAction = {
                         GlassIconButton(
                             onClick = { searchExpanded = true },
                             size = GlassNavigationBarDefaults.Height,
-                            backdrop = backdrop,
+                            backdrop = navigationBackdrop,
                         ) {
                             Icon(
                                 imageVector = MiuixIcons.Glass.Search,
@@ -200,54 +172,82 @@ internal fun MainTabs(
                     },
                 )
             },
-        ) { padding ->
+        ) { navigationPadding ->
             Box(
                 Modifier.fillMaxSize()
-                    .layerBackdrop(backdrop)
+                    .layerBackdrop(navigationBackdrop)
                     .background(MiuixTheme.colorScheme.surface),
             ) {
                 HorizontalPager(
                     state = pager,
-                    modifier = Modifier.fillMaxSize().consumeWindowInsets(padding),
+                    modifier = Modifier.fillMaxSize(),
                     userScrollEnabled = !searchExpanded,
                     flingBehavior = PagerDefaults.flingBehavior(
                         state = pager,
                         snapAnimationSpec = PagerNavigationSpringSpec,
                     ),
                 ) { page ->
-                    val scrollBehavior = tabScrollBehaviors[page]
-                    when (page) {
-                        0 -> HomeScreen(
-                            scrollBehavior = scrollBehavior,
-                            scaffoldPadding = padding,
-                            onOpenLibrary = { selectTab(1) },
-                        )
-                        1 -> LibraryScreen(
-                            catalog = catalog,
-                            mode = displayMode,
-                            gridState = libraryGrid,
-                            scrollBehavior = scrollBehavior,
-                            scaffoldPadding = padding,
-                            coverFile = library::coverFile,
-                            onRead = onReadBook,
-                            onDetails = onOpenBook,
-                            onShowMenu = { target ->
-                                bookMenuTarget = target
-                                libraryMenu = LibraryMenu.Book
-                            },
-                        )
-                        else -> Box(
-                            Modifier.fillMaxSize()
-                                .padding(padding)
-                                .nestedScroll(scrollBehavior.nestedScrollConnection)
-                                .verticalScroll(rememberScrollState()),
-                        )
+                    MainTabPage(
+                        navigationPadding = navigationPadding,
+                        topBar = { backdrop, scrollBehavior ->
+                            if (page == 0) {
+                                HomeTopBar(
+                                    avatar = avatar,
+                                    backdrop = backdrop,
+                                    scrollBehavior = scrollBehavior,
+                                    onOpenSettings = onOpenSettings,
+                                    modifier = topBarTransition,
+                                )
+                            } else {
+                                GlassTopAppBar(
+                                    title = items[page].label.orEmpty(),
+                                    modifier = Modifier.semantics { heading() },
+                                    contentModifier = topBarTransition,
+                                    expandable = true,
+                                    progressiveBlur = page == 1,
+                                    scrollBehavior = scrollBehavior,
+                                    backdrop = backdrop,
+                                    actions = {
+                                        if (page == 1) {
+                                            LibraryTopBarActions(displayAnchor, moreAnchor) { libraryMenu = it }
+                                        }
+                                    },
+                                )
+                            }
+                        },
+                    ) { scrollBehavior, pagePadding ->
+                        when (page) {
+                            0 -> HomeScreen(
+                                scrollBehavior = scrollBehavior,
+                                scaffoldPadding = pagePadding,
+                                onOpenLibrary = { selectTab(1) },
+                            )
+                            1 -> LibraryScreen(
+                                catalog = catalog,
+                                mode = displayMode,
+                                scrollBehavior = scrollBehavior,
+                                pagePadding = pagePadding,
+                                coverFile = library::coverFile,
+                                onRead = onReadBook,
+                                onDetails = onOpenBook,
+                                onShowMenu = { target ->
+                                    bookMenuTarget = target
+                                    libraryMenu = LibraryMenu.Book
+                                },
+                            )
+                            else -> Box(
+                                Modifier.fillMaxSize()
+                                    .nestedScroll(scrollBehavior.nestedScrollConnection)
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(pagePadding),
+                            )
+                        }
                     }
                 }
             }
             LibraryImportDialog(
                 progress = importProgress.takeIf { isCurrentDestination },
-                backdrop = backdrop,
+                backdrop = navigationBackdrop,
                 onStop = library::cancelImport,
                 onImportMatches = library::importMatches,
                 onDismiss = library::dismissImport,
@@ -256,7 +256,7 @@ internal fun MainTabs(
                 book = deleteTarget,
                 show = deleteDialogShown && isCurrentDestination,
                 busy = deletingBook,
-                backdrop = backdrop,
+                backdrop = navigationBackdrop,
                 onDismiss = { if (!deletingBook) deleteDialogShown = false },
                 onDismissFinished = { if (!deleteDialogShown) deleteTarget = null },
                 onDeleteLocal = {
@@ -323,5 +323,38 @@ internal fun MainTabs(
             onDismiss = { searchExpanded = false },
             onOpenBook = onOpenBook,
         )
+    }
+}
+
+@Composable
+private fun MainTabPage(
+    navigationPadding: PaddingValues,
+    topBar: @Composable (Backdrop, ScrollBehavior) -> Unit,
+    content: @Composable (ScrollBehavior, PaddingValues) -> Unit,
+) {
+    val backdrop = rememberLayerBackdrop()
+    val scrollBehavior = MiuixScrollBehavior()
+    val layoutDirection = LocalLayoutDirection.current
+    val background = MiuixTheme.colorScheme.surface
+    Scaffold(
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = { topBar(backdrop, scrollBehavior) },
+    ) { topBarPadding ->
+        // The page owns its header height. The outer scaffold supplies only the shared safe edges.
+        val pagePadding = PaddingValues(
+            start = navigationPadding.calculateStartPadding(layoutDirection),
+            top = topBarPadding.calculateTopPadding(),
+            end = navigationPadding.calculateEndPadding(layoutDirection),
+            bottom = navigationPadding.calculateBottomPadding(),
+        )
+        Box(
+            Modifier.fillMaxSize()
+                .layerBackdrop(backdrop)
+                .background(background)
+                .consumeWindowInsets(pagePadding),
+        ) {
+            content(scrollBehavior, pagePadding)
+        }
     }
 }
