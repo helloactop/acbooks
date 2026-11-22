@@ -86,7 +86,8 @@ internal class EpubDocumentFragment : Fragment() {
                 requireContext().classLoader,
                 EpubNavigatorFragment::class.java.name,
             ) as EpubNavigatorFragment
-            navigator.addInputListener(DirectionalNavigationAdapter(navigator, animatedTransition = true))
+            // Animated Readium page turns can visibly repaint WebView text; prefer stable pages.
+            navigator.addInputListener(DirectionalNavigationAdapter(navigator, animatedTransition = false))
             childFragmentManager.commitNow(allowStateLoss = true) {
                 setReorderingAllowed(true)
                 replace(R.id.reader_epub_container, navigator)
