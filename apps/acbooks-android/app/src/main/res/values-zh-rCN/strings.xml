@@ -36,6 +36,11 @@
     <string name="library_add_books">添加书籍</string>
     <string name="library_book_actions">书籍操作</string>
     <string name="library_read_book">阅读</string>
+    <string name="library_delete_book">删除</string>
+    <string name="library_delete_title">删除书籍？</string>
+    <string name="library_delete_summary">请选择《%1$s》的删除范围。</string>
+    <string name="library_delete_local">删除本地</string>
+    <string name="library_delete_everywhere">全部删除</string>
     <string name="library_empty">书库暂无书籍。</string>
     <string name="library_load_failed">无法读取本地书库。</string>
     <string name="library_unknown_author">作者未知</string>
