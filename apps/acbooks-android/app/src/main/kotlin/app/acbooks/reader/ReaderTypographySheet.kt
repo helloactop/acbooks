@@ -44,15 +44,33 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 internal fun ReaderTypographySheet(
     show: Boolean,
-    settings: ReaderTypographySettings?,
+    bookId: String,
+    profile: ReaderTypographyProfile?,
     backdrop: Backdrop,
     onDismiss: () -> Unit,
-    onSave: (ReaderTypographySettings) -> Unit,
+    onSaveGlobal: (ReaderTypographySettings) -> Unit,
+    onSaveBook: (ReaderTypographySettings) -> Unit,
+    onClearBook: () -> Unit,
 ) {
-    var draft by remember { mutableStateOf<ReaderTypographySettings?>(null) }
-    LaunchedEffect(show, settings) {
-        if (!show) draft = null
-        else if (draft == null) draft = settings
+    var draft by remember(bookId) { mutableStateOf<ReaderTypographySettings?>(null) }
+    var editingScope by remember(bookId) { mutableStateOf(TypographyEditingScope.GLOBAL) }
+
+    LaunchedEffect(show, bookId) {
+        if (!show) {
+            draft = null
+        } else {
+            editingScope = if (profile?.hasBookOverride == true) TypographyEditingScope.BOOK
+                else TypographyEditingScope.GLOBAL
+            draft = if (editingScope == TypographyEditingScope.BOOK) profile?.bookOverride else profile?.global
+        }
+    }
+    // The first DataStore emission can arrive after the sheet animation starts.
+    LaunchedEffect(show, bookId, profile) {
+        if (show && draft == null && profile != null) {
+            editingScope = if (profile.hasBookOverride) TypographyEditingScope.BOOK
+                else TypographyEditingScope.GLOBAL
+            draft = if (editingScope == TypographyEditingScope.BOOK) profile.bookOverride else profile.global
+        }
     }
 
     GlassBottomSheet(
@@ -80,7 +98,8 @@ internal fun ReaderTypographySheet(
             } else {
                 fun save(next: ReaderTypographySettings) {
                     draft = next
-                    onSave(next)
+                    if (editingScope == TypographyEditingScope.GLOBAL) onSaveGlobal(next)
+                    else onSaveBook(next)
                 }
 
                 Column(
@@ -90,6 +109,38 @@ internal fun ReaderTypographySheet(
                         .padding(horizontal = 16.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
+                    TypographySection(R.string.reader_typography_scope)
+                    GlassSegmentedTabRow(
+                        tabs = listOf(
+                            stringResource(R.string.reader_typography_scope_global),
+                            stringResource(R.string.reader_typography_scope_book),
+                        ),
+                        selectedIndex = if (editingScope == TypographyEditingScope.GLOBAL) 0 else 1,
+                        onSelect = { index ->
+                            editingScope = if (index == 0) TypographyEditingScope.GLOBAL
+                                else TypographyEditingScope.BOOK
+                            draft = if (editingScope == TypographyEditingScope.GLOBAL) profile?.global
+                                else profile?.bookOverride ?: profile?.global
+                        },
+                        backdrop = backdrop,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        stringResource(
+                            when {
+                                editingScope == TypographyEditingScope.GLOBAL && profile?.hasBookOverride == true ->
+                                    R.string.reader_typography_global_override_note
+                                editingScope == TypographyEditingScope.GLOBAL ->
+                                    R.string.reader_typography_global_note
+                                profile?.hasBookOverride == true ->
+                                    R.string.reader_typography_book_note
+                                else -> R.string.reader_typography_book_new_note
+                            },
+                        ),
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+
                     TypographySection(R.string.reader_typography_font)
                     GlassSegmentedTabRow(
                         tabs = listOf(
@@ -129,7 +180,7 @@ internal fun ReaderTypographySheet(
                             stringResource(R.string.reader_typography_optimized),
                         ),
                         selectedIndex = if (current.publisherStyles == false) 1 else 0,
-                        onSelect = { save(current.copy(publisherStyles = it == 0)) },
+                        onSelect = { save(current.withPublisherLayout(original = it == 0)) },
                         backdrop = backdrop,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -179,17 +230,32 @@ internal fun ReaderTypographySheet(
                     )
 
                     GlassDialogButton(
-                        onClick = { save(ReaderTypographySettings()) },
+                        onClick = {
+                            if (editingScope == TypographyEditingScope.GLOBAL) {
+                                save(ReaderTypographySettings())
+                            } else {
+                                onClearBook()
+                                editingScope = TypographyEditingScope.GLOBAL
+                                draft = profile?.global ?: ReaderTypographySettings()
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         minHeight = 48.dp,
                     ) {
-                        Text(stringResource(R.string.reader_typography_reset))
+                        Text(
+                            stringResource(
+                                if (editingScope == TypographyEditingScope.GLOBAL) R.string.reader_typography_reset
+                                else R.string.reader_typography_book_inherit,
+                            ),
+                        )
                     }
                 }
             }
         }
     }
 }
+
+private enum class TypographyEditingScope { GLOBAL, BOOK }
 
 @Composable
 private fun TypographySection(title: Int) {
