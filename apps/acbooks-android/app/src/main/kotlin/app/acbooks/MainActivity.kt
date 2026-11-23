@@ -3,6 +3,9 @@ package app.acbooks
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -15,7 +18,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -85,12 +87,13 @@ private sealed interface AcbooksRoute : NavKey {
 }
 
 @Composable
-internal fun AcbooksNavigation(
-    library: LibraryViewModel,
-    avatar: ImageBitmap? = null,
-    onChangeAvatar: (() -> Unit)? = null,
-) {
+internal fun AcbooksNavigation(library: LibraryViewModel) {
     val navController = rememberNavController<AcbooksRoute>(AcbooksRoute.Main)
+    val avatarState by library.profileAvatar.collectAsStateWithLifecycle()
+    val avatar = avatarState.image
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) library.chooseAvatar(uri)
+    }
     val window = LocalActivity.current?.window
     if (window != null && navController.backStack.lastOrNull() is AcbooksRoute.Reader) {
         DisposableEffect(window) {
@@ -173,10 +176,18 @@ internal fun AcbooksNavigation(
         entry<AcbooksRoute.Main> { libraryPage(AcbooksRoute.Main, null) }
         entry<AcbooksRoute.Shelf> { route -> libraryPage(route, route.shelfId) }
         entry<AcbooksRoute.Settings> {
+            val active = navController.backStack.lastOrNull() == AcbooksRoute.Settings
+            LaunchedEffect(active) {
+                if (active) library.refreshAvatar()
+            }
             AvatarSettingsScreen(
                 avatar = avatar,
+                avatarBusy = avatarState.busy,
+                avatarMessage = avatarState.message,
                 onBack = { navController.pop() },
-                onChangeAvatar = onChangeAvatar,
+                onChangeAvatar = {
+                    avatarPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
                 onOpenShelfSettings = {
                     if (navController.backStack.lastOrNull() == AcbooksRoute.Settings) {
                         navController.push(AcbooksRoute.ShelfSettings)
