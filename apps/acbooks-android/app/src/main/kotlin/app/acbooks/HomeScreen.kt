@@ -1,7 +1,6 @@
 package app.acbooks
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.blur
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +25,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -224,15 +224,15 @@ private fun ContinueReadingCard(
                 model = cover,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().blur(38.dp),
+                modifier = Modifier.matchParentSize().blur(38.dp),
             )
         }
         Box(
             Modifier.matchParentSize().background(
                 Brush.linearGradient(
                     listOf(
-                        Color(0xFF726775).copy(alpha = 0.96f),
-                        Color(0xFF413B49).copy(alpha = 0.94f),
+                        Color(0xFF726775).copy(alpha = 0.74f),
+                        Color(0xFF413B49).copy(alpha = 0.82f),
                     ),
                 ),
             ),
