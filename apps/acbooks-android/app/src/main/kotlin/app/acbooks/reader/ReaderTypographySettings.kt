@@ -43,6 +43,36 @@ internal data class ReaderTypographySettings(
     )
 }
 
+/**
+ * A complete per-book snapshot overrides the global profile. A missing override
+ * inherits global changes; creating one copies the currently effective values.
+ */
+internal data class ReaderTypographyProfile(
+    val global: ReaderTypographySettings = ReaderTypographySettings(),
+    val bookOverride: ReaderTypographySettings? = null,
+) {
+    val effective: ReaderTypographySettings get() = bookOverride ?: global
+    val hasBookOverride: Boolean get() = bookOverride != null
+}
+
+/**
+ * Original layout leaves paragraph/font CSS to the EPUB publisher. Keep theme,
+ * screen margins and text scaling, but clear overrides that might survive from
+ * optimized layout and contradict the "original" label.
+ */
+internal fun ReaderTypographySettings.withPublisherLayout(original: Boolean): ReaderTypographySettings =
+    if (!original) copy(publisherStyles = false)
+    else copy(
+        publisherStyles = true,
+        fontFamily = ReaderFontFamily.BOOK,
+        lineHeight = null,
+        paragraphIndent = null,
+        paragraphSpacing = null,
+        letterSpacing = null,
+        wordSpacing = null,
+        textAlignment = null,
+    )
+
 private fun Double?.inRange(range: ClosedFloatingPointRange<Double>): Double? =
     this?.takeIf { it.isFinite() && it in range }
 
