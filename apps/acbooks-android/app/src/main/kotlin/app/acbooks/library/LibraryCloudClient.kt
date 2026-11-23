@@ -10,6 +10,7 @@ import app.acbooks.core.database.ReadingPositionChange
 import app.acbooks.core.database.RemoteCatalogBook
 import app.acbooks.core.database.RemoteCatalogFile
 import app.acbooks.core.database.RemoteShelf
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
@@ -41,7 +42,7 @@ internal fun serverOrigin(value: String): String {
 internal class CloudHttpException(val status: Int) : IOException("Server responded with HTTP $status")
 internal class CloudMutationRejected(val code: String) : IOException("Server rejected the book creation")
 internal class CloudSetupRequired : IOException("Server setup is required")
-internal data class CloudAccount(val id: String, val username: String)
+internal data class CloudAccount(val id: String, val username: String, val avatarUpdatedAt: Long?)
 
 internal fun bookCreatePayload(book: LocalBook, bibliography: BookBibliography? = null,
     authors: List<String> = listOfNotNull(book.author), translators: List<String> = bibliography?.translators.orEmpty(),
@@ -71,9 +72,52 @@ internal class LibraryCloudClient(private val origin: String) {
         body = JSONObject().put("username", username).put("password", password).put("deviceName", "acbooks Android"),
     ).getString("accessToken").also { check(it.isNotBlank()) }
 
-    fun account(token: String): CloudAccount {
-        val response = json("/auth/me", token)
-        return CloudAccount(response.getString("id").asUuid(), response.getString("username").also { check(it.isNotBlank()) })
+    fun account(token: String): CloudAccount = parseAccount(json("/auth/me", token))
+
+    fun uploadAvatar(token: String, avatar: ByteArray): CloudAccount {
+        require(avatar.isNotEmpty() && avatar.size <= MAX_AVATAR_BYTES)
+        val boundary = UUID.randomUUID().toString()
+        val head = ("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"avatar.jpg\"\r\n" +
+            "Content-Type: image/jpeg\r\n\r\n").toByteArray(UTF_8)
+        val tail = "\r\n--$boundary--\r\n".toByteArray(UTF_8)
+        return parseAccount(request(
+            "/auth/me/avatar", "PUT", token, setOf(200),
+            contentType = "multipart/form-data; boundary=$boundary",
+            length = (head.size + avatar.size + tail.size).toLong(),
+            write = { output ->
+                output.write(head)
+                output.write(avatar)
+                output.write(tail)
+            },
+            read = ::readJson,
+        ))
+    }
+
+    fun avatar(token: String): ByteArray = request(
+        "/auth/me/avatar", "GET", token, setOf(200),
+    ) { connection ->
+        if (connection.contentLengthLong > MAX_AVATAR_BYTES) throw IOException("Avatar is too large")
+        val output = ByteArrayOutputStream()
+        connection.inputStream.use { stream ->
+            val buffer = ByteArray(8192)
+            while (true) {
+                val count = stream.read(buffer)
+                if (count < 0) break
+                if (output.size() + count > MAX_AVATAR_BYTES) throw IOException("Avatar is too large")
+                output.write(buffer, 0, count)
+            }
+        }
+        output.toByteArray().also { if (it.isEmpty()) throw IOException("Server sent an empty avatar") }
+    }
+
+    private fun parseAccount(response: JSONObject): CloudAccount = CloudAccount(
+        id = response.getString("id").asUuid(),
+        username = response.getString("username").also { check(it.isNotBlank()) },
+        avatarUpdatedAt = if (response.isNull("avatarUpdatedAt")) null else response.getLong("avatarUpdatedAt"),
+    )
+
+    private companion object {
+        const val MAX_AVATAR_BYTES = 5 * 1024 * 1024
     }
 
     fun testAddress() {
