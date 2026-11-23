@@ -34,7 +34,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.localToWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -213,6 +212,7 @@ private fun ContinueReadingCard(
     Box(
         modifier = modifier
             .clip(shape)
+            .background(Color(0xFF4C4855))
             .clickable(
                 role = Role.Button,
                 onClickLabel = stringResource(R.string.reader_open_book, book.title),
