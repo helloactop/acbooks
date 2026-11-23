@@ -90,6 +90,10 @@
     <string name="reader_open_failed">无法打开本地书籍文件。</string>
     <string name="reader_page">第 %1$d 页，共 %2$d 页</string>
     <string name="reader_previous">上一页</string>
+    <string name="reader_contents">目录</string>
+    <string name="reader_contents_loading">正在加载目录…</string>
+    <string name="reader_contents_empty">这本书没有可用的目录。</string>
+    <string name="reader_chapter_fallback">第 %1$d 节</string>
     <string name="reader_next">下一页</string>
     <string name="library_display_sort">显示与排序</string>
     <string name="library_more">更多书库操作</string>
