@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -27,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,6 +43,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -52,8 +55,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.acbooks.R
 import app.acbooks.core.database.LocalBookCard
+import app.acbooks.core.database.LocalShelf
 import coil3.compose.AsyncImage
 import java.io.File
+import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
@@ -213,15 +218,19 @@ internal fun BookGridItem(
 @Composable
 internal fun LibraryScreen(
     catalog: LibraryCatalog,
+    shelfId: String?,
     mode: LibraryDisplayMode,
     scrollBehavior: ScrollBehavior,
     pagePadding: PaddingValues,
     coverFile: (LocalBookCard) -> File?,
+    onOpenShelf: (String) -> Unit,
     onRead: (String) -> Unit,
     onDetails: (String) -> Unit,
     onShowMenu: (BookMenuTarget) -> Unit,
 ) {
-    val gridState = rememberLazyGridState()
+    val rootGridState = rememberLazyGridState()
+    val gridState = if (shelfId == null) rootGridState else key(shelfId) { rememberLazyGridState() }
+    val entries = remember(catalog.books, catalog.shelves, shelfId) { catalog.gridEntries(shelfId) }
     val compact = mode == LibraryDisplayMode.Compact
     val horizontalGap = if (compact) 12.dp else 16.dp
     val verticalGap = if (compact) 20.dp else 24.dp
@@ -249,17 +258,24 @@ internal fun LibraryScreen(
             horizontalArrangement = Arrangement.spacedBy(horizontalGap),
             verticalArrangement = Arrangement.spacedBy(verticalGap),
         ) {
-            items(catalog.books, key = { it.id }) { book ->
-                BookGridItem(
-                    book = book,
-                    cover = coverFile(book),
-                    onRead = { onRead(book.id) },
-                    onDetails = { onDetails(book.id) },
-                    onShowMenu = onShowMenu,
-                )
+            items(entries, key = { it.key }) { entry ->
+                when (entry) {
+                    is LibraryGridEntry.Book -> BookGridItem(
+                        book = entry.book,
+                        cover = coverFile(entry.book),
+                        onRead = { onRead(entry.book.id) },
+                        onDetails = { onDetails(entry.book.id) },
+                        onShowMenu = onShowMenu,
+                    )
+                    is LibraryGridEntry.Folder -> ShelfGridItem(
+                        entry,
+                        coverFile = coverFile,
+                        onClick = { onOpenShelf(entry.shelf.id) },
+                    )
+                }
             }
         }
-        if (catalog.books.isEmpty()) {
+        if (entries.isEmpty()) {
             Box(
                 Modifier.matchParentSize().padding(gridPadding),
                 contentAlignment = Alignment.Center,
@@ -267,9 +283,92 @@ internal fun LibraryScreen(
                 when {
                     !catalog.loaded -> CircularProgressIndicator()
                     catalog.failed -> Text(stringResource(R.string.library_load_failed))
+                    shelfId != null -> Text(stringResource(R.string.library_empty_shelf))
                     else -> Text(stringResource(R.string.library_empty))
                 }
             }
+        }
+    }
+}
+
+private sealed interface LibraryGridEntry {
+    val key: String
+
+    data class Book(val book: LocalBookCard) : LibraryGridEntry {
+        override val key get() = "book:${book.id}"
+    }
+
+    data class Folder(val shelf: LocalShelf, val books: List<LocalBookCard>) : LibraryGridEntry {
+        override val key get() = "shelf:${shelf.id}"
+    }
+}
+
+private fun LibraryCatalog.gridEntries(shelfId: String?): List<LibraryGridEntry> {
+    if (shelfId != null) {
+        val memberIds = shelves.firstOrNull { it.shelf.id == shelfId }?.bookIds.orEmpty().toSet()
+        return books.asSequence().filter { it.id in memberIds }.map { LibraryGridEntry.Book(it) }.toList()
+    }
+
+    val bookOrder = books.withIndex().associateBy { it.value.id }
+    val folders = shelves.mapNotNull { relation ->
+        val members = relation.bookIds.mapNotNull(bookOrder::get).sortedBy { it.index }.map { it.value }
+        if (members.isEmpty() && relation.shelf.serverNameKey == null) null
+        else LibraryGridEntry.Folder(relation.shelf, members)
+    }
+    val classified = folders.flatMap { folder -> folder.books.map { it.id } }.toSet()
+    val foldersByFirstBook = folders.groupBy { it.books.firstOrNull()?.id }
+    return buildList {
+        for (book in books) {
+            addAll(foldersByFirstBook[book.id].orEmpty())
+            if (book.id !in classified) add(LibraryGridEntry.Book(book))
+        }
+        addAll(foldersByFirstBook[null].orEmpty())
+    }
+}
+
+@Composable
+private fun ShelfGridItem(
+    folder: LibraryGridEntry.Folder,
+    coverFile: (LocalBookCard) -> File?,
+    onClick: () -> Unit,
+) {
+    val covers = folder.books.asSequence().mapNotNull { coverFile(it)?.takeIf(File::isFile) }.take(4).toList()
+    Column(
+        modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick),
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            insideMargin = PaddingValues(8.dp),
+        ) {
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (row in 0..1) {
+                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        for (column in 0..1) {
+                            Box(Modifier.weight(1f).fillMaxSize()) {
+                                covers.getOrNull(row * 2 + column)?.let { cover ->
+                                    AsyncImage(
+                                        model = cover,
+                                        contentDescription = null,
+                                        modifier = Modifier.matchParentSize().clip(RoundedCornerShape(3.dp)),
+                                        contentScale = ContentScale.Fit,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(folder.shelf.name, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(
+                pluralStringResource(R.plurals.library_shelf_book_count, folder.books.size, folder.books.size),
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                fontSize = 12.sp,
+            )
         }
     }
 }

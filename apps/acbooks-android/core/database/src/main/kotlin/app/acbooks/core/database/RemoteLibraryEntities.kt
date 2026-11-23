@@ -53,6 +53,8 @@ data class RemoteCatalogBook(
     val updatedAt: Long,
     val cachedAt: Long,
     val coverUpdatedAt: Long? = null,
+    val revision: Long? = null,
+    val metadataJson: String? = null,
 )
 
 fun RemoteCatalogBook.coverCacheKey(): String? =

@@ -13,6 +13,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.acbooks.R
 import app.acbooks.core.database.LibraryDatabase
+import app.acbooks.core.database.LibraryShelf
 import app.acbooks.core.database.LocalBookCard
 import java.io.IOException
 import kotlinx.coroutines.Job
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -29,6 +31,7 @@ import kotlinx.coroutines.sync.withLock
 
 internal data class LibraryCatalog(
     val books: List<LocalBookCard> = emptyList(),
+    val shelves: List<LibraryShelf> = emptyList(),
     val loaded: Boolean = false,
     val failed: Boolean = false,
 )
@@ -59,7 +62,7 @@ internal data class ImportProgress(
     val processed: Int get() = added + duplicate + matching + unsupported + failed
 
     fun record(outcome: ImportOutcome): ImportProgress = when (outcome) {
-        ImportOutcome.Added -> copy(added = added + 1)
+        is ImportOutcome.Added -> copy(added = added + 1)
         ImportOutcome.Duplicate -> copy(duplicate = duplicate + 1)
         ImportOutcome.MatchingContent -> copy(matching = matching + 1)
         ImportOutcome.Unsupported -> copy(unsupported = unsupported + 1)
@@ -76,8 +79,9 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     private val _cloudState = MutableStateFlow(CloudLibraryState())
     val cloudState = _cloudState.asStateFlow()
     private val preferences = application.libraryDisplayPreferences
-    val catalog = repository.books
-        .map { books -> LibraryCatalog(books, loaded = true) }
+    val catalog = combine(repository.books, dao.observeLibraryShelves()) { books, shelves ->
+        LibraryCatalog(books = books, shelves = shelves, loaded = true)
+    }
         .catch { failure ->
             if (failure !is SQLException) throw failure
             Log.e("Library", "Could not read the local catalog", failure)
@@ -97,8 +101,13 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryDisplayMode.Compact)
     private val _progress = MutableStateFlow<ImportProgress?>(null)
     val progress = _progress.asStateFlow()
+    private val _bookEditor = MutableStateFlow<BookEditorState?>(null)
+    val bookEditor = _bookEditor.asStateFlow()
+    private var editorJob: Job? = null
     private var importJob: Job? = null
     private val matches = mutableListOf<Uri>()
+    private val importReviews = ArrayDeque<BookEditorState>()
+    private var syncAfterImport = false
 
     fun connectServer(address: String, username: String, password: String) {
         launchCloudAction(R.string.cloud_connect_failed) {
@@ -178,12 +187,75 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
                     val outcome = repository.import(uri, allowMatchingContent)
                     if (outcome == ImportOutcome.MatchingContent) matches.add(uri)
                     progress = progress.record(outcome)
+                    if (outcome is ImportOutcome.Added) {
+                        try {
+                            autoFillImportedBook(outcome)?.let(importReviews::addLast)
+                        } catch (failure: CancellationException) {
+                            importReviews.addLast(BookEditorState(outcome.bookId, error = R.string.library_import_review_interrupted))
+                            throw failure
+                        }
+                    }
                     _progress.value = progress
                 }
             } finally {
                 _progress.value = progress.copy(running = false)
-                if (progress.added > 0 || progress.duplicate > 0) syncLibrary()
+                syncAfterImport = syncAfterImport || progress.added > 0 || progress.duplicate > 0
+                continueImportReviews()
             }
+        }
+    }
+
+    private suspend fun autoFillImportedBook(imported: ImportOutcome.Added): BookEditorState? {
+        val review = BookEditorState(imported.bookId)
+        val isbn = imported.isbn ?: return review.copy(error = R.string.library_import_review_isbn)
+        val candidates = try {
+            cloud.searchDoubanMetadata(isbn).distinctBy { it.doubanId }
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: CloudSignInRequired) {
+            return review.copy(error = R.string.book_edit_douban_sign_in)
+        } catch (failure: Exception) {
+            val error = if (failure is CloudHttpException && failure.status == 401) R.string.book_edit_douban_sign_in
+            else R.string.book_edit_search_failed
+            return review.copy(error = error)
+        }
+
+        val candidate = candidates.singleOrNull()?.takeIf {
+            it.isbn?.validImportedIsbn()?.bookIsbnMatchKey() == isbn.bookIsbnMatchKey()
+        } ?: return review.copy(error = R.string.library_import_review_no_exact_match)
+
+        val initial = try {
+            repository.loadBookEdit(imported.bookId)
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            return review.copy(error = R.string.book_edit_load_failed)
+        }
+
+        val (draft, coverError) = prepareBookCandidate(initial.draft, candidate)
+        val filled = draft.copy(isbn = isbn)
+        try {
+            val error = coverError ?: filled.validationError()
+            if (error != null) return review.copy(initial = initial, draft = filled.copy(cover = null), error = error)
+            cloud.saveBookEdit(imported.bookId, initial, filled)
+            return null
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            return review.copy(initial = initial, draft = filled.copy(cover = null), error = R.string.book_edit_save_failed)
+        } finally {
+            filled.cover?.delete()
+        }
+    }
+
+    private fun continueImportReviews() {
+        if (_progress.value?.running == true || _bookEditor.value != null) return
+        val review = importReviews.removeFirstOrNull()
+        if (review != null) {
+            openBookEditor(review)
+        } else if (syncAfterImport) {
+            syncAfterImport = false
+            syncLibrary()
         }
     }
 
@@ -195,6 +267,175 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
         if (_progress.value?.running == true) return
         matches.clear()
         _progress.value = null
+    }
+
+    fun openBookEditor(bookId: String) = openBookEditor(BookEditorState(bookId))
+
+    private fun openBookEditor(editor: BookEditorState) {
+        if (_bookEditor.value != null) return
+        _bookEditor.value = editor
+        if (editor.draft == null) {
+            runEditorOperation(editor, BookEditorOperation.Load, R.string.book_edit_load_failed) {
+                val session = repository.loadBookEdit(editor.bookId)
+                copy(initial = session, draft = session.draft, error = editor.error)
+            }
+        }
+    }
+
+    fun editBookDraft(draft: BookEditDraft) {
+        val editor = _bookEditor.value ?: return
+        if (!editor.open || editor.operation != null) return
+        _bookEditor.value = editor.copy(draft = draft, error = null)
+    }
+
+    fun chooseBookCover(uri: Uri) {
+        val editor = _bookEditor.value ?: return
+        val draft = editor.draft ?: return
+        runEditorOperation(editor, BookEditorOperation.Cover, R.string.book_edit_cover_failed) {
+            val staged = repository.stageBookCover(uri)
+            draft.cover?.delete()
+            copy(draft = draft.copy(cover = staged))
+        }
+    }
+
+    fun undoBookCover() {
+        val editor = _bookEditor.value ?: return
+        val draft = editor.draft ?: return
+        if (!editor.open || editor.operation != null) return
+        draft.cover?.delete()
+        _bookEditor.value = editor.copy(draft = draft.copy(cover = null), error = null)
+    }
+
+    fun fillBookDraft() {
+        val editor = _bookEditor.value ?: return
+        val draft = editor.draft ?: return
+        val isbn = draft.isbn.normalizedBookIsbn()
+        val title = draft.title.trim()
+        val query = isbn.ifEmpty { title }.take(200)
+        if (query.isEmpty()) {
+            _bookEditor.value = editor.copy(error = R.string.book_edit_query_required)
+            return
+        }
+        runEditorOperation(editor, BookEditorOperation.Fill, R.string.book_edit_search_failed) {
+            val preferredResults = cloud.searchDoubanMetadata(query)
+            val candidates = if (preferredResults.isEmpty() && isbn.isNotEmpty() && title.isNotEmpty() && title != query) {
+                cloud.searchDoubanMetadata(title.take(200))
+            } else preferredResults
+            val unique = candidates.distinctBy { it.doubanId }
+            fun exact(candidate: DoubanMetadataCandidate): Boolean =
+                if (isbn.isNotEmpty()) candidate.isbn?.normalizedBookIsbn()?.bookIsbnMatchKey() == isbn.bookIsbnMatchKey()
+                else candidate.title.trim().equals(title, ignoreCase = true)
+            val match = unique.singleOrNull()?.takeIf(::exact)
+            when {
+                unique.isEmpty() -> copy(error = R.string.book_edit_no_matches)
+                match != null -> applyCandidate(draft, match)
+                else -> copy(candidates = unique.sortedByDescending(::exact))
+            }
+        }
+    }
+
+    fun chooseBookCandidate(candidate: DoubanMetadataCandidate) {
+        val editor = _bookEditor.value ?: return
+        val draft = editor.draft ?: return
+        if (editor.candidates?.contains(candidate) != true) return
+        runEditorOperation(editor.copy(candidates = null), BookEditorOperation.Fill, R.string.book_edit_search_failed) {
+            applyCandidate(draft, candidate)
+        }
+    }
+
+    fun dismissBookCandidates() {
+        val editor = _bookEditor.value ?: return
+        _bookEditor.value = editor.copy(candidates = null)
+    }
+
+    private suspend fun BookEditorState.applyCandidate(
+        draft: BookEditDraft,
+        candidate: DoubanMetadataCandidate,
+    ): BookEditorState {
+        val (filled, error) = prepareBookCandidate(draft, candidate)
+        return copy(draft = filled, error = error)
+    }
+
+    private suspend fun prepareBookCandidate(
+        draft: BookEditDraft,
+        candidate: DoubanMetadataCandidate,
+    ): Pair<BookEditDraft, Int?> {
+        val filled = draft.fill(candidate)
+        val coverUrl = candidate.coverUrl ?: return filled to null
+        if (!doubanCoverUrl.matches(coverUrl)) return filled to R.string.book_edit_douban_cover_failed
+        val staged = try {
+            repository.stageDoubanCover(coverUrl)
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            return filled to R.string.book_edit_douban_cover_failed
+        }
+        draft.cover?.delete()
+        return filled.copy(cover = staged) to null
+    }
+
+    fun saveBookEditor() {
+        val editor = _bookEditor.value ?: return
+        if (!editor.open || editor.operation != null) return
+        val initial = editor.initial ?: return
+        val draft = editor.draft ?: return
+        if (!editor.dirty && !initial.pendingCover && initial.retryKeys.isEmpty()) {
+            dismissBookEditor()
+            return
+        }
+        val validation = draft.validationError()
+        if (validation != null) {
+            _bookEditor.value = editor.copy(error = validation)
+            return
+        }
+        runEditorOperation(editor, BookEditorOperation.Save, R.string.book_edit_save_failed) {
+            val pending = cloud.saveBookEdit(editor.bookId, initial, draft)
+            if (pending) {
+                launchCloudAction(R.string.cloud_sync_failed) { syncMessage(cloud.sync(uploadOfflineBooks = false)) }
+            }
+            copy(open = false, savedMessage = if (pending) R.string.book_edit_saved_pending else R.string.book_edit_saved)
+        }
+    }
+
+    fun dismissBookEditor() {
+        val editor = _bookEditor.value ?: return
+        if (editor.operation == BookEditorOperation.Save) return
+        editorJob?.cancel()
+        _bookEditor.value = editor.copy(open = false, candidates = null)
+    }
+
+    fun finishBookEditorDismissal() {
+        val editor = _bookEditor.value ?: return
+        if (editor.open) return
+        editor.draft?.cover?.delete()
+        _bookEditor.value = null
+        continueImportReviews()
+    }
+
+    private fun runEditorOperation(
+        editor: BookEditorState,
+        operation: BookEditorOperation,
+        failureMessage: Int,
+        action: suspend BookEditorState.() -> BookEditorState,
+    ) {
+        if (!editor.open || editor.operation != null) return
+        val running = editor.copy(operation = operation, error = null)
+        _bookEditor.value = running
+        editorJob = viewModelScope.launch {
+            val result = try {
+                running.action()
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (_: CloudSignInRequired) {
+                running.copy(error = R.string.book_edit_douban_sign_in)
+            } catch (failure: Exception) {
+                val error = if (failure is CloudHttpException && failure.status == 401 &&
+                    operation == BookEditorOperation.Fill
+                ) R.string.book_edit_douban_sign_in else failureMessage
+                running.copy(error = error)
+            }
+            if (_bookEditor.value === running) _bookEditor.value = result.copy(operation = null)
+        }
     }
 
     fun coverFile(book: LocalBookCard) = repository.coverFile(book)
@@ -256,6 +497,7 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     }
 
     override fun onCleared() {
+        _bookEditor.value?.draft?.cover?.delete()
         database.close()
     }
 }

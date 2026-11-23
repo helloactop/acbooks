@@ -43,6 +43,8 @@ from app.modules.books.schemas import (
     BookFilterSchema,
     BookIdentifier,
     BookPage,
+    BookShelf,
+    BookShelfPage,
     BookSummary,
     BookUpdate,
     ReadingStatus,
@@ -131,7 +133,7 @@ class BooksService:
             isbn=self._isbn(record),
             reading_status=cast(ReadingStatus, record.book.reading_status),
             tags=record.tags,
-            shelves=record.shelves,
+            shelves=[name for _, name in record.shelves],
             copy_count=len(record.copies),
             file_count=len(record.files),
             formats=sorted({file.format for file in record.files}),
@@ -147,6 +149,11 @@ class BooksService:
             **summary.model_dump(),
             description=record.book.description,
             series=record.book.series,
+            publisher=record.book.publisher,
+            publication_date=record.book.publication_date,
+            shelf_refs=[
+                BookShelf(id=UUID(shelf_id), name=name) for shelf_id, name in record.shelves
+            ],
             identifiers=[
                 BookIdentifier(scheme=scheme, value=value) for scheme, value in record.identifiers
             ],
@@ -279,6 +286,14 @@ class BooksService:
             offset=offset,
         )
 
+    def list_shelves(self, *, after: UUID | None, limit: int) -> BookShelfPage:
+        with self.read_sessions() as session:
+            shelves = repository.list_shelves(
+                session, after=str(after) if after is not None else None, limit=limit + 1
+            )
+            items = [BookShelf(id=UUID(shelf.id), name=shelf.name) for shelf in shelves[:limit]]
+        return BookShelfPage(items=items, next_after=items[-1].id if len(shelves) > limit else None)
+
     def get_book(self, book_id: UUID) -> BookDetail:
         with self.read_sessions() as session:
             book = repository.get_book(session, str(book_id))
@@ -305,6 +320,8 @@ class BooksService:
                 title=payload.title,
                 description=payload.description,
                 series=payload.series,
+                publisher=payload.publisher,
+                publication_date=payload.publication_date,
                 reading_status=payload.reading_status or "unread",
                 cover_path=None,
                 created_at=now,
@@ -346,6 +363,10 @@ class BooksService:
                 book.metadata_locks &= ~PLACEHOLDER_TITLE
             if "series" in fields:
                 book.series = payload.series
+            if "publisher" in fields:
+                book.publisher = payload.publisher
+            if "publication_date" in fields:
+                book.publication_date = payload.publication_date
             if "description" in fields:
                 book.description = payload.description
             if "reading_status" in fields:
@@ -396,7 +417,7 @@ class BooksService:
                         session,
                         book.id,
                         _batch_names(
-                            record.shelves,
+                            [name for _, name in record.shelves],
                             payload.add_shelves,
                             payload.remove_shelves,
                             "shelves",

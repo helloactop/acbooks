@@ -23,4 +23,12 @@ internal val migration2To3 = object : Migration(2, 3) {
     }
 }
 
-internal val libraryMigrations = arrayOf(migration1To2, migration2To3, migration3To4, migration4To5, migration5To6, migration6To7)
+internal val migration8To9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE shelves ADD COLUMN serverNameKey TEXT")
+    }
+}
+
+internal val libraryMigrations = arrayOf(
+    migration1To2, migration2To3, migration3To4, migration4To5, migration5To6, migration6To7, migration7To8, migration8To9,
+)

@@ -451,6 +451,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/books/shelves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Shelves */
+        get: operations["listBookShelves"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/books/{bookId}": {
         parameters: {
             query?: never;
@@ -1262,6 +1279,10 @@ export interface components {
             title: string;
             /** Series */
             series?: string | null;
+            /** Publisher */
+            publisher?: string | null;
+            /** Publicationdate */
+            publicationDate?: string | null;
             /** Description */
             description?: string | null;
             /** Authors */
@@ -1319,6 +1340,12 @@ export interface components {
             updatedAt: number;
             /** Series */
             series?: string | null;
+            /** Publisher */
+            publisher?: string | null;
+            /** Publicationdate */
+            publicationDate?: string | null;
+            /** Shelfrefs */
+            shelfRefs?: components["schemas"]["BookShelf"][];
             /** Description */
             description: string | null;
             /** Identifiers */
@@ -1465,6 +1492,23 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** BookShelf */
+        BookShelf: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** BookShelfPage */
+        BookShelfPage: {
+            /** Items */
+            items: components["schemas"]["BookShelf"][];
+            /** Nextafter */
+            nextAfter: string | null;
+        };
         /** BookSummary */
         BookSummary: {
             /**
@@ -1510,6 +1554,10 @@ export interface components {
             title?: string | null;
             /** Series */
             series?: string | null;
+            /** Publisher */
+            publisher?: string | null;
+            /** Publicationdate */
+            publicationDate?: string | null;
             /** Description */
             description?: string | null;
             /** Authors */
@@ -1593,6 +1641,10 @@ export interface components {
             title: string;
             /** Series */
             series?: string | null;
+            /** Publisher */
+            publisher?: string | null;
+            /** Publicationdate */
+            publicationDate?: string | null;
             /** Description */
             description?: string | null;
             /** Authors */
@@ -1617,10 +1669,6 @@ export interface components {
             doubanId?: string | null;
             /** Doubancoverurl */
             doubanCoverUrl?: string | null;
-            /** Publisher */
-            publisher?: string | null;
-            /** Publicationdate */
-            publicationDate?: string | null;
             /** Rating */
             rating?: number | null;
         };
@@ -6398,6 +6446,118 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    listBookShelves: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookShelfPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Type */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Code */
+                        code: string;
+                        /** Detail */
+                        detail: string;
+                        /** Requestid */
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

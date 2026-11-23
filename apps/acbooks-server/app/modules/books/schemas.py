@@ -86,6 +86,8 @@ class BookCopyCreate(LaxApiModel):
 class BookCreate(ApiModel):
     title: Annotated[str, Field(min_length=1, max_length=500)]
     series: Annotated[str | None, Field(max_length=200)] = None
+    publisher: Annotated[str | None, Field(max_length=200)] = None
+    publication_date: Annotated[str | None, Field(max_length=80)] = None
     description: Annotated[str | None, Field(max_length=20000)] = None
     authors: Annotated[list[str], Field(max_length=20)] = Field(default_factory=list)
     translators: Annotated[list[str], Field(max_length=20)] = Field(default_factory=list)
@@ -102,10 +104,17 @@ class BookCreate(ApiModel):
     def validate_title(cls, value: str) -> str:
         return clean_text(value, "title", max_length=500)
 
-    @field_validator("series")
+    @field_validator("series", "publisher")
     @classmethod
-    def validate_series(cls, value: str | None) -> str | None:
-        return clean_text(value, "series", max_length=200) if value is not None else None
+    def validate_publication_text(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is None:
+            return None
+        return clean_text(value, info.field_name or "publication", max_length=200)
+
+    @field_validator("publication_date")
+    @classmethod
+    def validate_publication_date(cls, value: str | None) -> str | None:
+        return clean_text(value, "publication_date", max_length=80) if value is not None else None
 
     @field_validator("description")
     @classmethod
@@ -137,6 +146,8 @@ class BookCreate(ApiModel):
 class BookUpdate(ApiModel):
     title: Annotated[str | None, Field(min_length=1, max_length=500)] = None
     series: Annotated[str | None, Field(max_length=200)] = None
+    publisher: Annotated[str | None, Field(max_length=200)] = None
+    publication_date: Annotated[str | None, Field(max_length=80)] = None
     description: Annotated[str | None, Field(max_length=20000)] = None
     authors: Annotated[list[str] | None, Field(max_length=20)] = None
     translators: Annotated[list[str] | None, Field(max_length=20)] = None
@@ -152,10 +163,17 @@ class BookUpdate(ApiModel):
             return None
         return clean_text(value, "title", max_length=500)
 
-    @field_validator("series")
+    @field_validator("series", "publisher")
     @classmethod
-    def validate_series(cls, value: str | None) -> str | None:
-        return clean_text(value, "series", max_length=200) if value is not None else None
+    def validate_publication_text(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is None:
+            return None
+        return clean_text(value, info.field_name or "publication", max_length=200)
+
+    @field_validator("publication_date")
+    @classmethod
+    def validate_publication_date(cls, value: str | None) -> str | None:
+        return clean_text(value, "publication_date", max_length=80) if value is not None else None
 
     @field_validator("description")
     @classmethod
@@ -294,8 +312,21 @@ class BookSummary(ApiModel):
     updated_at: int
 
 
+class BookShelf(ApiModel):
+    id: UUID
+    name: str
+
+
+class BookShelfPage(ApiModel):
+    items: list[BookShelf]
+    next_after: UUID | None
+
+
 class BookDetail(BookSummary):
     series: str | None = None
+    publisher: str | None = None
+    publication_date: str | None = None
+    shelf_refs: list[BookShelf] = Field(default_factory=list)
     description: str | None
     identifiers: list[BookIdentifier]
     copies: list[BookCopy]

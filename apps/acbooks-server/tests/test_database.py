@@ -621,6 +621,7 @@ def test_batch_migration_must_preserve_status_triggers(tmp_path: Path, table: st
     (scripts / "versions/0007_sync.py").unlink()
     (scripts / "versions/0008_file_hash.py").unlink()
     (scripts / "versions/0009_account_avatar.py").unlink()
+    (scripts / "versions/0010_book_publication.py").unlink()
     command.upgrade(config, "0003")
     migration = scripts / "versions/0006_test_batch.py"
     migration.write_text(

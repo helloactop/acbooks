@@ -38,14 +38,6 @@ interface RemoteLibraryDao {
     suspend fun clearRemoteCatalog(profileId: String)
 
     @Query("""
-        SELECT b.description FROM remote_catalog b
-        JOIN remote_book_links l ON l.profileId = b.profileId AND l.remoteBookId = b.remoteBookId
-        JOIN server_profiles p ON p.id = l.profileId AND p.currentSlot = 1
-        WHERE l.localBookId = :bookId AND b.available = 1
-    """)
-    fun observeCloudDescription(bookId: String): Flow<String?>
-
-    @Query("""
         SELECT f.* FROM remote_catalog_files f
         JOIN remote_book_links l ON l.profileId = f.profileId AND l.remoteBookId = f.remoteBookId
         WHERE f.profileId = :profileId AND l.localBookId = :bookId
@@ -84,6 +76,9 @@ interface RemoteLibraryDao {
 
     @Query("SELECT * FROM remote_book_links WHERE profileId = :profileId AND localBookId = :localBookId")
     suspend fun remoteBookLink(profileId: String, localBookId: String): RemoteBookLink?
+
+    @Query("SELECT * FROM remote_book_links WHERE profileId = :profileId")
+    suspend fun remoteBookLinks(profileId: String): List<RemoteBookLink>
 
     @Query("SELECT * FROM remote_book_links WHERE profileId = :profileId ORDER BY localBookId LIMIT :limit OFFSET :offset")
     fun observeRemoteBookLinks(profileId: String, limit: Int, offset: Int = 0): Flow<List<RemoteBookLink>>

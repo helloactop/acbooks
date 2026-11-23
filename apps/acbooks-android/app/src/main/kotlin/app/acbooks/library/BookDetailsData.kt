@@ -16,6 +16,7 @@ internal data class BookDetailsData(
     val formats: List<String> = emptyList(),
     val tags: List<String> = emptyList(),
     val readingStatus: BookReadingStatus? = null,
+    val series: String? = null,
     val readingStatistics: BookReadingStatistics? = null,
     val readingLocation: BookReadingLocation? = null,
 )
@@ -24,7 +25,6 @@ internal enum class BookReadingStatus { Unread, Reading, Finished }
 
 internal data class BookReadingStatistics(
     val activeSeconds: Long,
-    val sessionCount: Int,
     val readingDays: Int,
     val lastReadAt: Long,
 )

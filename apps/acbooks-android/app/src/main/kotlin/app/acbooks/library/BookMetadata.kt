@@ -11,7 +11,12 @@ import java.util.zip.ZipFile
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 
-internal data class BookMetadata(val title: String, val author: String? = null, val cover: ByteArray? = null)
+internal data class BookMetadata(
+    val title: String,
+    val author: String? = null,
+    val cover: ByteArray? = null,
+    val isbn: String? = null,
+)
 
 internal data class BookBibliography(
     val description: String? = null,
@@ -32,14 +37,15 @@ internal fun readBookMetadata(file: File, format: String, fallback: String): Boo
             if (!header.toString(Charsets.ISO_8859_1).contains("%PDF-") ||
                 !trailer.toString(Charsets.ISO_8859_1).contains("%%EOF")
             ) throw IOException("Invalid PDF")
+            BookMetadata(fallback, isbn = pdf.readPdfIsbn(fallback))
         }
-        BookMetadata(fallback)
     }
     "epub" -> try {
         ZipFile(file).use { epub ->
             val rootfile = epub.packagePath()
             var title: String? = null
             val authors = mutableListOf<String>()
+            val identifiers = mutableListOf<String>()
             var legacyCoverId: String? = null
             val images = mutableMapOf<String, String>()
             var coverHref: String? = null
@@ -51,6 +57,7 @@ internal fun readBookMetadata(file: File, format: String, fallback: String): Boo
                         "title" -> if (title == null) title = nextText().trim().take(512).ifEmpty { null }
                         "creator" -> if (authors.size < 12) nextText().trim().take(128)
                             .takeIf(String::isNotEmpty)?.let(authors::add)
+                        "identifier" -> identifiers.add(nextText())
                     }
                 }
                 if (depth == 3 && name == "meta" && getAttributeValue(null, "name") == "cover") {
@@ -69,7 +76,10 @@ internal fun readBookMetadata(file: File, format: String, fallback: String): Boo
             }
             requireEpub(sawPackage)
             val cover = (coverHref ?: legacyCoverId?.let(images::get))?.let { epub.readCover(rootfile, it) }
-            BookMetadata(title ?: fallback, authors.distinct().joinToString(", ").ifEmpty { null }, cover)
+            BookMetadata(
+                title ?: fallback, authors.distinct().joinToString(", ").ifEmpty { null }, cover,
+                selectImportedIsbn(identifiers, fallback),
+            )
         }
     } catch (failure: XmlPullParserException) {
         throw IOException("Invalid EPUB package", failure)
@@ -139,6 +149,54 @@ internal fun readEpubBibliography(file: File): BookBibliography = ZipFile(file).
         categories = categories.distinct(),
     )
 }
+
+private fun RandomAccessFile.readPdfIsbn(filename: String): String? {
+    val window = 256 * 1024
+    fun readWindow(offset: Long): String {
+        seek(offset)
+        val bytes = ByteArray(minOf(length() - offset, window.toLong()).toInt()).also(::readFully)
+        return bytes.toString(Charsets.UTF_8)
+    }
+
+    val start = readWindow(0)
+    val end = if (length() > window) readWindow(length() - window) else ""
+    val identifiers = sequenceOf(start, end).flatMap { section ->
+        pdfIsbnField.findAll(section).map { match -> match.groupValues[1].ifEmpty { match.groupValues[3] } }
+    }.toList()
+    return selectImportedIsbn(identifiers, filename)
+}
+
+private fun selectImportedIsbn(identifiers: Iterable<String>, filename: String): String? {
+    val embedded = identifiers.mapNotNull(String::validImportedIsbn).distinctBy(String::bookIsbnMatchKey)
+    if (embedded.isNotEmpty()) return embedded.singleOrNull()
+    val fromFilename = filenameIsbn.findAll(filename).mapNotNull { it.value.validImportedIsbn() }
+        .distinctBy(String::bookIsbnMatchKey).toList()
+    return filename.validImportedIsbn() ?: fromFilename.singleOrNull()
+}
+
+internal fun String.validImportedIsbn(): String? {
+    val value = replaceFirst(isbnPrefix, "").normalizedBookIsbn()
+    if (!importedIsbn.matches(value)) return null
+    val weightedSum = value.mapIndexed { index, digit ->
+        val number = if (digit == 'X') 10 else digit.digitToInt()
+        val weight = if (value.length == 10) 10 - index else if (index % 2 == 0) 1 else 3
+        number * weight
+    }.sum()
+    val modulus = if (value.length == 10) 11 else 10
+    return value.takeIf { weightedSum % modulus == 0 }
+}
+
+private val isbnPrefix = Regex("""^\s*(?:urn:isbn:|isbn(?:-1[03])?\s*[:：]?\s*)""", RegexOption.IGNORE_CASE)
+private val importedIsbn = Regex("""[0-9]{9}[0-9X]|97[89][0-9]{10}""")
+private val filenameIsbn = Regex(
+    """(?<![0-9])(?:97[89](?:[ -]?[0-9]){10}|ISBN(?:-1[03])?\s*[:：]?\s*[0-9](?:[ -]?[0-9]){8}[ -]?[0-9X])(?![0-9])""",
+    RegexOption.IGNORE_CASE,
+)
+// PDF Info strings and XMP packets are readable here when stored without filters.
+private val pdfIsbnField = Regex(
+    """/ISBN\s*\(([^()]{1,80})\)|<(prism:isbn|pdfx:ISBN|dc:identifier)(?:\s+[^<>]{0,256})?>\s*([^<>]{1,80})</\2>""",
+    RegexOption.IGNORE_CASE,
+)
 
 private const val DublinCore = "http://purl.org/dc/elements/1.1/"
 private const val Opf = "http://www.idpf.org/2007/opf"

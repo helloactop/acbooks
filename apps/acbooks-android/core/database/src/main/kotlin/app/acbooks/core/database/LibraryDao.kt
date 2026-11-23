@@ -16,12 +16,12 @@ enum class BookImportCommit { Added, Duplicate, MatchingContent }
 data class LocalBookRemoval(
     val unreferencedObjects: List<LocalFileObject>,
     val unreferencedCoverHashes: List<String>,
+    val editedCoverKey: String? = null,
 )
 
 @Dao
 abstract class LibraryDao :
-    ShelfDao, ReadingPositionDao, ReadingSessionDao, ReadingMarkDao, CatalogMetadataDao,
-    FileSourceDao, FolderDao, RemoteLibraryDao {
+    BookEditDao, ReadingPositionDao, ReadingSessionDao, ReadingMarkDao, FileSourceDao, FolderDao {
     @Upsert
     protected abstract suspend fun upsertServerProfile(profile: ServerProfile)
 
@@ -54,14 +54,17 @@ abstract class LibraryDao :
     }
 
     @Query("""
-        SELECT b.id, COALESCE(c.title, b.title) AS title, COALESCE(c.author, (
+        SELECT b.id,
+        CASE WHEN e.bookId IS NOT NULL THEN b.title ELSE COALESCE(c.title, b.title) END AS title,
+        CASE WHEN e.bookId IS NOT NULL THEN b.author WHEN c.metadataJson IS NOT NULL THEN c.author
+        ELSE COALESCE(c.author, (
             SELECT group_concat(name, ', ') FROM (
                 SELECT c.name FROM book_contributors bc
                 JOIN contributors c ON c.id = bc.contributorId
                 WHERE bc.bookId = b.id AND bc.role = 'author'
                 ORDER BY c.name, c.id
             )
-        ), b.author) AS author, b.importedAt,
+        ), b.author) END AS author, b.importedAt,
         COALESCE(f.format, (
             SELECT rf.format FROM remote_catalog_files rf
             WHERE rf.profileId = c.profileId AND rf.remoteBookId = c.remoteBookId
@@ -77,11 +80,13 @@ abstract class LibraryDao :
             SELECT 1 FROM remote_catalog_files rf WHERE rf.profileId = c.profileId AND rf.remoteBookId = c.remoteBookId
             AND rf.fileStatus = 'present' AND rf.format IN ('epub', 'pdf')
         ) AS canDownload,
-        (c.profileId || '-' || c.remoteBookId || '-' || c.coverUpdatedAt) AS cloudCoverKey
+        (c.profileId || '-' || c.remoteBookId || '-' || c.coverUpdatedAt) AS cloudCoverKey,
+        CASE WHEN c.remoteBookId IS NULL OR e.coverKey IS NOT NULL THEN b.editedCoverKey END AS editedCoverKey
         FROM books b
         LEFT JOIN server_profiles p ON p.currentSlot = 1
         LEFT JOIN remote_book_links l ON l.profileId = p.id AND l.localBookId = b.id
         LEFT JOIN remote_catalog c ON c.profileId = l.profileId AND c.remoteBookId = l.remoteBookId AND c.available = 1
+        LEFT JOIN pending_book_edits e ON e.bookId = b.id AND e.profileId = p.id
         LEFT JOIN book_files f ON f.id = COALESCE(b.preferredFileId, (
             SELECT id FROM book_files WHERE bookId = b.id ORDER BY id LIMIT 1
         ))
@@ -135,6 +140,7 @@ abstract class LibraryDao :
 
     @Transaction
     open suspend fun removeLocalBook(bookId: String): LocalBookRemoval? {
+        val editedCoverKey = book(bookId)?.editedCoverKey
         val files = allBookFiles(bookId)
         if (deleteBookRow(bookId) == 0) return null
 
@@ -145,7 +151,7 @@ abstract class LibraryDao :
         val unreferencedCoverHashes = files.map { it.sha256 }.distinct()
             .filterNot { hasFileWithHash(it) }
 
-        return LocalBookRemoval(unreferencedObjects, unreferencedCoverHashes)
+        return LocalBookRemoval(unreferencedObjects, unreferencedCoverHashes, editedCoverKey)
     }
 
     @Transaction
@@ -168,6 +174,8 @@ abstract class LibraryDao :
         profileId: String,
         books: List<RemoteCatalogBook>,
         files: List<RemoteCatalogFile>,
+        shelfSnapshot: RemoteShelfSnapshot? = null,
+        preserveShelfEditsFor: Set<String> = emptySet(),
     ) {
         check(currentServerProfile()?.id == profileId)
         require(books.all { it.profileId == profileId } && files.all { it.profileId == profileId })
@@ -181,6 +189,51 @@ abstract class LibraryDao :
             val id = remote.remoteBookId
             addBook(LocalBook(id, remote.title, remote.author, remote.cachedAt, description = remote.description))
             linkRemoteBook(RemoteBookLink(profileId, id, remote.remoteBookId))
+        }
+        if (shelfSnapshot != null) replaceRemoteShelves(profileId, shelfSnapshot, preserveShelfEditsFor)
+    }
+
+    private suspend fun replaceRemoteShelves(
+        profileId: String,
+        snapshot: RemoteShelfSnapshot,
+        preserveShelfEditsFor: Set<String>,
+    ) {
+        val existing = allShelves()
+        val localByName = existing.filter { it.serverNameKey == null }
+            .groupBy { it.name.shelfNameKey() }.toMutableMap()
+        val remoteIds = snapshot.shelves.mapTo(mutableSetOf()) { it.id }
+        for (remote in snapshot.shelves) {
+            val key = remote.name.shelfNameKey()
+            // Keep server shelves distinct by ID even if their names compare equal.
+            upsertShelf(LocalShelf(remote.id, remote.name, "\u0000${remote.id}", serverNameKey = key))
+            for (local in localByName.remove(key).orEmpty()) {
+                if (local.id == remote.id || local.id in remoteIds) continue
+                copyShelfMemberships(local.id, remote.id)
+                deleteShelf(local.id)
+            }
+        }
+
+        val linksByRemoteBook = remoteBookLinks(profileId).groupBy { it.remoteBookId }
+        for ((remoteBookId, shelfIds) in snapshot.shelfIdsByRemoteBook) {
+            check(remoteIds.containsAll(shelfIds))
+            for (link in linksByRemoteBook[remoteBookId].orEmpty()) {
+                if (link.localBookId !in preserveShelfEditsFor) replaceBookShelves(link.localBookId, shelfIds)
+            }
+        }
+
+        for (old in existing) {
+            val key = old.serverNameKey ?: continue
+            if (old.id in remoteIds) continue
+            if (hasShelfMembers(old.id)) {
+                // Retain assignments for local-only books and unsynced edits.
+                val replacement = shelfByNameKey(key, excludingId = old.id)
+                if (replacement == null) {
+                    upsertShelf(old.copy(nameKey = key, serverNameKey = null))
+                    continue
+                }
+                copyShelfMemberships(old.id, replacement.id)
+            }
+            deleteShelf(old.id)
         }
     }
 
@@ -261,6 +314,7 @@ abstract class LibraryDao :
         content: LocalFileObject,
         allowMatchingContent: Boolean,
         verifiedAt: Long? = null,
+        isbn: String? = null,
     ): BookImportCommit {
         if (hasImported(file.sourceUri, file.sha256, file.format)) {
             if (verifiedAt != null) {
@@ -277,6 +331,7 @@ abstract class LibraryDao :
             insertContributor(contributor)
             insertBookContributor(LocalBookContributor(book.id, contributor.id, "author"))
         }
+        isbn?.let { insertBookIdentifier(LocalBookIdentifier(UUID.randomUUID().toString(), book.id, "isbn", it)) }
         addFile(file)
         recordImportedSources(file.sha256, file.format, file.sourceUri, verifiedAt)
         return BookImportCommit.Added

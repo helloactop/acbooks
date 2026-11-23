@@ -74,7 +74,7 @@ class BookRecord:
     translators: list[str]
     identifiers: list[tuple[str, str]]
     tags: list[str]
-    shelves: list[str]
+    shelves: list[tuple[str, str]]
     copies: list[CopyRecord]
     files: list[FileRecord]
 
@@ -284,6 +284,13 @@ def _location_options(
     options.sort(key=lambda option: (-(option.count or 0), option.label.casefold()))
     has_more = len(options) > limit
     return options[:limit], has_more
+
+
+def list_shelves(session: Session, *, after: str | None, limit: int) -> list[Shelf]:
+    statement = select(Shelf).order_by(Shelf.id).limit(limit)
+    if after is not None:
+        statement = statement.where(Shelf.id > after)
+    return list(session.scalars(statement))
 
 
 def list_filter_options(
@@ -551,7 +558,7 @@ def load_records(
     translators: dict[str, list[str]] = defaultdict(list)
     identifiers: dict[str, list[tuple[str, str]]] = defaultdict(list)
     tags: dict[str, list[str]] = defaultdict(list)
-    shelves: dict[str, list[str]] = defaultdict(list)
+    shelves: dict[str, list[tuple[str, str]]] = defaultdict(list)
     copies: dict[str, list[CopyRecord]] = defaultdict(list)
     files: dict[str, list[FileRecord]] = defaultdict(list)
 
@@ -581,13 +588,13 @@ def load_records(
     ):
         tags[book_id].append(name)
 
-    for book_id, name in session.execute(
-        select(ShelfBook.book_id, Shelf.name)
+    for book_id, shelf_id, name in session.execute(
+        select(ShelfBook.book_id, Shelf.id, Shelf.name)
         .join(Shelf, Shelf.id == ShelfBook.shelf_id)
         .where(ShelfBook.book_id.in_(ids))
         .order_by(Shelf.name.collate("NOCASE"), Shelf.id)
     ):
-        shelves[book_id].append(name)
+        shelves[book_id].append((shelf_id, name))
 
     for copy_id, book_id, location_id, location_name, acquired_at, note in (
         session.execute(
