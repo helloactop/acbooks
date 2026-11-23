@@ -7,6 +7,7 @@ import android.util.Base64
 import app.acbooks.core.database.LibraryDao
 import app.acbooks.core.database.PendingBookEdit
 import app.acbooks.core.database.RemoteCatalogBook
+import app.acbooks.core.database.RemoteShelf
 import app.acbooks.core.database.RemoteShelfSnapshot
 import app.acbooks.core.database.PendingCloudUpload
 import app.acbooks.core.database.PendingCloudDownload
