@@ -41,6 +41,7 @@ import app.acbooks.library.LibraryViewModel
 import app.acbooks.library.ReadableBookFile
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -53,6 +54,7 @@ import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.Menu
+import top.yukonga.miuix.kmp.icon.glass.SettingsOutline
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private sealed interface ReaderState {
@@ -75,7 +77,11 @@ internal fun LocalReaderScreen(
     }
     val backdrop = rememberLayerBackdrop()
     var showContents by rememberSaveable(bookId) { mutableStateOf(false) }
+    var showTypography by rememberSaveable(bookId) { mutableStateOf(false) }
     var toolbarVisible by rememberSaveable(bookId) { mutableStateOf(false) }
+    val typography by produceState<ReaderTypographySettings?>(null, model) {
+        model.readerTypography.collect { value = it }
+    }
     var chapters by remember(bookId) { mutableStateOf<List<ReaderChapter>?>(null) }
     var currentHref by remember(bookId) { mutableStateOf<String?>(null) }
     var epubFragment by remember(bookId) { mutableStateOf<EpubDocumentFragment?>(null) }
@@ -87,7 +93,7 @@ internal fun LocalReaderScreen(
         { value -> currentHref = value }
     }
     val centerTapHandler: () -> Unit = remember(bookId) {
-        { if (!showContents) toolbarVisible = !toolbarVisible }
+        { if (!showContents && !showTypography) toolbarVisible = !toolbarVisible }
     }
     val readerInsets = WindowInsets.navigationBarsIgnoringVisibility
         .union(WindowInsets.displayCutout)
@@ -133,16 +139,35 @@ internal fun LocalReaderScreen(
             }
             val ready = state as? ReaderState.Ready
             if (ready?.file?.format == "epub") {
-                if (toolbarVisible) GlassIconButton(
-                    onClick = { showContents = true },
-                    modifier = Modifier.align(Alignment.BottomStart)
-                        .padding(start = 16.dp, bottom = 16.dp),
-                    backdrop = backdrop,
-                ) {
-                    Icon(
-                        MiuixIcons.Glass.Menu,
-                        stringResource(R.string.reader_contents),
-                    )
+                if (toolbarVisible) {
+                    GlassIconButton(
+                        onClick = {
+                            showTypography = false
+                            showContents = true
+                        },
+                        modifier = Modifier.align(Alignment.BottomStart)
+                            .padding(start = 16.dp, bottom = 16.dp),
+                        backdrop = backdrop,
+                    ) {
+                        Icon(
+                            MiuixIcons.Glass.Menu,
+                            stringResource(R.string.reader_contents),
+                        )
+                    }
+                    GlassIconButton(
+                        onClick = {
+                            showContents = false
+                            showTypography = true
+                        },
+                        modifier = Modifier.align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = 16.dp),
+                        backdrop = backdrop,
+                    ) {
+                        Icon(
+                            MiuixIcons.Glass.SettingsOutline,
+                            stringResource(R.string.reader_typography_title),
+                        )
+                    }
                 }
                 ReaderContentsSheet(
                     show = showContents,
@@ -155,6 +180,13 @@ internal fun LocalReaderScreen(
                             showContents = false
                         }
                     },
+                )
+                ReaderTypographySheet(
+                    show = showTypography,
+                    settings = typography,
+                    backdrop = backdrop,
+                    onDismiss = { showTypography = false },
+                    onSave = model::saveReaderTypographySettings,
                 )
             }
         }
