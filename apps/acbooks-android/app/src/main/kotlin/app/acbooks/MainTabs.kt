@@ -9,13 +9,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
@@ -422,10 +428,19 @@ private fun MainTabPage(
     val scrollBehavior = MiuixScrollBehavior()
     val layoutDirection = LocalLayoutDirection.current
     val background = MiuixTheme.colorScheme.surface
+    // The reader temporarily hides the Activity status bar. NavDisplay keeps the
+    // covered library entry alive during transitions, so compensate for the
+    // transiently missing status-bar inset instead of moving the whole library up.
+    val hiddenStatusBarInset = WindowInsets.statusBarsIgnoringVisibility.exclude(WindowInsets.statusBars)
     Scaffold(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = { topBar(backdrop, scrollBehavior) },
+        topBar = {
+            Column {
+                Spacer(Modifier.windowInsetsTopHeight(hiddenStatusBarInset))
+                topBar(backdrop, scrollBehavior)
+            }
+        },
     ) { topBarPadding ->
         // The page owns its header height. The outer scaffold supplies only the shared safe edges.
         val pagePadding = PaddingValues(
