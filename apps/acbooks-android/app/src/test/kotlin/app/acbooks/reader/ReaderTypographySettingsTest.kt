@@ -7,6 +7,27 @@ import org.junit.Test
 /** Pure JVM tests; Readium's Theme requires Android and is tested on device. */
 class ReaderTypographySettingsTest {
     @Test
+    fun newReaderUsesWechatInspiredTypographyWithoutChangingLegacyConstructor() {
+        val defaults = defaultReaderTypographySettings()
+
+        assertEquals(ReaderFontFamily.SANS_SERIF, defaults.fontFamily)
+        assertEquals(1.3, defaults.fontSize)
+        assertEquals(1.5, defaults.lineHeight)
+        assertEquals(1.0, defaults.pageMargins)
+        assertEquals(2.0, defaults.paragraphIndent)
+        assertEquals(0.0, defaults.paragraphSpacing)
+        assertEquals(ReaderTextAlignment.JUSTIFY, defaults.textAlignment)
+        assertEquals(false, defaults.publisherStyles)
+        assertEquals(false, defaults.scroll)
+        assertEquals(ReaderAppearance.SYSTEM, defaults.appearance)
+
+        // Old explicit styles and per-book snapshots must still deserialize
+        // using the same unspecific constructor as before this change.
+        assertEquals(ReaderFontFamily.BOOK, ReaderTypographySettings().fontFamily)
+        assertNull(ReaderTypographySettings().fontSize)
+    }
+
+    @Test
     fun defaultsPreservePublisherTypography() {
         val settings = ReaderTypographySettings()
         assertEquals(ReaderFontFamily.BOOK, settings.fontFamily)
