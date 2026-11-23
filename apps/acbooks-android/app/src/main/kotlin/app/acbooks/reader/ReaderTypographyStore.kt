@@ -44,32 +44,39 @@ private object Keys {
 internal class ReaderTypographyStore(context: Context) {
     private val dataStore = context.applicationContext.readerTypographyDataStore
 
-    val settings: Flow<ReaderTypographySettings> = dataStore.data
+    private val savedPreferences: Flow<Preferences> = dataStore.data
         .catch { failure ->
             if (failure !is IOException) throw failure
             Log.w("Reader", "Could not load typography preferences", failure)
             emit(emptyPreferences())
         }
-        .map { saved ->
-            ReaderTypographySettings(
-                fontFamily = saved[Keys.fontFamily].enumOr(ReaderFontFamily.BOOK),
-                fontSize = saved[Keys.fontSize],
-                fontWeight = saved[Keys.fontWeight],
-                lineHeight = saved[Keys.lineHeight],
-                pageMargins = saved[Keys.pageMargins],
-                paragraphIndent = saved[Keys.paragraphIndent],
-                paragraphSpacing = saved[Keys.paragraphSpacing],
-                letterSpacing = saved[Keys.letterSpacing],
-                wordSpacing = saved[Keys.wordSpacing],
-                textAlignment = saved[Keys.textAlignment].enumOrNull<ReaderTextAlignment>(),
-                publisherStyles = saved[Keys.publisherStyles],
-                scroll = saved[Keys.scroll] ?: false,
-                appearance = saved[Keys.appearance].enumOr(ReaderAppearance.SYSTEM),
-                backgroundArgb = saved[Keys.backgroundArgb],
-                textArgb = saved[Keys.textArgb],
-            ).normalized()
-        }
+
+    /** Existing global preferences remain in place; no migration is necessary. */
+    val settings: Flow<ReaderTypographySettings> = savedPreferences
+        .map { it.readGlobalTypography() }
         .distinctUntilChanged()
+
+    fun forBook(bookId: String): Flow<ReaderTypographyProfile> {
+        val key = bookOverrideKey(bookId)
+        return savedPreferences
+            .map { saved ->
+                ReaderTypographyProfile(
+                    global = saved.readGlobalTypography(),
+                    bookOverride = saved[key]?.let(::readerTypographyFromBookOverrideJson),
+                )
+            }
+            .distinctUntilChanged()
+    }
+
+    suspend fun saveBook(bookId: String, value: ReaderTypographySettings) {
+        val key = bookOverrideKey(bookId)
+        dataStore.edit { it[key] = value.toBookOverrideJson() }
+    }
+
+    suspend fun clearBook(bookId: String) {
+        val key = bookOverrideKey(bookId)
+        dataStore.edit { it.remove(key) }
+    }
 
     suspend fun save(value: ReaderTypographySettings) {
         val saved = value.normalized()
@@ -92,6 +99,31 @@ internal class ReaderTypographyStore(context: Context) {
         }
     }
 }
+
+/** Dynamic preference keys keep book-specific entries independent of global keys. */
+private fun bookOverrideKey(bookId: String): Preferences.Key<String> {
+    require(bookId.isNotBlank()) { "Book ID must not be blank" }
+    return stringPreferencesKey("book_override_$bookId")
+}
+
+private fun Preferences.readGlobalTypography(): ReaderTypographySettings =
+    ReaderTypographySettings(
+        fontFamily = this[Keys.fontFamily].enumOr(ReaderFontFamily.BOOK),
+        fontSize = this[Keys.fontSize],
+        fontWeight = this[Keys.fontWeight],
+        lineHeight = this[Keys.lineHeight],
+        pageMargins = this[Keys.pageMargins],
+        paragraphIndent = this[Keys.paragraphIndent],
+        paragraphSpacing = this[Keys.paragraphSpacing],
+        letterSpacing = this[Keys.letterSpacing],
+        wordSpacing = this[Keys.wordSpacing],
+        textAlignment = this[Keys.textAlignment].enumOrNull<ReaderTextAlignment>(),
+        publisherStyles = this[Keys.publisherStyles],
+        scroll = this[Keys.scroll] ?: false,
+        appearance = this[Keys.appearance].enumOr(ReaderAppearance.SYSTEM),
+        backgroundArgb = this[Keys.backgroundArgb],
+        textArgb = this[Keys.textArgb],
+    ).normalized()
 
 private inline fun <reified T : Enum<T>> String?.enumOrNull(): T? =
     enumValues<T>().firstOrNull { it.name == this }

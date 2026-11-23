@@ -79,8 +79,8 @@ internal fun LocalReaderScreen(
     var showContents by rememberSaveable(bookId) { mutableStateOf(false) }
     var showTypography by rememberSaveable(bookId) { mutableStateOf(false) }
     var toolbarVisible by rememberSaveable(bookId) { mutableStateOf(false) }
-    val typography by produceState<ReaderTypographySettings?>(null, model) {
-        model.readerTypography.collect { value = it }
+    val typographyProfile by produceState<ReaderTypographyProfile?>(null, model, bookId) {
+        model.readerTypographyFor(bookId).collect { value = it }
     }
     var chapters by remember(bookId) { mutableStateOf<List<ReaderChapter>?>(null) }
     var currentHref by remember(bookId) { mutableStateOf<String?>(null) }
@@ -183,10 +183,13 @@ internal fun LocalReaderScreen(
                 )
                 ReaderTypographySheet(
                     show = showTypography,
-                    settings = typography,
+                    bookId = bookId,
+                    profile = typographyProfile,
                     backdrop = backdrop,
                     onDismiss = { showTypography = false },
-                    onSave = model::saveReaderTypographySettings,
+                    onSaveGlobal = model::saveReaderTypographySettings,
+                    onSaveBook = { model.saveBookReaderTypographySettings(bookId, it) },
+                    onClearBook = { model.clearBookReaderTypographySettings(bookId) },
                 )
             }
         }

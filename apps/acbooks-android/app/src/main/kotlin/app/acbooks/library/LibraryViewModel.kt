@@ -18,6 +18,7 @@ import app.acbooks.core.database.LibraryShelf
 import app.acbooks.core.database.LocalBookCard
 import app.acbooks.core.database.LocalReadingSession
 import app.acbooks.reader.ReaderTypographySettings
+import app.acbooks.reader.ReaderTypographyProfile
 import app.acbooks.reader.ReaderTypographyStore
 import java.io.IOException
 import java.util.UUID
@@ -26,6 +27,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
@@ -112,6 +114,35 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
 
     /** Read from the store before creating Readium; avoid applying an optimistic default. */
     suspend fun loadReaderTypographySettings(): ReaderTypographySettings = readerTypography.first()
+
+    /** Resolve the actual book-scoped layout, inheriting global when no override exists. */
+    fun readerTypographyFor(bookId: String): Flow<ReaderTypographyProfile> =
+        readerTypographyStore.forBook(bookId)
+
+    suspend fun loadReaderTypographyProfile(bookId: String): ReaderTypographyProfile =
+        readerTypographyFor(bookId).first()
+
+    /** Editing an individual book never modifies the shared/global configuration. */
+    fun saveBookReaderTypographySettings(bookId: String, value: ReaderTypographySettings) {
+        viewModelScope.launch {
+            try {
+                readerTypographyStore.saveBook(bookId, value)
+            } catch (failure: IOException) {
+                Log.w("Reader", "Could not save book-specific typography", failure)
+            }
+        }
+    }
+
+    /** Remove only this book's override, allowing global changes to take effect. */
+    fun clearBookReaderTypographySettings(bookId: String) {
+        viewModelScope.launch {
+            try {
+                readerTypographyStore.clearBook(bookId)
+            } catch (failure: IOException) {
+                Log.w("Reader", "Could not clear book-specific typography", failure)
+            }
+        }
+    }
 
     /** Called by the future typography sheet. Existing EPUBs can observe readerTypography. */
     fun saveReaderTypographySettings(value: ReaderTypographySettings) {
