@@ -111,6 +111,8 @@ internal class EpubDocumentFragment : Fragment() {
                 null
             }
             if (source == null || opened == null) {
+                chapters = emptyList()
+                onContentsChanged?.invoke(chapters)
                 root.removeView(loading)
                 root.addView(TextView(root.context).apply {
                     setText(R.string.reader_open_failed)
