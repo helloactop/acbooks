@@ -1,0 +1,81 @@
+name: Publish Server Image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    name: Build ${{ matrix.arch }} server image
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Check out server build sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            deploy
+            apps/acbooks-server
+            apps/acbooks-web
+            packages/acbooks-ui
+            packages/acbooks-api-client
+
+      - name: Sign in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build and push platform image
+        env:
+          IMAGE_ARCH: ${{ matrix.arch }}
+        shell: bash
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}-server"
+          docker buildx create --driver docker-container --use
+          docker buildx build --platform "linux/$IMAGE_ARCH" --file deploy/Dockerfile \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.licenses=GPL-3.0-only" \
+            --tag "$image:build-$GITHUB_RUN_ID-$IMAGE_ARCH" --push .
+
+  publish:
+    name: Publish multi-platform image
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Sign in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Publish image tag and show deployment reference
+        shell: bash
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}-server"
+          release="$image:sha-$GITHUB_SHA"
+          docker buildx imagetools create --tag "$release" \
+            "$image:build-$GITHUB_RUN_ID-amd64" \
+            "$image:build-$GITHUB_RUN_ID-arm64"
+          {
+            printf '### Server image\n\n`ACBOOKS_IMAGE=%s`\n\n' "$release"
+            printf '```text\n'
+            docker buildx imagetools inspect "$release"
+            printf '```\n'
+          } >> "$GITHUB_STEP_SUMMARY"

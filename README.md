@@ -52,6 +52,11 @@ Docker 镜像在一个容器内构建 Web 客户端并由 FastAPI 同源托管�
 SPA 深链接自动回退到 `index.html`；API、Cookie 与 CSRF 校验保持同源，
 无需额外 CORS 配置。Worker 使用同一镜像单独运行。
 
+VPS 可以从 GHCR 拉取已发布的 AMD64/ARM64 服务端镜像。安装和升级步骤见
+[从 GHCR 部署](docs/deployment/docker.md#从-ghcr-部署)。
+
+从源码构建时，从仓库根目录执行。
+
 ```sh
 docker compose -f deploy/compose.yaml up -d --build --wait
 curl -fsS http://127.0.0.1:8000/api/v1/ready
