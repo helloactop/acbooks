@@ -1613,6 +1613,16 @@ export interface components {
             sourceKey?: string | null;
             /** Coverid */
             coverId?: number | null;
+            /** Doubanid */
+            doubanId?: string | null;
+            /** Doubancoverurl */
+            doubanCoverUrl?: string | null;
+            /** Publisher */
+            publisher?: string | null;
+            /** Publicationdate */
+            publicationDate?: string | null;
+            /** Rating */
+            rating?: number | null;
         };
         /** CreateBook */
         CreateBook: {
@@ -8213,6 +8223,7 @@ export interface operations {
         parameters: {
             query: {
                 q: string;
+                source?: "openlibrary" | "douban";
             };
             header?: never;
             path?: never;

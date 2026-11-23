@@ -16,6 +16,7 @@ from app.db.session import create_session_factory
 from app.modules.books import repository
 from app.modules.books.normalization import normalize_isbn
 from app.modules.books.service import MAX_COVER_BYTES, publish_cover
+from app.modules.metadata import douban
 from app.modules.metadata.extract import EmbeddedMetadata, _authors, _text, read_metadata
 from app.modules.metadata.locks import (
     AUTHOR,
@@ -26,7 +27,7 @@ from app.modules.metadata.locks import (
     SERIES,
     TRANSLATOR,
 )
-from app.modules.metadata.schemas import DEFAULT_FIELDS, Candidate, MetadataSettings
+from app.modules.metadata.schemas import DEFAULT_FIELDS, Candidate, MetadataSettings, MetadataSource
 from app.workers import queue
 
 AUTO_FILL_KEY = "metadata.auto_fill"
@@ -135,7 +136,9 @@ class MetadataService:
             queue.add_job(session, "metadata_fill", {"bookIds": [book_id], "automatic": True})
 
     @staticmethod
-    def search(query: str) -> list[Candidate]:
+    def search(query: str, *, source: MetadataSource = "openlibrary") -> list[Candidate]:
+        if source == "douban":
+            return douban.search(query)
         isbn = normalize_isbn(query)
         if isbn:
             key = f"ISBN:{isbn}"
@@ -292,12 +295,16 @@ class MetadataService:
             except BusinessError:
                 pass
         cover = None
-        if needs_cover and candidate.cover_id is not None:
+        if needs_cover and (candidate.cover_id is not None or candidate.douban_cover_url):
             try:
-                content = _download(
-                    "covers.openlibrary.org",
-                    f"/b/id/{candidate.cover_id}-M.jpg?default=false",
-                    MAX_COVER_BYTES,
+                content = (
+                    douban.download_cover(candidate.douban_cover_url, MAX_COVER_BYTES)
+                    if candidate.douban_cover_url
+                    else _download(
+                        "covers.openlibrary.org",
+                        f"/b/id/{candidate.cover_id}-M.jpg?default=false",
+                        MAX_COVER_BYTES,
+                    )
                 )
             except BusinessError:
                 content = None

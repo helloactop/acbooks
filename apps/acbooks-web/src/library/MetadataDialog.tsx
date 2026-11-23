@@ -1,4 +1,4 @@
-import { Button, Input, Spinner } from "@acbooks/ui";
+import { Button, Input, Select, Spinner } from "@acbooks/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -9,6 +9,7 @@ import { getJob } from "../storage/storage-api";
 import { Modal } from "./Modal";
 
 type Candidate = components["schemas"]["Candidate"];
+type MetadataSource = "douban" | "openlibrary";
 type Job = components["schemas"]["JobStatus"];
 type BatchItem = { bookId: string; status: string; fields?: string[] };
 
@@ -22,6 +23,7 @@ export function MetadataDialog(props: Props) {
   const { t } = useTranslation("library");
   const { expireSession } = useAppShell();
   const [query, setQuery] = useState(props.isbn ?? props.title ?? "");
+  const [source, setSource] = useState<MetadataSource>("douban");
   const [candidates, setCandidates] = useState<Candidate[]>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -109,9 +111,22 @@ export function MetadataDialog(props: Props) {
               event.preventDefault();
               void perform(async () => {
                 setFields(undefined);
-                setCandidates(await apiRequest<Candidate[]>(`/metadata/candidates?q=${encodeURIComponent(query.trim())}`));
+                setCandidates(undefined);
+                const params = new URLSearchParams({ q: query.trim(), source });
+                setCandidates(await apiRequest<Candidate[]>(`/metadata/candidates?${params}`));
               });
             }}>
+              <Select ariaLabel={t("metadata.source")} disabled={busy} value={source}
+                onValueChange={(value) => {
+                  setSource(value === "openlibrary" ? "openlibrary" : "douban");
+                  setCandidates(undefined);
+                  setFields(undefined);
+                  setError(false);
+                }}
+                options={[
+                  { value: "douban", label: t("metadata.douban") },
+                  { value: "openlibrary", label: "Open Library" },
+                ]} />
               <Input aria-label={t("metadata.query")} className="min-w-0 flex-1" maxLength={200}
                 onChange={(event) => setQuery(event.target.value)} value={query} />
               <Button disabled={busy || query.trim().length === 0} type="submit">{t("metadata.search")}</Button>
@@ -123,11 +138,32 @@ export function MetadataDialog(props: Props) {
             ) : null}
             {candidates?.length === 0 ? <p>{t("metadata.empty")}</p> : null}
             {candidates?.map((candidate, index) => (
-              <div className="rounded-card border border-border p-3" key={index}>
+              <div className="flex flex-col items-start gap-1 rounded-card border border-border p-3"
+                key={candidate.doubanId ?? candidate.sourceKey ?? index}>
                 <h3 className="font-semibold">{candidate.title}</h3>
-                <p className="text-sm">{candidate.authors?.join(" · ")}</p>
+                {candidate.authors?.length ? <p className="text-sm">{candidate.authors.join(" · ")}</p> : null}
+                {candidate.translators?.length ? (
+                  <p className="text-sm">{t("metadata.translatedBy", { names: candidate.translators.join(" · ") })}</p>
+                ) : null}
+                {candidate.publisher || candidate.publicationDate || candidate.rating ? (
+                  <p className="text-sm">{[
+                    candidate.publisher, candidate.publicationDate,
+                    candidate.rating ? t("metadata.rating", { score: candidate.rating }) : null,
+                  ].filter(Boolean).join(" · ")}</p>
+                ) : null}
                 {candidate.isbn ? <p className="text-sm">ISBN {candidate.isbn}</p> : null}
-                <p className="text-xs text-muted-foreground">Open Library</p>
+                {candidate.description ? (
+                  <p className="line-clamp-3 whitespace-pre-line text-sm text-muted-foreground">{candidate.description}</p>
+                ) : null}
+                {candidate.tags?.length ? (
+                  <p className="text-xs text-muted-foreground">{candidate.tags.join(" · ")}</p>
+                ) : null}
+                {candidate.doubanId ? (
+                  <a className="text-xs text-accent-text underline" target="_blank" rel="noreferrer"
+                    href={`https://book.douban.com/subject/${encodeURIComponent(candidate.doubanId)}/`}>
+                    {t("metadata.douban")}
+                  </a>
+                ) : <p className="text-xs text-muted-foreground">Open Library</p>}
                 <Button disabled={busy} onClick={() => void perform(async () => {
                   const result = await postWithCsrf<components["schemas"]["AppliedMetadata"]>(
                     `/books/${encodeURIComponent(props.bookId)}/metadata`, candidate,

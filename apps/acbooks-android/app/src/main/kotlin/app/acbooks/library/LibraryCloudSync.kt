@@ -38,6 +38,13 @@ internal class LibraryCloudSync(
         profile?.origin to (profile != null && credentials.read(profile.id) != null)
     }
 
+    suspend fun searchDoubanMetadata(query: String): List<DoubanMetadataCandidate> = serialized {
+        val search = query.trim()
+        require(search.length in 1..200)
+        val session = verifiedSession() ?: throw IOException("No active server session")
+        session.client.searchDoubanMetadata(session.token, search)
+    }
+
     suspend fun login(address: String, username: String, password: String) = serialized {
         val origin = serverOrigin(address)
         val previous = dao.currentServerProfile()

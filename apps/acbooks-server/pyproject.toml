@@ -10,6 +10,7 @@ license = "GPL-3.0-only"
 dependencies = [
     "alembic>=1.16,<2",
     "argon2-cffi>=25.1,<26",
+    "beautifulsoup4>=4.13,<5",
     "defusedxml>=0.7,<1",
     "fastapi>=0.115,<1",
     "pillow>=11,<13",

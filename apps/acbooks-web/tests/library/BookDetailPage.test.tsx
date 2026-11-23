@@ -679,6 +679,51 @@ describe("BookDetailPage", () => {
     expect(more).toHaveFocus();
   });
 
+  it("searches Douban by the current ISBN and applies the selected candidate", async () => {
+    const candidate = {
+      title: "三体",
+      authors: ["刘慈欣"],
+      publisher: "重庆出版社",
+      publicationDate: "2008-01",
+      isbn: BOOK.isbn,
+      doubanId: "2567698",
+      rating: 9.3,
+    };
+    installApi(
+      baseHandler((url, init) => {
+        const method = methodOf(init);
+        if (url.pathname === `/api/v1/books/${BOOK_ID}` && method === "GET") {
+          return jsonResponse(BOOK);
+        }
+        if (url.pathname === "/api/v1/metadata/candidates" && method === "GET") {
+          expect(url.searchParams.get("q")).toBe(BOOK.isbn);
+          expect(url.searchParams.get("source")).toBe("douban");
+          return jsonResponse([candidate]);
+        }
+        if (url.pathname === `/api/v1/books/${BOOK_ID}/metadata` && method === "POST") {
+          expect(JSON.parse(String(init.body))).toEqual(candidate);
+          return jsonResponse({ fields: ["description"] });
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(await screen.findByRole("button", { name: "更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "搜索元数据" }));
+    const dialog = screen.getByRole("dialog", { name: "搜索元数据" });
+    await user.click(within(dialog).getByRole("button", { name: "搜索元数据" }));
+
+    expect(await within(dialog).findByText(/重庆出版社/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "豆瓣" })).toHaveAttribute(
+      "href",
+      "https://book.douban.com/subject/2567698/",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "采用候选" }));
+    expect(await within(dialog).findByRole("status")).toHaveTextContent("简介");
+  });
+
   it("renders the detail page in English", async () => {
     installApi(
       baseHandler((url, init) => {

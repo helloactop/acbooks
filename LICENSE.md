@@ -21,6 +21,7 @@ acbooks 的项目源码采用 **GNU 通用公共许可证第 3 版（GPL-3.0-onl
 | React DayPicker | `react-day-picker@9.14.0` | [gpbl/react-day-picker](https://github.com/gpbl/react-day-picker/tree/v9.14.0) | MIT | 月历、键盘导航与日期交互 |
 | date-fns | `date-fns@4.4.0` | [date-fns/date-fns](https://github.com/date-fns/date-fns/tree/v4.4.0) | MIT | 月历日期转换及中英文 locale |
 | Python tzdata | `tzdata==2026.6` | [python/tzdata](https://github.com/python/tzdata) | [Apache-2.0](https://pypi.org/project/tzdata/2026.6/) | 为缺少 IANA 时区数据库的 Windows 或精简部署提供 `zoneinfo` 回退 |
+| Beautiful Soup | `beautifulsoup4>=4.13,<5` | [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/) | [MIT](https://pypi.org/project/beautifulsoup4/) | 解析豆瓣网页元数据 |
 
 MIT（Expat）、ISC 和 Apache-2.0 均兼容 GPL 第 3 版。[GNU 许可证兼容性说明](https://www.gnu.org/licenses/license-compatibility.html)
 

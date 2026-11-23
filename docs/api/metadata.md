@@ -6,16 +6,18 @@
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| GET | `/api/v1/metadata/candidates?q=…` | ISBN 精确检索或按书名查找，至多返回 10 个候选 |
+| GET | `/api/v1/metadata/candidates?q=…&source=…` | 按 ISBN 或书名查找候选 |
 | POST | `/api/v1/books/{book_id}/metadata` | 采用候选，返回实际修改的 `fields` |
 | POST | `/api/v1/metadata/jobs` | 提交 `bookIds`（1–20 项），返回 202 和 `jobId` |
 | GET | `/api/v1/metadata/settings` | 读取服务端自动补全设置 |
 | PATCH | `/api/v1/metadata/settings` | 保存 `autoFill`（默认关闭）和 `fields` |
 
-读接口须登录，写接口另需 CSRF。在线查询源暂为 Open Library。ISBN 走版本级
-查询，按书名搜索返回作品级候选，因此不从同一作品的多个版本里任取 ISBN。
-简介和封面缺失或下载失败时保留空白。Open Library 缺少部分书目的译者或系列，
-这些字段只有来源确实提供时才可补全。源站失败返回 `502 METADATA_UNAVAILABLE`。
+读接口须登录。Web 会话写入另需 CSRF。手动查询的 `source` 可为 `openlibrary`（API 默认）
+或 `douban`。Open Library 按书名返回作品级候选，至多 10 条。
+豆瓣按书名提取最多 5 条详情，按 ISBN 先访问版本入口，然后回退搜索并匹配版本。
+出版年、出版社、评分和标签可在豆瓣候选中预览。服务端在采用候选时下载经校验的豆瓣封面。
+简介和封面缺失或下载失败时保留空白。源站失败返回 `502 METADATA_UNAVAILABLE`。
+自动和批量补全使用 Open Library。Android 已接入设备认证查询。
 
 字段包括 `title`、`authors`、`translators`、`series`、`description`、
 `isbn`、`cover`。字段开关适用于自动和批量在线补全。手动采用候选仍只写入

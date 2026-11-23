@@ -7,6 +7,7 @@ import java.io.File
 import java.io.IOException
 import java.io.OutputStream
 import java.net.URI
+import java.net.URLEncoder
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.UUID
 import javax.net.ssl.HttpsURLConnection
@@ -33,6 +34,13 @@ internal class LibraryCloudClient(private val origin: String) {
     ).getString("accessToken").also { check(it.isNotBlank()) }
 
     fun accountId(token: String): String = json("/auth/me", token).getString("id").asUuid()
+
+    fun searchDoubanMetadata(token: String, query: String): List<DoubanMetadataCandidate> {
+        val encoded = URLEncoder.encode(query, UTF_8.name())
+        return request("/metadata/candidates?source=douban&q=$encoded", "GET", token, setOf(200)) { response ->
+            response.inputStream.bufferedReader(UTF_8).use { parseDoubanCandidates(it.readText()) }
+        }
+    }
 
     fun logout(token: String) {
         request("/auth/logout", "POST", token, setOf(204)) { }

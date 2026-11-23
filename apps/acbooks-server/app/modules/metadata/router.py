@@ -12,6 +12,7 @@ from app.modules.metadata.schemas import (
     Candidate,
     MetadataJob,
     MetadataSettings,
+    MetadataSource,
 )
 from app.modules.metadata.service import MetadataService
 from app.workers import queue
@@ -28,8 +29,9 @@ def metadata_router(
     def search(
         current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
         q: Annotated[str, Query(min_length=1, max_length=200)],
+        source: MetadataSource = "openlibrary",
     ) -> list[Candidate]:
-        return service.search(q.strip()) if q.strip() else []
+        return service.search(q.strip(), source=source) if q.strip() else []
 
     @router.post("/books/{book_id}/metadata", operation_id="applyMetadata")
     def apply(
