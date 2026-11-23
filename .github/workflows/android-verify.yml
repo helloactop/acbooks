@@ -31,6 +31,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+          cache: gradle
+          cache-dependency-path: |
+            apps/acbooks-android/gradle/libs.versions.toml
+            apps/acbooks-android/gradle/wrapper/gradle-wrapper.properties
+            apps/acbooks-android/**/*.gradle.kts
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
@@ -39,4 +44,4 @@ jobs:
 
       - name: Build debug APK
         working-directory: apps/acbooks-android
-        run: bash ./gradlew --no-daemon :app:assembleDebug
+        run: bash ./ci-assemble.sh Debug
