@@ -65,6 +65,7 @@ internal fun ReaderTypographySettings.withPublisherLayout(original: Boolean): Re
     else copy(
         publisherStyles = true,
         fontFamily = ReaderFontFamily.BOOK,
+        fontWeight = null,
         lineHeight = null,
         paragraphIndent = null,
         paragraphSpacing = null,
