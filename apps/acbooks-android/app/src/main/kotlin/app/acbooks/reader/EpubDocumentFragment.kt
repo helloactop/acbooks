@@ -28,7 +28,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
-import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.navigator.preferences.Theme
@@ -130,10 +129,13 @@ internal class EpubDocumentFragment : Fragment() {
             publication = opened
             chapters = opened.readerChapters()
             onContentsChanged?.invoke(chapters)
+            // Load DataStore before creating Readium to avoid a default-layout flash.
+            val initialTypography = library.loadReaderTypographySettings()
+            val systemDark = theme == Theme.DARK
             val navigator = owner.lifecycle.withResumed {
                 val factory = EpubNavigatorFactory(opened).createFragmentFactory(
                     initialLocator = locator,
-                    initialPreferences = EpubPreferences(theme = theme, scroll = false),
+                    initialPreferences = initialTypography.toEpubPreferences(systemDark),
                     paginationListener = object : EpubNavigatorFragment.PaginationListener {
                         override fun onPageLoaded() {
                             if (loading.parent === root) root.removeView(loading)
@@ -167,7 +169,18 @@ internal class EpubDocumentFragment : Fragment() {
             }
             activeNavigator = navigator
             var lastPosition: Locator? = null
+            var appliedTypography = initialTypography
             owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // Updating the stored settings reflows the current publication without
+                // recreating its Fragment or discarding the existing Readium locator.
+                launch {
+                    library.readerTypography.collect { settings ->
+                        if (settings != appliedTypography) {
+                            appliedTypography = settings
+                            navigator.submitPreferences(settings.toEpubPreferences(systemDark))
+                        }
+                    }
+                }
                 navigator.currentLocator.collect { position ->
                     currentHref = position.href.toString()
                     onCurrentHrefChanged?.invoke(currentHref)
