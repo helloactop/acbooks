@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.ImageDecoder
 import android.graphics.Paint
 import android.graphics.Rect
@@ -55,7 +56,7 @@ internal class ProfileAvatarStore(private val context: Context) {
         !preferences.getBoolean("pending", false) && (
             preferences.getString("scope", null) != scope ||
                 preferences.getString("serverVersion", null) != version?.toString() ||
-                (version != null && !file.isFile) ||
+                (version != null && (!file.isFile || BitmapFactory.decodeFile(file.absolutePath) == null)) ||
                 (version == null && file.exists())
             )
     }
@@ -65,9 +66,12 @@ internal class ProfileAvatarStore(private val context: Context) {
         if (bytes == null) {
             if (file.exists() && !file.delete()) throw IOException("Could not clear the previous avatar")
         } else {
-            if (bytes.size > MAX_AVATAR_BYTES || bytes.isEmpty() ||
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size) == null
-            ) throw IOException("Invalid server avatar")
+            if (bytes.size > MAX_AVATAR_BYTES || bytes.isEmpty()) throw IOException("Invalid server avatar")
+            val dimensions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, dimensions)
+            if (dimensions.outWidth != 512 || dimensions.outHeight != 512) {
+                throw IOException("Unexpected server avatar dimensions")
+            }
             replace(bytes)
         }
         if (!preferences.edit().putString("scope", scope).putString("serverVersion", version?.toString()).commit()) {
@@ -116,7 +120,9 @@ internal class ProfileAvatarStore(private val context: Context) {
             val side = minOf(decoded.width, decoded.height)
             val left = (decoded.width - side) / 2
             val top = (decoded.height - side) / 2
-            Canvas(result).drawBitmap(
+            val canvas = Canvas(result)
+            canvas.drawColor(Color.WHITE)
+            canvas.drawBitmap(
                 decoded,
                 Rect(left, top, left + side, top + side),
                 Rect(0, 0, 512, 512),
