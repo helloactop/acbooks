@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -68,6 +69,9 @@ private sealed interface AcbooksRoute : NavKey {
     data object Settings : AcbooksRoute
 
     @Serializable
+    data object About : AcbooksRoute
+
+    @Serializable
     data object ShelfSettings : AcbooksRoute
 
     @Serializable
@@ -111,6 +115,7 @@ internal fun AcbooksNavigation(library: LibraryViewModel) {
     val catalog by library.catalog.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     var downloading by remember { mutableStateOf(false) }
     val libraryPage: @Composable (AcbooksRoute, String?) -> Unit = { route, shelfId ->
         MainTabs(
@@ -195,6 +200,21 @@ internal fun AcbooksNavigation(library: LibraryViewModel) {
                 },
                 onOpenServer = {
                     if (navController.backStack.lastOrNull() == AcbooksRoute.Settings) navController.push(AcbooksRoute.Server)
+                },
+                onOpenAbout = {
+                    if (navController.backStack.lastOrNull() == AcbooksRoute.Settings) navController.push(AcbooksRoute.About)
+                },
+            )
+        }
+        entry<AcbooksRoute.About> {
+            AboutScreen(
+                onBack = {
+                    if (navController.backStack.lastOrNull() == AcbooksRoute.About) navController.pop()
+                },
+                onOpenUrl = { url ->
+                    runCatching { uriHandler.openUri(url) }.onFailure {
+                        Toast.makeText(context, R.string.about_link_failed, Toast.LENGTH_SHORT).show()
+                    }
                 },
             )
         }
