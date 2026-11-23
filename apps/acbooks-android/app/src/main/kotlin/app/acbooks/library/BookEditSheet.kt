@@ -3,6 +3,7 @@ package app.acbooks.library
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -31,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -89,12 +91,29 @@ internal fun BookEditSheet(
         backdrop = backdrop,
     ) {
         Column(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
-            Text(
-                stringResource(R.string.book_edit_title),
-                modifier = Modifier.fillMaxWidth().semantics { heading() },
-                style = MiuixTheme.textStyles.title4,
-                textAlign = TextAlign.Center,
-            )
+            Box(Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Text(
+                    stringResource(R.string.book_edit_title),
+                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 72.dp)
+                        .semantics { heading() },
+                    style = MiuixTheme.textStyles.title4,
+                    textAlign = TextAlign.Center,
+                )
+                GlassDialogButton(
+                    onClick = {
+                        focus.clearFocus()
+                        keyboard?.hide()
+                        library.fillBookDraft()
+                    },
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                    enabled = ready,
+                    minWidth = 48.dp,
+                    minHeight = 40.dp,
+                    insideMargin = PaddingValues(horizontal = 8.dp),
+                ) {
+                    Text(stringResource(R.string.book_edit_fill), style = MiuixTheme.textStyles.button)
+                }
+            }
             val pending = editor?.initial?.let { it.pendingCover || it.retryKeys.isNotEmpty() } == true
             val message = editor?.error ?: if (pending) R.string.book_edit_retry_sync else null
             if (message != null) {
@@ -120,55 +139,45 @@ internal fun BookEditSheet(
                         backdrop = backdrop,
                         enabled = ready,
                         onChange = library::editBookDraft,
-                        onUndoCover = library::undoBookCover,
-                    )
-                }
-            }
-            Column(
-                Modifier.fillMaxWidth().navigationBarsPadding(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    EditAction(
-                        R.string.book_edit_fill,
-                        onClick = {
-                            focus.clearFocus()
-                            keyboard?.hide()
-                            library.fillBookDraft()
-                        },
-                        modifier = Modifier.weight(1f),
-                        enabled = ready,
-                    )
-                    EditAction(
-                        R.string.book_edit_choose_cover,
-                        onClick = {
+                        onSelectCover = {
                             focus.clearFocus()
                             keyboard?.hide()
                             picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
-                        modifier = Modifier.weight(1f),
-                        enabled = ready,
+                        onUndoCover = library::undoBookCover,
                     )
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    EditAction(
-                        R.string.book_edit_cancel,
-                        onClick = ::dismiss,
-                        modifier = Modifier.weight(1f),
+            }
+            Row(
+                Modifier.fillMaxWidth().navigationBarsPadding(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.weight(1f).heightIn(min = 48.dp).clickable(
                         enabled = editor?.open == true && !saving,
-                    )
-                    EditAction(
-                        R.string.book_edit_confirm,
-                        onClick = {
-                            focus.clearFocus()
-                            keyboard?.hide()
-                            library.saveBookEditor()
-                        },
-                        modifier = Modifier.weight(1f),
-                        enabled = ready,
-                        role = GlassDialogButtonRole.Primary,
+                        role = Role.Button,
+                        onClick = ::dismiss,
+                    ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        stringResource(R.string.book_edit_cancel),
+                        style = MiuixTheme.textStyles.button,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
+                EditAction(
+                    R.string.book_edit_confirm,
+                    onClick = {
+                        focus.clearFocus()
+                        keyboard?.hide()
+                        library.saveBookEditor()
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = ready,
+                    role = GlassDialogButtonRole.Primary,
+                )
             }
         }
     }
@@ -237,12 +246,42 @@ private fun BookEditForm(
     backdrop: Backdrop,
     enabled: Boolean,
     onChange: (BookEditDraft) -> Unit,
+    onSelectCover: () -> Unit,
     onUndoCover: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            BookCover(draft.cover ?: cover, Modifier.width(72.dp), title = draft.title)
-            if (draft.cover != null) EditAction(R.string.book_edit_undo_cover, onUndoCover, enabled = enabled)
+            BookCover(
+                draft.cover ?: cover,
+                Modifier.width(72.dp).clickable(
+                    enabled = enabled,
+                    role = Role.Button,
+                    onClickLabel = stringResource(R.string.book_edit_choose_cover),
+                    onClick = onSelectCover,
+                ),
+                title = draft.title,
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    stringResource(R.string.book_edit_choose_cover),
+                    modifier = Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onSelectCover)
+                        .padding(vertical = 8.dp),
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+                if (draft.cover != null) {
+                    Text(
+                        stringResource(R.string.book_edit_undo_cover),
+                        modifier = Modifier.heightIn(min = 44.dp).clickable(
+                            enabled = enabled,
+                            role = Role.Button,
+                            onClick = onUndoCover,
+                        ).padding(vertical = 8.dp),
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
+            }
         }
         EditField(R.string.book_details_book_name, draft.title, enabled) { onChange(draft.copy(title = it)) }
         Text(stringResource(R.string.book_edit_names_hint), style = MiuixTheme.textStyles.footnote1)
