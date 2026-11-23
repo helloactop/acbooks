@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
@@ -66,9 +66,7 @@ internal fun LocalReaderScreen(
         value = if (source == null) ReaderState.Unavailable
         else ReaderState.Ready(source, if (source.format == "pdf") model.readingPosition(source.id) else null)
     }
-    // Keep system bar visibility stable across navigation transitions. Toggling bars here
-    // relayouts the still-visible library and resizes the EPUB WebView during its first paint.
-    val readerInsets = WindowInsets.systemBarsIgnoringVisibility
+    val readerInsets = WindowInsets.navigationBarsIgnoringVisibility
         .union(WindowInsets.displayCutout)
         .union(WindowInsets.ime)
     Box(

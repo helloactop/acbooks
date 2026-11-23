@@ -2,11 +2,13 @@ package app.acbooks
 
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -15,6 +17,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.acbooks.library.BookDetailsScreen
 import app.acbooks.library.LibraryViewModel
@@ -86,6 +91,20 @@ internal fun AcbooksNavigation(
     onChangeAvatar: (() -> Unit)? = null,
 ) {
     val navController = rememberNavController<AcbooksRoute>(AcbooksRoute.Main)
+    val window = LocalActivity.current?.window
+    if (window != null && navController.backStack.lastOrNull() is AcbooksRoute.Reader) {
+        DisposableEffect(window) {
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            val statusBars = WindowInsetsCompat.Type.statusBars()
+            val previousBehavior = controller.systemBarsBehavior
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(statusBars)
+            onDispose {
+                controller.systemBarsBehavior = previousBehavior
+                controller.show(statusBars)
+            }
+        }
+    }
     val catalog by library.catalog.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
