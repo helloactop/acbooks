@@ -96,6 +96,14 @@
     <string name="reader_previous">Previous</string>
     <string name="reader_contents">Contents</string>
     <string name="reader_typography_title">Reading appearance</string>
+    <string name="reader_typography_scope">Settings scope</string>
+    <string name="reader_typography_scope_global">All books</string>
+    <string name="reader_typography_scope_book">This book</string>
+    <string name="reader_typography_global_note">Global defaults apply to books without individual settings.</string>
+    <string name="reader_typography_global_override_note">This book uses its own settings. Editing global defaults will not change its appearance.</string>
+    <string name="reader_typography_book_note">These settings belong only to this book and override global defaults.</string>
+    <string name="reader_typography_book_new_note">Changing a setting here will create independent preferences for this book.</string>
+    <string name="reader_typography_book_inherit">Use global defaults for this book</string>
     <string name="reader_typography_font">Font</string>
     <string name="reader_typography_font_book">Book</string>
     <string name="reader_typography_font_serif">Serif</string>
