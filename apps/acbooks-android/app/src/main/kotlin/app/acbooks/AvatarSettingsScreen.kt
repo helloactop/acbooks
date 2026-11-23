@@ -13,7 +13,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -34,7 +33,9 @@ internal fun ProfileAvatar(avatar: ImageBitmap?, contentDescription: String?, mo
 internal fun AvatarSettingsScreen(
     avatar: ImageBitmap?,
     onBack: () -> Unit,
-    onChangeAvatar: (() -> Unit)?,
+    avatarBusy: Boolean,
+    avatarMessage: Int?,
+    onChangeAvatar: () -> Unit,
     onOpenShelfSettings: () -> Unit,
     onOpenServer: () -> Unit,
 ) {
@@ -46,26 +47,21 @@ internal fun AvatarSettingsScreen(
             groupedCardItems(
                 groupKey = "profile",
                 title = R.string.settings_profile,
-                rows = buildList {
-                    add(SettingsCardItem("avatar") {
-                        BasicComponent(
-                            title = stringResource(R.string.settings_avatar),
-                            titleColor = BasicComponentDefaults.titleColor(color = LocalContentColor.current),
-                            startAction = {
-                                ProfileAvatar(avatar, contentDescription = null, modifier = Modifier.size(48.dp))
-                            },
-                        )
-                    })
-                    if (onChangeAvatar != null) {
-                        add(SettingsCardItem("change-avatar") {
-                            ArrowPreference(
-                                title = stringResource(R.string.settings_change_avatar),
-                                titleColor = BasicComponentDefaults.titleColor(color = LocalContentColor.current),
-                                onClick = onChangeAvatar,
-                            )
-                        })
-                    }
-                },
+                rows = listOf(SettingsCardItem("avatar") {
+                    ArrowPreference(
+                        title = stringResource(R.string.settings_avatar),
+                        summary = stringResource(
+                            if (avatarBusy) R.string.settings_avatar_syncing
+                            else avatarMessage ?: R.string.settings_change_avatar,
+                        ),
+                        titleColor = BasicComponentDefaults.titleColor(color = LocalContentColor.current),
+                        startAction = {
+                            ProfileAvatar(avatar, contentDescription = null, modifier = Modifier.size(56.dp))
+                        },
+                        onClick = onChangeAvatar,
+                        enabled = !avatarBusy,
+                    )
+                }),
             )
             groupedCardItems(
                 groupKey = "library",

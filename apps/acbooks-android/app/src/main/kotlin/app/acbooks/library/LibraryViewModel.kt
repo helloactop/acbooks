@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.ui.graphics.ImageBitmap
 import app.acbooks.R
 import app.acbooks.core.database.LibraryDatabase
 import app.acbooks.core.database.LibraryShelf
@@ -24,6 +25,7 @@ import java.io.IOException
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -39,6 +41,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 internal data class LibraryCatalog(
@@ -60,6 +63,12 @@ internal data class CloudLibraryState(
     val connected: Boolean get() = status == ServerConnectionStatus.Connected && connection.hasSession
     val busy: Boolean get() = operation != null
 }
+
+internal data class ProfileAvatarState(
+    val image: ImageBitmap? = null,
+    val busy: Boolean = false,
+    val message: Int? = null,
+)
 
 internal enum class LibraryDisplayMode(val preference: String) {
     Compact("compact"), Comfortable("comfortable"),
@@ -108,9 +117,76 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     private val cloudActions = Mutex()
     private val _cloudState = MutableStateFlow(CloudLibraryState())
     val cloudState = _cloudState.asStateFlow()
+    private val avatarStore = ProfileAvatarStore(application)
+    private val avatarActions = Mutex()
+    private val _profileAvatar = MutableStateFlow(ProfileAvatarState())
+    val profileAvatar = _profileAvatar.asStateFlow()
     private val preferences = application.libraryDisplayPreferences
     private val readerTypographyStore = ReaderTypographyStore(application)
     val readerTypography = readerTypographyStore.settings
+
+    init {
+        viewModelScope.launch {
+            avatarActions.withLock {
+                try {
+                    val image = withContext(Dispatchers.IO) { avatarStore.image() }
+                    val pending = withContext(Dispatchers.IO) { avatarStore.isPending() }
+                    _profileAvatar.value = ProfileAvatarState(
+                        image = image,
+                        message = if (pending) R.string.settings_avatar_pending else null,
+                    )
+                } catch (failure: Exception) {
+                    Log.w("ProfileAvatar", "Could not load the cached avatar", failure)
+                }
+            }
+        }
+    }
+
+    fun chooseAvatar(uri: Uri) {
+        viewModelScope.launch {
+            avatarActions.withLock {
+                _profileAvatar.value = _profileAvatar.value.copy(busy = true, message = null)
+                try {
+                    val image = withContext(Dispatchers.IO) { avatarStore.select(uri) }
+                    _profileAvatar.value = ProfileAvatarState(image = image, busy = true)
+                    syncAvatarLocked()
+                } catch (failure: CancellationException) {
+                    throw failure
+                } catch (failure: Exception) {
+                    Log.w("ProfileAvatar", "Could not select avatar", failure)
+                    _profileAvatar.value = _profileAvatar.value.copy(message = R.string.settings_avatar_select_failed)
+                } finally {
+                    _profileAvatar.value = _profileAvatar.value.copy(busy = false)
+                }
+            }
+        }
+    }
+
+    fun refreshAvatar() {
+        viewModelScope.launch {
+            avatarActions.withLock { syncAvatarLocked() }
+        }
+    }
+
+    private suspend fun syncAvatarLocked() {
+        try {
+            cloud.syncAvatar(avatarStore)
+            val image = withContext(Dispatchers.IO) { avatarStore.image() }
+            val pending = withContext(Dispatchers.IO) { avatarStore.isPending() }
+            _profileAvatar.value = _profileAvatar.value.copy(
+                image = image,
+                message = if (pending) R.string.settings_avatar_pending else null,
+            )
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (failure: Exception) {
+            Log.w("ProfileAvatar", "Avatar sync failed; retaining local data", failure)
+            val pending = withContext(Dispatchers.IO) { avatarStore.isPending() }
+            _profileAvatar.value = _profileAvatar.value.copy(
+                message = if (pending) R.string.settings_avatar_pending else R.string.settings_avatar_sync_failed,
+            )
+        }
+    }
 
     /** Read from the store before creating Readium; avoid applying an optimistic default. */
     suspend fun loadReaderTypographySettings(): ReaderTypographySettings = readerTypography.first()
@@ -219,6 +295,7 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
             }
             _cloudState.value = CloudLibraryState(connection, ServerConnectionStatus.Connected, message = R.string.cloud_login_done)
             CloudSyncJobs.request(getApplication())
+            refreshAvatar()
             null
         }
 
@@ -228,7 +305,10 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
 
     fun disconnectServer() = launchCloudAction(ServerOperation.SigningOut)
 
-    fun syncLibrary() = launchCloudAction(ServerOperation.Syncing)
+    fun syncLibrary() {
+        launchCloudAction(ServerOperation.Syncing)
+        refreshAvatar()
+    }
 
     private fun syncMessage(result: Boolean?): Int? = when (result) {
         true -> R.string.cloud_sync_done
