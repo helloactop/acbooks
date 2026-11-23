@@ -21,6 +21,7 @@ internal data class BookBibliography(
     val publicationDate: String? = null,
     val languages: List<String> = emptyList(),
     val categories: List<String> = emptyList(),
+    val series: String? = null,
 )
 
 internal fun readBookMetadata(file: File, format: String, fallback: String): BookMetadata = when (format) {

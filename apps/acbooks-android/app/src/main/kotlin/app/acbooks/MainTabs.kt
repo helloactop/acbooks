@@ -308,7 +308,7 @@ internal fun MainTabs(
             backdrop = menuBackdrop,
             mode = displayMode,
             importing = importProgress?.running == true,
-            cloudConnected = cloud.connected,
+            cloudConnected = cloud.connection.hasSession,
             cloudBusy = cloud.busy,
             onDismiss = { menu -> if (libraryMenu == menu) libraryMenu = null },
             onDisplayMode = library::setDisplayMode,

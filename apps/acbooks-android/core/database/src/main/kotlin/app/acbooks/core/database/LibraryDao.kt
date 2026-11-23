@@ -20,10 +20,13 @@ data class LocalBookRemoval(
 
 @Dao
 abstract class LibraryDao :
-    ShelfDao, ReadingPositionDao, ReadingSessionDao, ReadingMarkDao, CatalogMetadataDao,
-    FileSourceDao, FolderDao, RemoteLibraryDao, CloudSyncDao {
+    ReadingSyncDao(), ShelfDao, ReadingSessionDao, ReadingMarkDao, CatalogMetadataDao,
+    FileSourceDao, FolderDao, CloudSyncDao, CloudReaderDao, CloudDownloadDao {
     @Upsert
     protected abstract suspend fun upsertServerProfile(profile: ServerProfile)
+
+    @Query("UPDATE server_profiles SET currentSlot = NULL WHERE id = :profileId")
+    protected abstract suspend fun deactivateServerProfile(profileId: String)
 
     /** Accepts identity confirmed by the server. Selecting a connection does not authenticate a session. */
     @Transaction
@@ -33,19 +36,25 @@ abstract class LibraryDao :
         deviceId: String,
         origin: String,
         verifiedAt: Long,
+        replaceCurrent: Boolean = false,
+        newProfileId: String = UUID.randomUUID().toString(),
     ): ServerProfile {
         require(isServerOriginSafe(origin)) { "Invalid server origin" }
-        val existing = currentServerProfile()
-        check(existing == null || (
-            existing.serverInstanceId == serverInstanceId && existing.accountId == accountId &&
-                existing.origin == origin.trimEnd('/')
-            )) { "Server identity changed" }
+        val current = currentServerProfile()
+        val normalized = origin.trimEnd('/')
+        val existing = verifiedServerProfile(normalized, accountId)
+        check(existing == null || existing.serverInstanceId == serverInstanceId) { "Server identity changed" }
+        if (current != null && current.id != existing?.id) {
+            check(replaceCurrent) { "Server identity changed" }
+            clearReadingPositionRevisions(current.id, resync = true)
+            deactivateServerProfile(current.id)
+        }
         val profile = ServerProfile(
-            id = existing?.id ?: UUID.randomUUID().toString(),
+            id = existing?.id ?: newProfileId,
             serverInstanceId = serverInstanceId,
             accountId = accountId,
             deviceId = deviceId,
-            origin = origin.trimEnd('/'),
+            origin = normalized,
             updatedAt = verifiedAt,
             currentSlot = 1,
         )
@@ -85,9 +94,12 @@ abstract class LibraryDao :
         LEFT JOIN book_files f ON f.id = COALESCE(b.preferredFileId, (
             SELECT id FROM book_files WHERE bookId = b.id ORDER BY id LIMIT 1
         ))
-        WHERE l.localBookId IS NULL OR c.remoteBookId IS NOT NULL OR EXISTS (
-            SELECT 1 FROM book_files bf WHERE bf.bookId = b.id AND bf.localCopyRemoved = 0
-        )
+        WHERE c.remoteBookId IS NOT NULL
+           OR EXISTS (SELECT 1 FROM book_files bf WHERE bf.bookId = b.id AND bf.localCopyRemoved = 0)
+           OR NOT EXISTS (
+               SELECT 1 FROM remote_book_links old JOIN server_profiles owner ON owner.id = old.profileId
+               WHERE old.localBookId = b.id AND owner.verification = 'verified'
+           )
         ORDER BY b.importedAt DESC, b.id
     """)
     abstract fun observeBooks(): Flow<List<LocalBookCard>>
@@ -195,10 +207,17 @@ abstract class LibraryDao :
         val after = if (rebuild) 0L else checkNotNull(expectedCursor)
         require(batch.cursor >= after && batch.versions.all { it.profileId == profileId && it.revision in (after + 1)..batch.cursor })
         require(batch.books.all { it.profileId == profileId } && batch.files.all { it.profileId == profileId })
+        require(batch.positions.all { it.revision in (after + 1)..batch.cursor })
+        require(batch.readerRecords.all { it.profileId == profileId && it.revision in (after + 1)..batch.cursor })
+        val positionedFileIds = batch.positions.mapTo(mutableSetOf()) { it.fileId }
+        val previousHashes = batch.files.filter { it.remoteFileId in positionedFileIds }.mapNotNull { file ->
+            remoteCatalogFile(profileId, file.remoteFileId)?.sha256?.let { file.remoteFileId to it }
+        }.toMap()
 
         if (rebuild) {
             clearRemoteCatalog(profileId)
             clearCloudCatalogVersions(profileId)
+            clearCloudReaderRecords(profileId)
         }
         val removals = mutableListOf<LocalBookRemoval>()
         val deletedBookIds = batch.versions.filter { it.deleted && it.entityType == "book" }.map { it.entityId }.toSet()
@@ -219,18 +238,52 @@ abstract class LibraryDao :
         // A missing parent rolls back the batch and cursor so a later pull can include the parent.
         cacheCatalogBooks(profileId, batch.books)
         cacheRemoteFiles(batch.files.filterNot { it.remoteBookId in deletedBookIds })
+        applyReadingChanges(profileId, rebuild, rebuild && expectedCursor != null, batch, previousHashes, deletedFileIds)
+        for (record in batch.readerRecords) applyCloudReaderRecord(record)
         saveCloudCatalogVersions(batch.versions)
         saveCloudSyncState(CloudSyncState(profileId, batch.cursor))
         return removals
+    }
+
+    @Transaction
+    open suspend fun acknowledgeReaderUpload(upload: PendingCloudUpload, record: CloudReaderRecord) {
+        require(upload.profileId == record.profileId && upload.id == "reader:${record.kind}:${record.id}")
+        applyCloudReaderRecord(record)
+    }
+
+    private suspend fun applyCloudReaderRecord(record: CloudReaderRecord) {
+        val cached = cloudReaderRecord(record.profileId, record.kind, record.id)
+        if (cached == null || record.revision > cached.revision) {
+            cacheCloudReaderRecord(record)
+            val remoteBookId = record.remoteBookId ?: cached?.remoteBookId
+            if (record.payload == null && remoteBookId != null) {
+                val localBookId = when (record.kind) {
+                    "reading_session" -> readingSession(record.id)?.bookId
+                    "bookmark" -> bookmark(record.id)?.bookId
+                    "annotation" -> annotation(record.id)?.bookId
+                    else -> null
+                }
+                if (localBookId != null && remoteBookLink(record.profileId, localBookId)?.remoteBookId == remoteBookId) {
+                    when (record.kind) {
+                        "reading_session" -> deleteReadingSession(record.id)
+                        "bookmark" -> deleteBookmark(record.id)
+                        "annotation" -> deleteAnnotation(record.id)
+                    }
+                }
+            }
+        }
+        removeCloudUpload(record.profileId, "reader:${record.kind}:${record.id}")
     }
 
     private suspend fun cacheCatalogBooks(profileId: String, books: List<RemoteCatalogBook>) {
         cacheRemoteBooks(books)
         for (remote in books) {
             if (!remote.available || localBookLinks(profileId, remote.remoteBookId).isNotEmpty()) continue
-            // An existing local UUID may be awaiting its idempotent create receipt.
-            if (book(remote.remoteBookId) != null) continue
-            val id = remote.remoteBookId
+            val existing = book(remote.remoteBookId)
+            // Let this profile's own queued create confirm its association. A UUID from another
+            // profile is not proof of ownership, even when both servers have a book with that ID.
+            if (existing != null && hasQueuedCloudBook(profileId, existing.id)) continue
+            val id = if (existing == null) remote.remoteBookId else UUID.randomUUID().toString()
             addBook(LocalBook(id, remote.title, remote.author, remote.cachedAt, description = remote.description))
             linkRemoteBook(RemoteBookLink(profileId, id, remote.remoteBookId))
         }
@@ -240,7 +293,11 @@ abstract class LibraryDao :
     open suspend fun acknowledgeCloudUpload(upload: PendingCloudUpload, remoteId: String) {
         if (removeCloudUpload(upload.profileId, upload.id) == 0) return
         if (upload.fileId == null) linkRemoteBook(RemoteBookLink(upload.profileId, upload.bookId, remoteId))
-        else linkRemoteFile(RemoteFileLink(upload.profileId, upload.fileId, remoteId))
+        else {
+            val previous = remoteFileLink(upload.profileId, upload.fileId)
+            if (previous != null && previous.remoteFileId != remoteId) requeueReadingPosition(upload.fileId)
+            linkRemoteFile(RemoteFileLink(upload.profileId, upload.fileId, remoteId))
+        }
     }
 
     @Transaction
@@ -275,6 +332,8 @@ abstract class LibraryDao :
         linkRemoteFile(RemoteFileLink(remote.profileId, file.id, remote.remoteFileId))
         recordFileSource(sha256, remote.format, FileSourceKind.Downloaded, managedObjectPath(sha256, remote.format),
             FileSourceStatus.Present, verifiedAt)
+        restoreCloudReadingPosition(remote.profileId, file.id)
+        completeDownload(remote.profileId, bookId, remote.remoteFileId)
         return file
     }
 

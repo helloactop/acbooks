@@ -47,6 +47,9 @@ interface CloudSyncDao {
     @Query("SELECT * FROM sync_outbox WHERE profileId = :profileId ORDER BY fileId IS NOT NULL, bookId, id")
     suspend fun pendingCloudUploads(profileId: String): List<PendingCloudUpload>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE profileId = :profileId AND id = 'book:' || :bookId)")
+    suspend fun hasQueuedCloudBook(profileId: String, bookId: String): Boolean
+
     @Query("UPDATE sync_outbox SET lastError = :error, blocked = :blocked WHERE profileId = :profileId AND id = :id")
     suspend fun recordCloudUploadFailure(profileId: String, id: String, error: String, blocked: Boolean = false)
 

@@ -35,6 +35,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.fragment.compose.AndroidFragment
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.acbooks.R
 import app.acbooks.library.LibraryViewModel
 import app.acbooks.library.ReadableBookFile
@@ -61,6 +62,7 @@ internal fun LocalReaderScreen(
     val colors = MiuixTheme.colorScheme
     val state by produceState<ReaderState>(ReaderState.Loading, bookId) {
         val source = model.openBook(bookId)
+        if (source != null) model.prepareReadingPosition(source.id)
         value = if (source == null) ReaderState.Unavailable
         else ReaderState.Ready(source, if (source.format == "pdf") model.readingPosition(source.id) else null)
     }
@@ -78,12 +80,18 @@ internal fun LocalReaderScreen(
         when (val reader = state) {
             ReaderState.Loading -> CircularProgressIndicator()
             ReaderState.Unavailable -> Text(stringResource(R.string.reader_open_failed))
-            is ReaderState.Ready -> if (reader.file.format == "epub") {
-                val dark = colors.background.luminance() < 0.5f
-                val args = remember(bookId, dark) { EpubDocumentFragment.arguments(bookId, dark) }
-                AndroidFragment<EpubDocumentFragment>(modifier = Modifier.fillMaxSize(), arguments = args)
-            } else {
-                PdfBook(reader, model)
+            is ReaderState.Ready -> {
+                LifecycleResumeEffect(bookId, reader.file.id) {
+                    model.startReadingSession(bookId, reader.file.id)
+                    onPauseOrDispose { model.finishReadingSession(reader.file.id) }
+                }
+                if (reader.file.format == "epub") {
+                    val dark = colors.background.luminance() < 0.5f
+                    val args = remember(bookId, dark) { EpubDocumentFragment.arguments(bookId, dark) }
+                    AndroidFragment<EpubDocumentFragment>(modifier = Modifier.fillMaxSize(), arguments = args)
+                } else {
+                    PdfBook(reader, model)
+                }
             }
         }
     }
@@ -111,11 +119,12 @@ private fun PdfBook(ready: ReaderState.Ready, model: LibraryViewModel) {
                 renderPdf(source, index).also { undelivered = it }
             }
             // A displayed bitmap may still be in use by Compose's render thread after replacement.
+            val moved = displayedPage != null
             displayedPage = page
             undelivered = null
             lastReadPage = page.index
             requestedPage = page.index
-            model.saveReadingPosition(
+            if (moved) model.saveReadingPosition(
                 source.id,
                 JSONObject().put("page", page.index).toString(),
                 (page.index + 1) * 100.0 / page.count,

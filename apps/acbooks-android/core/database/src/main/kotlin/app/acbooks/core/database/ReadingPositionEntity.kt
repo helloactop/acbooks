@@ -16,6 +16,8 @@ data class LocalReadingPosition(
     val percent: Double? = null,
     @ColumnInfo(defaultValue = "0") val revision: Long = 0,
     @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0,
+    @ColumnInfo(defaultValue = "1") val needsSync: Boolean = true,
+    val cloudRevision: Long? = null,
 )
 
 data class LocalBookReadingPosition(val format: String, val locator: String?, val percent: Double? = null)

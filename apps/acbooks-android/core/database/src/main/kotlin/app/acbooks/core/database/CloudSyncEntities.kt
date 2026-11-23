@@ -29,6 +29,8 @@ data class CloudCatalogBatch(
     val books: List<RemoteCatalogBook>,
     val files: List<RemoteCatalogFile>,
     val versions: List<CloudCatalogVersion>,
+    val positions: List<ReadingPositionChange> = emptyList(),
+    val readerRecords: List<CloudReaderRecord> = emptyList(),
 )
 
 @Entity(

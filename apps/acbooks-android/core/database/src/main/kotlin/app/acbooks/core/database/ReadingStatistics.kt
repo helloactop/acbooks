@@ -18,7 +18,7 @@ fun ReadingSessionDao.observeReadingStatistics(bookId: String, timeZone: ZoneId)
 
 private data class ReadingInterval(val id: String, val start: Long, val end: Long, val activeRatio: Double)
 
-internal fun summarizeReadingSessions(
+fun summarizeReadingSessions(
     sessions: List<LocalReadingSession>,
     timeZone: ZoneId,
 ): LocalReadingStatistics? {

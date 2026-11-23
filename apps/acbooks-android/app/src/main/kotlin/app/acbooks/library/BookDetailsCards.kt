@@ -105,6 +105,7 @@ internal fun BookBibliographyCard(book: LocalBookCard, details: BookDetailsData)
         R.string.book_details_author to book.author,
         R.string.book_details_translator to metadata?.translators?.joinToString(", "),
         R.string.book_details_isbn to metadata?.isbn,
+        R.string.book_details_series to metadata?.series,
         R.string.book_details_publisher to metadata?.publisher,
         R.string.book_details_publish_date to metadata?.publicationDate,
         R.string.book_details_language to metadata?.languages?.joinToString(", "),

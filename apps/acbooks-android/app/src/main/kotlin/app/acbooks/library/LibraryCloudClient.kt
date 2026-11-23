@@ -2,22 +2,33 @@ package app.acbooks.library
 
 import app.acbooks.core.database.CloudCatalogBatch
 import app.acbooks.core.database.CloudCatalogVersion
+import app.acbooks.core.database.CloudReaderRecord
 import app.acbooks.core.database.LocalBook
+import app.acbooks.core.database.PendingReadingPosition
+import app.acbooks.core.database.PendingCloudUpload
+import app.acbooks.core.database.ReadingPositionChange
 import app.acbooks.core.database.RemoteCatalogBook
 import app.acbooks.core.database.RemoteCatalogFile
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
 import java.net.URI
+import java.net.URISyntaxException
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.UUID
 import javax.net.ssl.HttpsURLConnection
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 
 internal fun serverOrigin(value: String): String {
-    val uri = URI(value.trim())
+    val address = value.trim()
+    val uri = try {
+        URI(if ("://" in address) address else "https://$address")
+    } catch (failure: URISyntaxException) {
+        throw IllegalArgumentException("Invalid server address", failure)
+    }
     require(uri.scheme.equals("https", ignoreCase = true) && uri.host != null &&
         uri.rawUserInfo == null && uri.rawQuery == null && uri.rawFragment == null && uri.rawPath in listOf("", "/") &&
         (uri.port == -1 || uri.port in 1..65535)
@@ -28,13 +39,24 @@ internal fun serverOrigin(value: String): String {
 
 internal class CloudHttpException(val status: Int) : IOException("Server responded with HTTP $status")
 internal class CloudMutationRejected(val code: String) : IOException("Server rejected the book creation")
+internal class CloudSetupRequired : IOException("Server setup is required")
+internal data class CloudAccount(val id: String, val username: String)
 
-internal fun bookCreatePayload(book: LocalBook): String {
+internal fun bookCreatePayload(book: LocalBook, bibliography: BookBibliography? = null,
+    authors: List<String> = listOfNotNull(book.author), translators: List<String> = bibliography?.translators.orEmpty(),
+    isbn: String? = bibliography?.isbn, tags: List<String> = emptyList(), shelves: List<String> = emptyList(),
+): String {
     val mutationId = UUID.nameUUIDFromBytes("acbooks:book.create:${book.id}".toByteArray(UTF_8)).toString()
     val data = JSONObject().put("title", book.title.take(500))
-    book.author?.takeIf(String::isNotBlank)?.let { data.put("authors", JSONArray().put(it.take(200))) }
-    book.description?.let { data.put("description", it.take(20_000)) }
+    for ((key, names) in mapOf("authors" to authors, "translators" to translators, "tags" to tags, "shelves" to shelves)) {
+        val values = names.map { it.trim().take(200) }.filter(String::isNotEmpty).distinct().take(20)
+        if (values.isNotEmpty()) data.put(key, JSONArray(values))
+    }
+    (book.description ?: bibliography?.description)?.takeIf(String::isNotBlank)?.let { data.put("description", it.take(20_000)) }
     book.series?.let { data.put("series", it.take(200)) }
+    isbn?.filterNot { it.isWhitespace() || it == '-' }?.uppercase()
+        ?.takeIf { it.matches(Regex("(?:[0-9]{13}|[0-9]{9}[0-9X])")) }?.let { data.put("isbn", it) }
+    if (book.readingStatus != "unread") data.put("readingStatus", book.readingStatus)
     return JSONObject().put("mutationId", mutationId).put("entityId", book.id.asUuid())
         .put("baseRevision", 0).put("action", "book.create").put("data", data).toString()
 }
@@ -46,7 +68,18 @@ internal class LibraryCloudClient(private val origin: String) {
         body = JSONObject().put("username", username).put("password", password).put("deviceName", "acbooks Android"),
     ).getString("accessToken").also { check(it.isNotBlank()) }
 
-    fun accountId(token: String): String = json("/auth/me", token).getString("id").asUuid()
+    fun account(token: String): CloudAccount {
+        val response = json("/auth/me", token)
+        return CloudAccount(response.getString("id").asUuid(), response.getString("username").also { check(it.isNotBlank()) })
+    }
+
+    fun testAddress() {
+        val ready = json("/ready")
+        if (ready.getString("status") != "ok" || ready.getString("migration") != "current") {
+            throw IOException("Server is not ready")
+        }
+        if (!json("/setup/status").getBoolean("initialized")) throw CloudSetupRequired()
+    }
 
     fun searchDoubanMetadata(token: String, query: String): List<DoubanMetadataCandidate> {
         val encoded = URLEncoder.encode(query, UTF_8.name())
@@ -55,8 +88,8 @@ internal class LibraryCloudClient(private val origin: String) {
         }
     }
 
-    fun logout(token: String) {
-        request("/auth/logout", "POST", token, setOf(204)) { }
+    fun logout(token: String, timeout: Int? = null) {
+        request("/auth/logout", "POST", token, setOf(204), timeout = timeout) { }
     }
 
     fun createBook(token: String, deviceId: String, bookId: String, payload: String) {
@@ -101,18 +134,78 @@ internal class LibraryCloudClient(private val origin: String) {
         request("/books/${bookId.asUuid()}", "DELETE", token, setOf(204)) { }
     }
 
+    fun uploadReaderRecord(token: String, deviceId: String, upload: PendingCloudUpload): CloudReaderRecord {
+        val mutation = JSONObject(checkNotNull(upload.payload))
+        val response = json("/sync/mutations", token, "POST",
+            JSONObject().put("deviceId", deviceId).put("mutations", JSONArray().put(mutation)))
+        val receipt = response.getJSONArray("receipts").getJSONObject(0)
+        if (receipt.getString("mutationId") != mutation.getString("mutationId")) throw IOException("Invalid reading record receipt")
+        when (receipt.getString("status")) {
+            "rejected" -> throw CloudMutationRejected(receipt.optString("code", "REJECTED"))
+            "accepted", "conflict" -> {
+                val current = receipt.optJSONObject("current") ?: throw IOException("Missing cloud reading record")
+                val record = readCloudReaderRecord(upload.profileId, current)
+                if (upload.id != "reader:${record.kind}:${record.id}" ||
+                    (record.remoteBookId != null && record.remoteBookId != mutation.getString("bookId"))
+                ) throw IOException("Invalid cloud reading record receipt")
+                return record
+            }
+            else -> throw IOException("Unknown cloud reading record receipt")
+        }
+    }
+
+    fun saveReadingPosition(token: String, deviceId: String, pending: PendingReadingPosition): ReadingPositionChange? {
+        if (pending.locator.toByteArray(UTF_8).size > 32_768) throw CloudMutationRejected("INVALID_LOCATOR")
+        val locator = try {
+            JSONObject(pending.locator)
+        } catch (_: JSONException) {
+            throw CloudMutationRejected("INVALID_LOCATOR")
+        }
+        val data = JSONObject().put("locator", locator)
+            .put("percent", pending.percent ?: JSONObject.NULL)
+        val mutation = JSONObject().put("action", "reading_position.save")
+            .put("entityId", pending.remoteFileId).put("baseRevision", pending.baseRevision)
+            .put("mutationId", pending.mutationId).put("data", data)
+        val response = json("/sync/mutations", token, "POST",
+            JSONObject().put("deviceId", deviceId).put("mutations", JSONArray().put(mutation)))
+        val receipt = response.getJSONArray("receipts").getJSONObject(0)
+        if (receipt.getString("mutationId") != pending.mutationId) throw IOException("Invalid reading position receipt")
+        val current = receipt.optJSONObject("current")?.let(::readPositionChange)
+        if (current != null && current.fileId != pending.remoteFileId) throw IOException("Invalid reading position file")
+        return when (receipt.getString("status")) {
+            "accepted" -> current?.takeIf { it.locator != null && it.revision > pending.baseRevision }
+                ?: throw IOException("Missing accepted reading position")
+            "conflict" -> current
+            "rejected" -> throw CloudMutationRejected(receipt.optString("code", "REJECTED"))
+            else -> throw IOException("Unknown reading position receipt")
+        }
+    }
+
     fun catalog(token: String, profileId: String, after: Long): CloudCatalogBatch {
         val books = mutableMapOf<String, RemoteCatalogBook>()
         val files = mutableMapOf<String, RemoteCatalogFile>()
         val versions = mutableMapOf<Pair<String, String>, CloudCatalogVersion>()
+        val positions = mutableMapOf<String, ReadingPositionChange>()
+        val readerRecords = mutableMapOf<Pair<String, String>, CloudReaderRecord>()
         val cachedAt = System.currentTimeMillis()
         val accept: (JSONObject) -> Unit = { record ->
-            applyCatalogRecord(record, profileId, cachedAt, books, files, versions)
+            when (record.getString("entityType")) {
+                "reading_position" -> {
+                    val position = readPositionChange(record)
+                    positions[position.fileId] = position
+                }
+                in readerRecordKinds -> {
+                    val reading = readCloudReaderRecord(profileId, record)
+                    readerRecords[reading.kind to reading.id] = reading
+                }
+                else -> applyCatalogRecord(record, profileId, cachedAt, books, files, versions)
+            }
         }
         // Bootstrapping from the change stream retains historical deletions for existing local links.
         val through = pullChanges(token, after, accept)
         val cursor = if (after == 0L) pullChanges(token, through, accept) else through
-        return CloudCatalogBatch(cursor, books.values.toList(), files.values.toList(), versions.values.toList())
+        return CloudCatalogBatch(cursor, books.values.toList(), files.values.toList(), versions.values.toList(),
+            positions.values.toList(), readerRecords.values.toList())
     }
 
     private fun pullChanges(token: String, start: Long, accept: (JSONObject) -> Unit): Long {
@@ -141,8 +234,11 @@ internal class LibraryCloudClient(private val origin: String) {
         }
     }
 
-    fun <T> download(token: String, remoteFileId: String, read: (HttpsURLConnection) -> T): T =
-        request("/files/${remoteFileId.asUuid()}/content", "GET", token, setOf(200), read = read)
+    fun <T> download(token: String, remoteFileId: String, offset: Long, sha256: String?, read: (HttpsURLConnection) -> T): T {
+        val headers = if (offset > 0) mapOf("Range" to "bytes=$offset-", "If-Range" to "\"${checkNotNull(sha256)}\"")
+            else emptyMap()
+        return request("/files/${remoteFileId.asUuid()}/content", "GET", token, setOf(200, 206), headers = headers, read = read)
+    }
 
     fun <T> cover(token: String, bookId: String, version: Long, read: (HttpsURLConnection) -> T): T =
         request("/books/${bookId.asUuid()}/cover?v=$version", "GET", token, setOf(200), read = read)
@@ -161,17 +257,20 @@ internal class LibraryCloudClient(private val origin: String) {
         contentType: String? = null,
         length: Long? = null,
         write: (OutputStream) -> Unit = {},
+        headers: Map<String, String> = emptyMap(),
+        timeout: Int? = null,
         read: (HttpsURLConnection) -> T,
     ): T {
         val connection = URI("$origin/api/v1$path").toURL().openConnection() as HttpsURLConnection
         try {
             connection.requestMethod = method
             connection.instanceFollowRedirects = false
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 30_000
+            connection.connectTimeout = timeout ?: 10_000
+            connection.readTimeout = timeout ?: 30_000
             connection.useCaches = false
             connection.setRequestProperty("Cache-Control", "no-store")
             connection.setRequestProperty("Accept-Encoding", "identity")
+            for ((name, value) in headers) connection.setRequestProperty(name, value)
             if (token != null) connection.setRequestProperty("Authorization", "Bearer $token")
             if (length != null) {
                 connection.doOutput = true
@@ -190,6 +289,27 @@ internal class LibraryCloudClient(private val origin: String) {
 
 private fun readJson(connection: HttpsURLConnection): JSONObject =
     connection.inputStream.bufferedReader(UTF_8).use { JSONObject(it.readText()) }
+
+private fun readPositionChange(record: JSONObject): ReadingPositionChange {
+    if (record.getString("entityType") != "reading_position") throw IOException("Invalid reading position type")
+    val fileId = record.getString("entityId").asUuid()
+    val revision = record.getLong("revision")
+    if (revision <= 0) throw IOException("Invalid reading position revision")
+    return when (record.getString("operation")) {
+        "delete" -> ReadingPositionChange(fileId, revision, null)
+        "upsert" -> {
+            val data = record.getJSONObject("data")
+            if (data.getString("bookFileId") != fileId) throw IOException("Invalid reading position file")
+            val percent = if (data.isNull("percent")) null else data.getDouble("percent")
+            val updatedAt = data.getLong("updatedAt")
+            if ((percent != null && percent !in 0.0..100.0) || updatedAt !in 0..9_007_199_254_740_991L) {
+                throw IOException("Invalid reading position data")
+            }
+            ReadingPositionChange(fileId, revision, data.getJSONObject("locator").toString(), percent, updatedAt)
+        }
+        else -> throw IOException("Invalid reading position operation")
+    }
+}
 
 private fun applyCatalogRecord(
     record: JSONObject,
@@ -214,7 +334,7 @@ private fun applyCatalogRecord(
                 val updatedAt = data.getLong("updatedAt")
                 val coverUpdatedAt = if (data.getBoolean("hasCover")) data.optLong("coverUpdatedAt", updatedAt) else null
                 books[id] = RemoteCatalogBook(profileId, id, data.getString("title"), author.takeIf(String::isNotEmpty),
-                    data.optionalString("description"), true, updatedAt, cachedAt, coverUpdatedAt)
+                    data.optionalString("description"), true, updatedAt, cachedAt, coverUpdatedAt, data.toString())
             } else {
                 files[id] = RemoteCatalogFile(profileId, id, data.getString("bookId").asUuid(), data.getString("format"),
                     data.getLong("sizeBytes"), data.optionalString("sha256"), data.getString("fileStatus"), cachedAt)

@@ -120,17 +120,17 @@ internal class EpubDocumentFragment : Fragment() {
                 }
                 fragment
             }
-            var lastPosition = locator
+            var lastPosition: Locator? = null
             owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 navigator.currentLocator.collect { position ->
-                    if (position != lastPosition) {
-                        lastPosition = position
+                    if (lastPosition != null && position != lastPosition) {
                         library.saveReadingPosition(
                             source.id,
                             position.toJSON().toString(),
                             position.locations.totalProgression?.times(100.0),
                         )
                     }
+                    lastPosition = position
                 }
             }
         }

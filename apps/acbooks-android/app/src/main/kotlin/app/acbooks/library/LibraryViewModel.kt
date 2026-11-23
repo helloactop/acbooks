@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.database.SQLException
 import android.net.Uri
+import android.os.SystemClock
 import android.util.Log
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
@@ -14,9 +15,14 @@ import androidx.lifecycle.viewModelScope
 import app.acbooks.R
 import app.acbooks.core.database.LibraryDatabase
 import app.acbooks.core.database.LocalBookCard
+import app.acbooks.core.database.LocalReadingSession
 import java.io.IOException
+import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +32,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal data class LibraryCatalog(
     val books: List<LocalBookCard> = emptyList(),
@@ -33,12 +40,18 @@ internal data class LibraryCatalog(
     val failed: Boolean = false,
 )
 
+internal enum class ServerConnectionStatus { Unknown, SignedOut, Connected, Unavailable }
+internal enum class ServerOperation { Checking, Syncing, SigningOut }
+
 internal data class CloudLibraryState(
-    val origin: String? = null,
-    val connected: Boolean = false,
-    val busy: Boolean = false,
+    val connection: CloudConnection = CloudConnection(),
+    val status: ServerConnectionStatus = ServerConnectionStatus.Unknown,
+    val operation: ServerOperation? = null,
     val message: Int? = null,
-)
+) {
+    val connected: Boolean get() = status == ServerConnectionStatus.Connected && connection.hasSession
+    val busy: Boolean get() = operation != null
+}
 
 internal enum class LibraryDisplayMode(val preference: String) {
     Compact("compact"), Comfortable("comfortable"),
@@ -46,6 +59,18 @@ internal enum class LibraryDisplayMode(val preference: String) {
 
 private val Context.libraryDisplayPreferences by preferencesDataStore(name = "library_display")
 private val displayModeKey = stringPreferencesKey("display_mode")
+private const val ReadingIdleLimitMillis = 5 * 60 * 1000L
+
+private class ForegroundReading(val bookId: String, val startedAt: Long, val startedElapsed: Long) {
+    private var lastActivity = startedElapsed
+    var activeMillis: Long = 0
+        private set
+
+    fun recordActivity(now: Long) {
+        activeMillis += (now - lastActivity).coerceIn(0, ReadingIdleLimitMillis)
+        lastActivity = now
+    }
+}
 
 internal data class ImportProgress(
     val total: Int,
@@ -100,24 +125,50 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     private var importJob: Job? = null
     private val matches = mutableListOf<Uri>()
 
-    fun connectServer(address: String, username: String, password: String) {
-        launchCloudAction(R.string.cloud_connect_failed) {
-            cloud.login(address, username, password)
-            syncLibrary()
-            null
-        }
+    suspend fun testServerAddress(address: String): Int = try {
+        cloud.testAddress(address)
+        R.string.cloud_address_reachable
+    } catch (failure: CancellationException) {
+        throw failure
+    } catch (_: CloudSetupRequired) {
+        R.string.cloud_setup_required
+    } catch (_: IllegalArgumentException) {
+        R.string.cloud_invalid_address
+    } catch (_: Exception) {
+        R.string.cloud_test_failed
     }
 
-    fun disconnectServer() {
-        launchCloudAction(R.string.cloud_disconnect_warning) {
-            cloud.logout()
+    suspend fun connectServer(address: String, username: String, password: String, replace: Boolean): Int? =
+        cloudActions.withLock {
+            val connection = try {
+                cloud.login(address, username, password, replace)
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (_: CloudIdentityChanged) {
+                return@withLock R.string.cloud_confirm_new_identity
+            } catch (_: IllegalArgumentException) {
+                return@withLock R.string.cloud_invalid_address
+            } catch (failure: CloudHttpException) {
+                return@withLock when (failure.status) {
+                    401 -> R.string.cloud_invalid_credentials
+                    429 -> R.string.cloud_too_many_attempts
+                    else -> R.string.cloud_connect_failed
+                }
+            } catch (_: Exception) {
+                return@withLock R.string.cloud_connect_failed
+            }
+            _cloudState.value = CloudLibraryState(connection, ServerConnectionStatus.Connected, message = R.string.cloud_login_done)
+            CloudSyncJobs.request(getApplication())
             null
         }
-    }
 
-    fun syncLibrary() {
-        launchCloudAction(R.string.cloud_sync_failed) { syncMessage(cloud.sync()) }
-    }
+    fun testServerConnection() = launchCloudAction(ServerOperation.Checking)
+
+    fun refreshServerConnection() = launchCloudAction(ServerOperation.Checking, reportSuccess = false)
+
+    fun disconnectServer() = launchCloudAction(ServerOperation.SigningOut)
+
+    fun syncLibrary() = launchCloudAction(ServerOperation.Syncing)
 
     private fun syncMessage(result: Boolean?): Int? = when (result) {
         true -> R.string.cloud_sync_done
@@ -125,31 +176,72 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
         null -> null
     }
 
-    private fun launchCloudAction(errorMessage: Int, action: suspend () -> Int?) {
+    private fun launchCloudAction(operation: ServerOperation, reportSuccess: Boolean = true) {
         viewModelScope.launch {
             cloudActions.withLock {
-                if (_cloudState.value.connected || errorMessage != R.string.cloud_sync_failed) {
-                    _cloudState.value = _cloudState.value.copy(busy = true, message = null)
+                val before = _cloudState.value
+                val saved = savedConnection(before.connection)
+                if (!saved.hasSession) {
+                    _cloudState.value = CloudLibraryState(saved, ServerConnectionStatus.SignedOut, message = before.message)
+                    return@withLock
                 }
+                val previousMessage = before.message.takeIf { !reportSuccess || it == R.string.cloud_login_done }
+                _cloudState.value = before.copy(connection = saved, operation = operation, message = previousMessage)
+                var authenticated = false
+                var revokeFailed = false
                 val message = try {
-                    action()
+                    when (operation) {
+                        ServerOperation.Checking -> {
+                            authenticated = cloud.testConnection()
+                            if (authenticated && reportSuccess) R.string.cloud_connection_verified else previousMessage
+                        }
+                        ServerOperation.Syncing -> {
+                            CloudSyncJobs.request(getApplication())
+                            val result = cloud.sync()
+                            authenticated = result != null
+                            syncMessage(result)
+                        }
+                        ServerOperation.SigningOut -> {
+                            cloud.logout()
+                            R.string.cloud_signed_out
+                        }
+                    }
                 } catch (failure: CancellationException) {
                     throw failure
                 } catch (_: CloudIdentityChanged) {
                     R.string.cloud_identity_changed
+                } catch (failure: CloudHttpException) {
+                    revokeFailed = operation == ServerOperation.SigningOut
+                    if (failure.status == 401 && !revokeFailed) R.string.cloud_session_expired else operation.failureMessage()
                 } catch (_: Exception) {
-                    errorMessage
+                    revokeFailed = operation == ServerOperation.SigningOut
+                    operation.failureMessage()
                 }
-                val connection = try {
-                    cloud.connection()
-                } catch (failure: CancellationException) {
-                    throw failure
-                } catch (_: Exception) {
-                    _cloudState.value.origin to false
+                val connection = savedConnection(saved)
+                if (operation == ServerOperation.SigningOut && !connection.hasSession) CloudSyncJobs.cancel(getApplication())
+                val status = when {
+                    !connection.hasSession -> ServerConnectionStatus.SignedOut
+                    authenticated -> ServerConnectionStatus.Connected
+                    else -> ServerConnectionStatus.Unavailable
                 }
-                _cloudState.value = CloudLibraryState(connection.first, connection.second, message = message)
+                _cloudState.value = CloudLibraryState(connection, status,
+                    message = if (revokeFailed && !connection.hasSession) R.string.cloud_disconnect_warning else message)
             }
         }
+    }
+
+    private suspend fun savedConnection(fallback: CloudConnection): CloudConnection = try {
+        cloud.connection()
+    } catch (failure: CancellationException) {
+        throw failure
+    } catch (_: Exception) {
+        fallback
+    }
+
+    private fun ServerOperation.failureMessage(): Int = when (this) {
+        ServerOperation.Checking -> R.string.cloud_test_failed
+        ServerOperation.Syncing -> R.string.cloud_sync_failed
+        ServerOperation.SigningOut -> R.string.cloud_sign_out_failed
     }
 
     fun setDisplayMode(mode: LibraryDisplayMode) {
@@ -233,6 +325,34 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     }
 
     private val readingPositionLock = Mutex()
+    private val readingSyncRequests = Channel<Unit>(Channel.CONFLATED)
+    private val foregroundReading = mutableMapOf<String, ForegroundReading>()
+
+    init {
+        viewModelScope.launch {
+            for (request in readingSyncRequests) {
+                delay(1_000)
+                readingSyncRequests.tryReceive()
+                tryReadingSync { cloud.syncReaderData() }
+            }
+        }
+    }
+
+    suspend fun prepareReadingPosition(fileId: String) {
+        val refresh = viewModelScope.async { tryReadingSync { cloud.refreshReadingPosition(fileId) } }
+        withTimeoutOrNull(1_200) { refresh.await() }
+    }
+
+    private suspend fun tryReadingSync(sync: suspend () -> Unit) {
+        try {
+            sync()
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            // Local positions and any in-flight request are durable across connectivity failures.
+            Log.d("ReaderSync", "Reading position sync will retry later")
+        }
+    }
 
     suspend fun readingPosition(fileId: String): String? = readingPositionLock.withLock {
         try {
@@ -243,11 +363,12 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     }
 
     fun saveReadingPosition(fileId: String, locator: String, percent: Double?) {
+        foregroundReading[fileId]?.recordActivity(SystemClock.elapsedRealtime())
         // Finish writes after the reader's view is gone; reopening waits for queued positions.
         viewModelScope.launch {
             readingPositionLock.withLock {
                 try {
-                    repository.saveReadingPosition(fileId, locator, percent)
+                    if (repository.saveReadingPosition(fileId, locator, percent)) requestReadingSync()
                 } catch (_: SQLException) {
                     Log.w("Reader", "Could not save the reading position")
                 }
@@ -255,7 +376,30 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
         }
     }
 
-    override fun onCleared() {
-        database.close()
+    fun startReadingSession(bookId: String, fileId: String) {
+        foregroundReading.getOrPut(fileId) { ForegroundReading(bookId, System.currentTimeMillis(), SystemClock.elapsedRealtime()) }
+    }
+
+    fun finishReadingSession(fileId: String) {
+        val reading = foregroundReading.remove(fileId) ?: return
+        val now = SystemClock.elapsedRealtime()
+        reading.recordActivity(now)
+        val seconds = reading.activeMillis / 1000
+        if (seconds == 0L) return
+        val session = LocalReadingSession(UUID.randomUUID().toString(), reading.bookId, fileId, null,
+            reading.startedAt, reading.startedAt + (now - reading.startedElapsed), seconds, "automatic")
+        viewModelScope.launch {
+            try {
+                repository.saveReadingSession(session)
+                requestReadingSync()
+            } catch (_: SQLException) {
+                Log.w("Reader", "Could not save the reading session")
+            }
+        }
+    }
+
+    private fun requestReadingSync() {
+        readingSyncRequests.trySend(Unit)
+        if (_cloudState.value.connection.hasSession) CloudSyncJobs.request(getApplication())
     }
 }

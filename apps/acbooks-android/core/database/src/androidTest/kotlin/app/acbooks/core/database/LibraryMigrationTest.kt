@@ -188,6 +188,40 @@ class LibraryMigrationTest {
         }
     }
 
+    @Test
+    fun version8PreservesPositionsAndPendingUploadsAndReplaysTheSyncCursor() = runBlocking {
+        val profileId = ShelfId
+        val locator = """{"page":12}"""
+        helper.createDatabase(DatabaseName, 8).use { old ->
+            old.execSQL("INSERT INTO books(id, title, importedAt) VALUES (?, 'Existing', 1000)", arrayOf(BookId))
+            old.execSQL("INSERT INTO file_objects VALUES (?, 'pdf', 123)", arrayOf(Hash))
+            old.execSQL("INSERT INTO book_files VALUES (?, ?, ?, 'pdf', ?, 'old.pdf', 0)", arrayOf(FileId, BookId, Hash, SourceUri))
+            old.execSQL("INSERT INTO reading_positions VALUES (?, ?, 50, 3, 1000)", arrayOf(FileId, locator))
+            old.execSQL("""
+                INSERT INTO server_profiles (id,serverInstanceId,accountId,deviceId,origin,updatedAt,verification,currentSlot)
+                VALUES (?, ?, ?, ?, ?, 1000, 'verified', 1)
+            """.trimIndent(), arrayOf(profileId, RecordId, RecordId, FileId, ServerOrigin))
+            old.execSQL("INSERT INTO sync_state VALUES (?, 177)", arrayOf(profileId))
+            old.execSQL("INSERT INTO sync_outbox VALUES (?, ?, ?, ?, NULL, NULL, 0)",
+                arrayOf(profileId, "file:$FileId", BookId, FileId))
+        }
+        helper.runMigrationsAndValidate(DatabaseName, 9, true, migration8To9).use { upgraded ->
+            assertEquals(0, upgraded.rowCount("sync_state"))
+            assertEquals(1, upgraded.rowCount("sync_outbox"))
+            assertEquals(1, upgraded.rowCount("reading_positions"))
+            upgraded.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
+        }
+        val database = Room.databaseBuilder(context, LibraryDatabase::class.java, DatabaseName).configureLibrary().build()
+        try {
+            val dao = database.library()
+            assertEquals(LocalReadingPosition(FileId, locator, 50.0, 3, 1000), dao.readingPositionRecord(FileId))
+            assertEquals(FileId, dao.pendingCloudUploads(profileId).single().fileId)
+            assertNull(dao.cloudSyncCursor(profileId))
+        } finally {
+            database.close()
+        }
+    }
+
     private fun migrateAndVerify(startVersion: Int, expectedLocator: String?) = runBlocking {
         helper.createDatabase(DatabaseName, startVersion).use { old ->
             old.execSQL("INSERT INTO books VALUES (?, ?, ?, ?)", arrayOf<Any>(BookId, "旧版书籍", "作者", 9876L))
@@ -225,8 +259,8 @@ class LibraryMigrationTest {
             }
         }
 
-        helper.runMigrationsAndValidate(DatabaseName, 8, true, *libraryMigrations).use { upgraded ->
-            assertEquals(8, upgraded.version)
+        helper.runMigrationsAndValidate(DatabaseName, 10, true, *libraryMigrations).use { upgraded ->
+            assertEquals(10, upgraded.version)
             assertEquals(if (startVersion >= 3) 1 else 0, upgraded.rowCount("remote_book_links"))
             upgraded.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
             upgraded.query("SELECT sha256, format, size FROM file_objects").use { objects ->

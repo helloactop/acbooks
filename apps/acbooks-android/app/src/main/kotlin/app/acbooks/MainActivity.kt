@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -61,6 +62,9 @@ private sealed interface AcbooksRoute : NavKey {
 
     @Serializable
     data object Server : AcbooksRoute
+
+    @Serializable
+    data class ServerLogin(val replacing: Boolean) : AcbooksRoute
 
     @Serializable
     data class BookDetails(val bookId: String) : AcbooksRoute
@@ -144,12 +148,40 @@ internal fun AcbooksNavigation(
         }
         entry<AcbooksRoute.Server> {
             val state by library.cloudState.collectAsStateWithLifecycle()
-            ServerSettingsScreen(
+            val active = navController.backStack.lastOrNull() == AcbooksRoute.Server
+            LaunchedEffect(active) {
+                if (active && state.operation == null) library.refreshServerConnection()
+            }
+            ServerConnectionScreen(
                 state = state,
-                onBack = { navController.pop() },
-                onConnect = library::connectServer,
+                onBack = { if (navController.backStack.lastOrNull() == AcbooksRoute.Server) navController.pop() },
+                onLogin = {
+                    if (navController.backStack.lastOrNull() == AcbooksRoute.Server) {
+                        navController.push(AcbooksRoute.ServerLogin(replacing = false))
+                    }
+                },
+                onTest = library::testServerConnection,
                 onSync = library::syncLibrary,
-                onDisconnect = library::disconnectServer,
+                onChangeServer = {
+                    if (navController.backStack.lastOrNull() == AcbooksRoute.Server) {
+                        navController.push(AcbooksRoute.ServerLogin(replacing = true))
+                    }
+                },
+                onSignOut = library::disconnectServer,
+            )
+        }
+        entry<AcbooksRoute.ServerLogin> { route ->
+            val state by library.cloudState.collectAsStateWithLifecycle()
+            ServerLoginScreen(
+                connection = state.connection,
+                replacing = route.replacing,
+                onBack = { if (navController.backStack.lastOrNull() == route) navController.pop() },
+                onTest = library::testServerAddress,
+                onLogin = library::connectServer,
+                onConnected = {
+                    if (navController.backStack.lastOrNull() == route) navController.pop()
+                    library.syncLibrary()
+                },
             )
         }
         entry<AcbooksRoute.BookDetails> { route ->

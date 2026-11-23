@@ -30,16 +30,18 @@ interface ReadingPositionDao {
     suspend fun saveReadingPosition(position: LocalReadingPosition)
 
     @Query("""
-        INSERT INTO reading_positions (fileId, locator, percent, revision, updatedAt)
-        VALUES (:fileId, :locator, :percent, 1, :updatedAt)
+        INSERT INTO reading_positions (fileId, locator, percent, revision, updatedAt, needsSync, cloudRevision)
+        VALUES (:fileId, :locator, :percent, 1, :updatedAt, 1, :cloudRevision)
         ON CONFLICT(fileId) DO UPDATE SET
             locator = excluded.locator,
             percent = excluded.percent,
             revision = reading_positions.revision + 1,
-            updatedAt = MAX(reading_positions.updatedAt, excluded.updatedAt)
+            updatedAt = MAX(reading_positions.updatedAt, excluded.updatedAt),
+            needsSync = 1,
+            cloudRevision = COALESCE(reading_positions.cloudRevision, excluded.cloudRevision)
         WHERE reading_positions.locator <> excluded.locator OR reading_positions.percent IS NOT excluded.percent
     """)
-    suspend fun writeReadingPosition(fileId: String, locator: String, percent: Double?, updatedAt: Long)
+    suspend fun writeReadingPosition(fileId: String, locator: String, percent: Double?, updatedAt: Long, cloudRevision: Long? = null)
 
     @Query("DELETE FROM reading_positions WHERE fileId = :fileId")
     suspend fun deleteReadingPosition(fileId: String): Int

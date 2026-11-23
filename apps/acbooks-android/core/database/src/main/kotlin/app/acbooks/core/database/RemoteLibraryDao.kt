@@ -18,6 +18,12 @@ interface RemoteLibraryDao {
     suspend fun serverProfile(profileId: String): ServerProfile?
 
     @Query("""
+        SELECT * FROM server_profiles WHERE origin = :origin AND accountId = :accountId AND verification = 'verified'
+        ORDER BY currentSlot DESC, updatedAt DESC LIMIT 1
+    """)
+    suspend fun verifiedServerProfile(origin: String, accountId: String): ServerProfile?
+
+    @Query("""
         SELECT c.*, l.localBookId FROM remote_catalog c
         LEFT JOIN remote_book_links l ON l.profileId = c.profileId AND l.remoteBookId = c.remoteBookId
         WHERE c.profileId = :profileId
@@ -47,6 +53,14 @@ interface RemoteLibraryDao {
         WHERE l.localBookId = :bookId AND b.available = 1
     """)
     fun observeCloudDescription(bookId: String): Flow<String?>
+
+    @Query("""
+        SELECT c.detailsJson FROM remote_catalog c
+        JOIN remote_book_links l ON l.profileId = c.profileId AND l.remoteBookId = c.remoteBookId
+        JOIN server_profiles p ON p.id = l.profileId AND p.currentSlot = 1
+        WHERE l.localBookId = :bookId AND c.available = 1
+    """)
+    fun observeCloudBookDetails(bookId: String): Flow<String?>
 
     @Query("""
         SELECT f.* FROM remote_catalog_files f

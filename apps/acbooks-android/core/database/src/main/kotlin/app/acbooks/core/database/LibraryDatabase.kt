@@ -17,17 +17,21 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ServerProfile::class, RemoteCatalogBook::class, RemoteCatalogFile::class,
         RemoteBookLink::class, RemoteFileLink::class,
         CloudSyncState::class, CloudCatalogVersion::class, PendingCloudUpload::class,
+        CloudReadingPosition::class, PendingReadingPosition::class,
+        CloudReaderRecord::class, PendingCloudDownload::class,
     ],
-    version = 8,
+    version = 10,
 )
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun library(): LibraryDao
 
     companion object {
-        fun open(context: Context): LibraryDatabase =
-            Room.databaseBuilder(context.applicationContext, LibraryDatabase::class.java, "acbooks-reader.db")
-                .configureLibrary()
-                .build()
+        @Volatile private var instance: LibraryDatabase? = null
+
+        fun open(context: Context): LibraryDatabase = instance ?: synchronized(this) {
+            instance ?: Room.databaseBuilder(context.applicationContext, LibraryDatabase::class.java, "acbooks-reader.db")
+                .configureLibrary().build().also { instance = it }
+        }
     }
 }
 

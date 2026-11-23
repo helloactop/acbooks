@@ -16,6 +16,7 @@ import app.acbooks.core.database.LocalBook
 import app.acbooks.core.database.LocalBookCard
 import app.acbooks.core.database.LocalBookFile
 import app.acbooks.core.database.LocalBookRemoval
+import app.acbooks.core.database.LocalReadingSession
 import app.acbooks.core.database.LocalFileObject
 import app.acbooks.core.database.LocalFileSource
 import app.acbooks.core.database.RemoteBookLink
@@ -23,10 +24,11 @@ import app.acbooks.core.database.RemoteCatalogBook
 import app.acbooks.core.database.RemoteCatalogFile
 import app.acbooks.core.database.coverCacheKey
 import app.acbooks.core.database.managedObjectPath
-import app.acbooks.core.database.observeReadingStatistics
+import app.acbooks.core.database.summarizeReadingSessions
 import app.acbooks.R
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.FileOutputStream
 import java.io.IOException
 import java.security.MessageDigest
 import java.time.ZoneId
@@ -38,6 +40,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -149,40 +152,26 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
     ): ReadableBookFile = withContext(Dispatchers.IO) {
         if (!objects.isDirectory && !objects.mkdirs() && !objects.isDirectory) throw IOException("Cannot open book storage")
         if (objects.canonicalFile != File(filesRoot.canonicalFile, "library/objects")) throw IOException("Invalid book storage")
-        val pending = File.createTempFile("download-", ".part", objects)
+        val hash = remote.sha256
+        val prefix = "download-${remote.profileId.asUuid()}-${remote.remoteFileId.asUuid()}-"
+        val pending = if (hash == null) File.createTempFile("download-", ".part", objects) else {
+            require(contentHash.matches(hash) && remote.format in setOf("epub", "pdf"))
+            val part = File(objects, "$prefix$hash-${remote.sizeBytes}.part")
+            if (part.canonicalFile != File(objects.canonicalFile, part.name)) throw IOException("Invalid download path")
+            objects.listFiles { candidate -> candidate.name.startsWith(prefix) && candidate.name.endsWith(".part") }
+                ?.filterNot { it == part }?.forEach(File::delete)
+            part
+        }
+        var complete = false
         try {
-            val actualHash = client.download(token, remote.remoteFileId) { response ->
-                val responseHash = response.getHeaderField("X-Content-SHA256")
-                val expected = remote.sha256 ?: responseHash ?: throw IOException("Book checksum is unavailable")
-                if (!contentHash.matches(expected) || (responseHash != null && responseHash != expected)) {
-                    throw IOException("Book version changed")
-                }
-                val digest = MessageDigest.getInstance("SHA-256")
-                var size = 0L
-                response.inputStream.use { input ->
-                    pending.outputStream().use { output ->
-                        val buffer = ByteArray(64 * 1024)
-                        while (true) {
-                            ensureActive()
-                            val count = input.read(buffer)
-                            if (count < 0) break
-                            size += count
-                            if (size > remote.sizeBytes) throw IOException("Book size changed")
-                            digest.update(buffer, 0, count)
-                            output.write(buffer, 0, count)
-                        }
-                        output.fd.sync()
-                    }
-                }
-                if (size != remote.sizeBytes || digest.digest().hex() != expected) throw IOException("Incomplete book download")
-                expected
-            }
+            val actualHash = downloadContent(pending, remote, client, token)
             libraryFilesLock.withLock {
                 val target = ownedObject(actualHash, remote.format) ?: throw IOException("Cannot open book storage")
                 val published = !target.isFile || !matchesContent(target, actualHash)
                 if (published && !pending.renameTo(target)) throw IOException("Could not publish the book file")
                 try {
                     val file = dao.attachDownloadedFile(remote, bookId, actualHash, remote.sizeBytes, System.currentTimeMillis())
+                    complete = true
                     ReadableBookFile(file.id, file.format, target)
                 } catch (failure: Exception) {
                     if (published && !dao.hasContent(actualHash, remote.format)) target.delete()
@@ -190,8 +179,76 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                 }
             }
         } finally {
-            pending.delete()
+            if (complete || hash == null || pending.length() > remote.sizeBytes) pending.delete()
         }
+    }
+
+    private suspend fun downloadContent(part: File, remote: RemoteCatalogFile, client: LibraryCloudClient, token: String): String {
+        val hash = remote.sha256
+        if (part.length() >= remote.sizeBytes && part.isFile) {
+            if (hash != null && part.length() == remote.sizeBytes && matchesContent(part, hash)) return hash
+            part.delete()
+        }
+        val offset = if (hash == null) 0L else part.length()
+        return try {
+            transferContent(part, remote, client, token, offset)
+        } catch (failure: CloudHttpException) {
+            if (failure.status != 416 || offset == 0L) throw failure
+            part.delete()
+            transferContent(part, remote, client, token, 0)
+        }
+    }
+
+    fun removePartialDownloads(profileId: String, remoteFileIds: Set<String>) {
+        if (remoteFileIds.isEmpty()) return
+        val prefix = "download-${profileId.asUuid()}-"
+        objects.listFiles { file -> file.name.startsWith(prefix) && file.name.endsWith(".part") &&
+            file.name.removePrefix(prefix).take(36) in remoteFileIds
+        }
+            ?.forEach(File::delete)
+    }
+
+    private suspend fun transferContent(
+        part: File, remote: RemoteCatalogFile, client: LibraryCloudClient, token: String, offset: Long,
+    ): String {
+        val context = kotlin.coroutines.coroutineContext
+        val expected = client.download(token, remote.remoteFileId, offset, remote.sha256) { response ->
+            val responseHash = response.getHeaderField("X-Content-SHA256")
+            val hash = remote.sha256 ?: responseHash ?: throw IOException("Book checksum is unavailable")
+            val append = response.responseCode == 206
+            if (!contentHash.matches(hash) || (responseHash != null && responseHash != hash) ||
+                (append && (offset == 0L || response.getHeaderField("ETag") != "\"$hash\"" ||
+                    response.getHeaderField("Content-Range") != "bytes $offset-${remote.sizeBytes - 1}/${remote.sizeBytes}"))
+            ) {
+                part.delete()
+                throw IOException("Book version changed")
+            }
+            var size = if (append) offset else 0L
+            response.inputStream.use { input ->
+                FileOutputStream(part, append).use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        context.ensureActive()
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        size += count
+                        if (size > remote.sizeBytes) {
+                            part.delete()
+                            throw IOException("Book size changed")
+                        }
+                        output.write(buffer, 0, count)
+                    }
+                    output.fd.sync()
+                }
+            }
+            if (size != remote.sizeBytes) throw IOException("Incomplete book download")
+            hash
+        }
+        if (!matchesContent(part, expected)) {
+            part.delete()
+            throw IOException("Book checksum changed")
+        }
+        return expected
     }
 
     /** Evict the app-owned copy while keeping the content object and all book references. */
@@ -260,7 +317,11 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
         dao.observeBookShelves(bookId).distinctUntilChanged(),
         dao.observeBookReadingPosition(bookId).distinctUntilChanged(),
         flow { emit(readBookDetailsFile(openBook(bookId))) },
-        dao.observeReadingStatistics(bookId, ZoneId.systemDefault()),
+        dao.observeCompletedReadingSessions(bookId).combine(dao.observeCloudReaderRecords(bookId)) { local, cloud ->
+            val remote = cloud.mapNotNull { it.completedSession(bookId) }
+            val remoteIds = cloud.filter { it.kind == "reading_session" }.mapTo(mutableSetOf()) { it.id }
+            summarizeReadingSessions(remote + local.filterNot { it.id in remoteIds }, ZoneId.systemDefault())
+        },
     ) { formats, shelves, position, detailsFile, statistics ->
         BookDetailsData(
             metadata = detailsFile?.metadata,
@@ -271,14 +332,23 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                 BookReadingStatistics(it.activeSeconds.toLong(), it.sessionCount, it.readingDays, it.lastReadAt)
             },
         )
-    }.combine(dao.observeCloudDescription(bookId)) { details, description ->
-        if (description == null) details else details.copy(
-            metadata = details.metadata?.copy(description = description) ?: BookBibliography(description = description),
-        )
+    }.combine(dao.observeCloudBookDetails(bookId)) { details, payload -> details.withCloudDetails(payload) }
+
+    suspend fun saveReadingSession(session: LocalReadingSession) = dao.insertReadingSession(session)
+
+    suspend fun bookUploadPayload(book: LocalBook): String {
+        val bibliography = readBookDetailsFile(openBook(book.id)?.takeIf { it.format == "epub" })?.metadata
+        val contributors = dao.observeBookContributors(book.id).first()
+        return bookCreatePayload(book, bibliography, authors = contributors.filter { it.role == "author" }.map { it.name }
+            .ifEmpty { listOfNotNull(book.author) },
+            translators = contributors.filter { it.role == "translator" }.map { it.name }
+                .ifEmpty { bibliography?.translators.orEmpty() },
+            isbn = dao.bookIdentifiers(book.id).firstOrNull { it.scheme == "isbn" }?.value ?: bibliography?.isbn,
+            tags = dao.observeBookTags(book.id).first().map { it.name }, shelves = dao.observeBookShelves(book.id).first())
     }
 
     suspend fun saveReadingPosition(fileId: String, locator: String, percent: Double? = null) =
-        dao.writeReadingPosition(fileId, locator, percent, System.currentTimeMillis())
+        dao.recordReadingPosition(fileId, locator, percent, System.currentTimeMillis())
 
     /** Remove the local book record and owned cached files, but never the source URI. */
     suspend fun deleteLocalBook(bookId: String): Boolean = withContext(Dispatchers.IO) {
@@ -325,6 +395,8 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
             libraryFilesLock.withLock {
                 withContext(NonCancellable) {
                     dao.applyCloudCatalog(profileId, expectedCursor, rebuild, batch).forEach(::removeBookFiles)
+                    removePartialDownloads(profileId, batch.versions.filter { it.deleted && it.entityType == "book_file" }
+                        .mapTo(mutableSetOf()) { it.entityId })
                 }
             }
         }
@@ -407,8 +479,11 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                     saveCover(sha256, metadata.cover)
                     val book = LocalBook(uuid(), metadata.title, metadata.author, System.currentTimeMillis())
                     val file = LocalBookFile(uuid(), book.id, sha256, format, sourceKey, name?.take(512) ?: "$title.$format")
+                    val bibliography = if (format == "epub") {
+                        readBookDetailsFile(ReadableBookFile(file.id, format, objectFile))?.metadata
+                    } else null
                     when (dao.importBook(book, file, LocalFileObject(sha256, format, size), allowMatchingContent,
-                        book.importedAt, bookCreatePayload(book))) {
+                        book.importedAt, bookCreatePayload(book, bibliography))) {
                         BookImportCommit.Added -> ImportOutcome.Added
                         BookImportCommit.Duplicate -> ImportOutcome.Duplicate
                         BookImportCommit.MatchingContent -> ImportOutcome.MatchingContent

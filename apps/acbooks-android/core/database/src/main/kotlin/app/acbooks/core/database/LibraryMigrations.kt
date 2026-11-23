@@ -25,4 +25,5 @@ internal val migration2To3 = object : Migration(2, 3) {
 
 internal val libraryMigrations = arrayOf(
     migration1To2, migration2To3, migration3To4, migration4To5, migration5To6, migration6To7, migration7To8,
+    migration8To9, migration9To10,
 )

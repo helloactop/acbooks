@@ -22,6 +22,28 @@ internal data class BookDetailsData(
 
 internal enum class BookReadingStatus { Unread, Reading, Finished }
 
+internal fun BookDetailsData.withCloudDetails(payload: String?): BookDetailsData {
+    if (payload == null) return this
+    return try {
+        val data = JSONObject(payload)
+        fun text(key: String): String? = if (data.isNull(key)) null else data.getString(key)
+        fun names(key: String): List<String> = data.optJSONArray(key)?.let { values ->
+            List(values.length()) { values.getString(it) }
+        }.orEmpty()
+        val embedded = metadata ?: BookBibliography()
+        copy(metadata = embedded.copy(description = text("description"), translators = names("translators"),
+            isbn = text("isbn"), series = text("series")), shelves = names("shelves"), tags = names("tags"),
+            readingStatus = when (text("readingStatus")) {
+                "unread" -> BookReadingStatus.Unread
+                "reading" -> BookReadingStatus.Reading
+                "done" -> BookReadingStatus.Finished
+                else -> null
+            })
+    } catch (_: JSONException) {
+        this
+    }
+}
+
 internal data class BookReadingStatistics(
     val activeSeconds: Long,
     val sessionCount: Int,
