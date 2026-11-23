@@ -220,4 +220,14 @@
     <string name="library_delete_unbacked_summary">“%1$s” has no confirmed cloud backup. Deleting it removes it from this device.</string>
     <string name="library_delete_local_failed">Could not remove the local copy. Make sure all files are backed up and try again.</string>
     <string name="library_delete_cloud_failed">Could not complete deletion from the server and this device.</string>
+    <string name="settings_other">More</string>
+    <string name="settings_about_summary">Version and open-source information</string>
+    <string name="about_title">About this app</string>
+    <string name="about_resources">Open source &amp; support</string>
+    <string name="about_source">Source code</string>
+    <string name="about_dependencies">Open-source dependencies</string>
+    <string name="about_dependencies_summary">Third-party notices and licenses</string>
+    <string name="about_license">Software license</string>
+    <string name="about_feedback">Report an issue</string>
+    <string name="about_link_failed">No browser found to open this link</string>
 </resources>
