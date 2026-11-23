@@ -1,10 +1,10 @@
 package app.acbooks.library
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.absoluteOffset
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
@@ -46,6 +47,7 @@ import top.yukonga.miuix.kmp.glass.glassPopupAnchor
 import top.yukonga.miuix.kmp.glass.glassPopupAnchorContent
 import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.layout.CascadingPopupDefaults
 import top.yukonga.miuix.kmp.icon.glass.Add
 import top.yukonga.miuix.kmp.icon.glass.BookOutline
 import top.yukonga.miuix.kmp.icon.glass.GridView
@@ -177,6 +179,12 @@ private fun BoxScope.LibraryDisplayPopup(
     var primaryWidth by remember { mutableStateOf(sizing.minWidth) }
     val density = LocalDensity.current
     val submenuShown = show && submenuOpen
+    val arrowTurn = CascadingPopupDefaults.arrowRotation(LocalLayoutDirection.current)
+    val submenuArrow by animateFloatAsState(
+        targetValue = if (submenuShown) arrowTurn else 0f,
+        animationSpec = CascadingPopupDefaults.arrowSpring(submenuShown),
+        label = "libraryLayoutSubmenuArrow",
+    )
 
     LaunchedEffect(show) {
         if (!show) submenuOpen = false
@@ -220,6 +228,7 @@ private fun BoxScope.LibraryDisplayPopup(
                 text = stringResource(R.string.library_display_mode),
                 icon = MiuixIcons.Glass.GridView,
                 showArrow = true,
+                arrowRotation = { submenuArrow * (1f - anchor.secondaryBackProgress) },
                 modifier = Modifier.onGloballyPositioned { coordinates ->
                     if (!submenuPresent) submenuAnchor = coordinates.boundsInWindow()
                 },
@@ -247,6 +256,7 @@ private fun BoxScope.LibraryDisplayPopup(
                 text = stringResource(R.string.library_display_mode),
                 icon = MiuixIcons.Glass.GridView,
                 showArrow = true,
+                arrowRotation = { submenuArrow * (1f - anchor.secondaryBackProgress) },
                 onClick = { submenuOpen = false },
             )
             HorizontalDivider(
