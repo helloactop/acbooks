@@ -62,6 +62,8 @@ dependencies {
     implementation(libs.readium.navigator)
     implementation(libs.readium.streamer)
     implementation(libs.coil.compose)
+    testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.junit)
     androidTestImplementation(libs.junit)
 }
