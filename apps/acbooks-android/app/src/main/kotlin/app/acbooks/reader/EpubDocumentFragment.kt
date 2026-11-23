@@ -130,7 +130,7 @@ internal class EpubDocumentFragment : Fragment() {
             chapters = opened.readerChapters()
             onContentsChanged?.invoke(chapters)
             // Load DataStore before creating Readium to avoid a default-layout flash.
-            val initialTypography = library.loadReaderTypographySettings()
+            val initialTypography = library.loadReaderTypographyProfile(bookId).effective
             val systemDark = theme == Theme.DARK
             val initialPreferences = initialTypography.toEpubPreferences(systemDark)
             // Match the loading surface to the selected reading theme, not just
@@ -180,7 +180,8 @@ internal class EpubDocumentFragment : Fragment() {
                 // Updating the stored settings reflows the current publication without
                 // recreating its Fragment or discarding the existing Readium locator.
                 launch {
-                    library.readerTypography.collect { settings ->
+                    library.readerTypographyFor(bookId).collect { profile ->
+                        val settings = profile.effective
                         if (settings != appliedTypography) {
                             appliedTypography = settings
                             val preferences = settings.toEpubPreferences(systemDark)
