@@ -132,10 +132,16 @@ internal class EpubDocumentFragment : Fragment() {
             // Load DataStore before creating Readium to avoid a default-layout flash.
             val initialTypography = library.loadReaderTypographySettings()
             val systemDark = theme == Theme.DARK
+            val initialPreferences = initialTypography.toEpubPreferences(systemDark)
+            // Match the loading surface to the selected reading theme, not just
+            // the app's light/dark mode, to avoid a contrasting background flash.
+            val pageBackground = initialPreferences.theme?.backgroundColor ?: theme.backgroundColor
+            root.setBackgroundColor(pageBackground)
+            loading.setBackgroundColor(pageBackground)
             val navigator = owner.lifecycle.withResumed {
                 val factory = EpubNavigatorFactory(opened).createFragmentFactory(
                     initialLocator = locator,
-                    initialPreferences = initialTypography.toEpubPreferences(systemDark),
+                    initialPreferences = initialPreferences,
                     paginationListener = object : EpubNavigatorFragment.PaginationListener {
                         override fun onPageLoaded() {
                             if (loading.parent === root) root.removeView(loading)
@@ -177,7 +183,9 @@ internal class EpubDocumentFragment : Fragment() {
                     library.readerTypography.collect { settings ->
                         if (settings != appliedTypography) {
                             appliedTypography = settings
-                            navigator.submitPreferences(settings.toEpubPreferences(systemDark))
+                            val preferences = settings.toEpubPreferences(systemDark)
+                            root.setBackgroundColor(preferences.theme?.backgroundColor ?: theme.backgroundColor)
+                            navigator.submitPreferences(preferences)
                         }
                     }
                 }
