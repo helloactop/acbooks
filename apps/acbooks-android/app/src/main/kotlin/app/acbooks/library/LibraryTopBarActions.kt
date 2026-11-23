@@ -4,28 +4,42 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.matchParentSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.AbsoluteAlignment
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import app.acbooks.R
 import app.acbooks.core.database.LocalBookCard
 import kotlin.math.roundToInt
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.blur.Backdrop
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.glass.GlassPopupAnchor
 import top.yukonga.miuix.kmp.glass.GlassPopupItem
+import top.yukonga.miuix.kmp.glass.GlassPopupDefaults
+import top.yukonga.miuix.kmp.glass.GlassPopupSizing
+import top.yukonga.miuix.kmp.glass.GlassSecondaryPopup
 import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
 import top.yukonga.miuix.kmp.glass.GlassTransformPopup
 import top.yukonga.miuix.kmp.glass.glassPopupAnchor
@@ -38,6 +52,7 @@ import top.yukonga.miuix.kmp.icon.glass.GridView
 import top.yukonga.miuix.kmp.icon.glass.Delete
 import top.yukonga.miuix.kmp.icon.glass.Edit
 import top.yukonga.miuix.kmp.icon.glass.Info
+import top.yukonga.miuix.kmp.icon.glass.ImageOutline
 import top.yukonga.miuix.kmp.icon.glass.More
 import top.yukonga.miuix.kmp.icon.glass.Refresh
 import top.yukonga.miuix.kmp.icon.glass.Tune
@@ -99,34 +114,14 @@ internal fun BoxScope.LibraryMenus(
     onChangeShelves: (String) -> Unit,
     onDelete: (LocalBookCard) -> Unit,
 ) {
-    // The Miuix GlassIconDropdownMenu does not forward DropdownItem.icon to the
-    // underlying GlassPopupItem, so use GlassTransformPopup for visible icon + text rows.
-    GlassTransformPopup(
+    LibraryDisplayPopup(
         show = activeMenu == LibraryMenu.Display,
-        onDismissRequest = { onDismiss(LibraryMenu.Display) },
         anchor = displayAnchor,
-        anchorContent = { LibraryMenuIcon(LibraryMenu.Display) },
         backdrop = backdrop,
-    ) {
-        GlassPopupItem(
-            text = stringResource(R.string.library_compact),
-            icon = MiuixIcons.Glass.GridView,
-            selected = mode == LibraryDisplayMode.Compact,
-            onClick = {
-                onDisplayMode(LibraryDisplayMode.Compact)
-                onDismiss(LibraryMenu.Display)
-            },
-        )
-        GlassPopupItem(
-            text = stringResource(R.string.library_comfortable),
-            icon = MiuixIcons.Glass.BookOutline,
-            selected = mode == LibraryDisplayMode.Comfortable,
-            onClick = {
-                onDisplayMode(LibraryDisplayMode.Comfortable)
-                onDismiss(LibraryMenu.Display)
-            },
-        )
-    }
+        mode = mode,
+        onDismiss = { onDismiss(LibraryMenu.Display) },
+        onDisplayMode = onDisplayMode,
+    )
     GlassTransformPopup(
         show = activeMenu == LibraryMenu.More,
         onDismissRequest = { onDismiss(LibraryMenu.More) },
@@ -160,6 +155,129 @@ internal fun BoxScope.LibraryMenus(
         onChangeShelves = onChangeShelves,
         onDelete = onDelete,
     )
+}
+
+/**
+ * Native Miuix two-level glass menu. We compose the secondary popup explicitly because
+ * GlassIconDropdownMenu currently drops DropdownItem icons in both levels.
+ */
+@Composable
+private fun BoxScope.LibraryDisplayPopup(
+    show: Boolean,
+    anchor: GlassPopupAnchor,
+    backdrop: Backdrop,
+    mode: LibraryDisplayMode,
+    onDismiss: () -> Unit,
+    onDisplayMode: (LibraryDisplayMode) -> Unit,
+) {
+    var submenuOpen by remember { mutableStateOf(false) }
+    var submenuPresent by remember { mutableStateOf(false) }
+    var submenuAnchor by remember { mutableStateOf(Rect.Zero) }
+    val sizing = GlassPopupSizing()
+    var primaryWidth by remember { mutableStateOf(sizing.minWidth) }
+    val density = LocalDensity.current
+    val submenuShown = show && submenuOpen
+
+    LaunchedEffect(show) {
+        if (!show) submenuOpen = false
+    }
+
+    // Record only the primary panel; the secondary samples both the page and the
+    // primary glass panel, without accidentally recording itself.
+    val primaryBackdrop = rememberLayerBackdrop()
+    val secondaryBackdrop = remember(backdrop, primaryBackdrop) {
+        object : Backdrop {
+            override val isCoordinatesDependent = true
+            override val offsetResidualX: Float get() = backdrop.offsetResidualX
+            override val offsetResidualY: Float get() = backdrop.offsetResidualY
+
+            override fun DrawScope.drawBackdrop(
+                density: Density,
+                coordinates: LayoutCoordinates?,
+                layerBlock: (GraphicsLayerScope.() -> Unit)?,
+                downscaleFactor: Float,
+            ) {
+                with(backdrop) { drawBackdrop(density, coordinates, layerBlock, downscaleFactor) }
+                with(primaryBackdrop) { drawBackdrop(density, coordinates, layerBlock, downscaleFactor) }
+            }
+        }
+    }
+    Box(Modifier.matchParentSize().layerBackdrop(primaryBackdrop)) {
+        GlassTransformPopup(
+            show = show,
+            onDismissRequest = {
+                submenuOpen = false
+                onDismiss()
+            },
+            anchor = anchor,
+            anchorContent = { LibraryMenuIcon(LibraryMenu.Display) },
+            backdrop = backdrop,
+            stacked = submenuShown,
+            sizing = sizing,
+            onMeasured = { primaryWidth = with(density) { it.width.toDp() } },
+        ) {
+            GlassPopupItem(
+                text = stringResource(R.string.library_display_mode),
+                icon = MiuixIcons.Glass.GridView,
+                showArrow = true,
+                modifier = Modifier.onGloballyPositioned { coordinates ->
+                    if (!submenuPresent) submenuAnchor = coordinates.boundsInWindow()
+                },
+                onClick = {
+                    if (show && !submenuPresent) {
+                        // Freeze the parent row's bounds before stacking it.
+                        submenuPresent = true
+                        submenuOpen = true
+                    }
+                },
+            )
+        }
+    }
+    Box(Modifier.matchParentSize()) {
+        GlassSecondaryPopup(
+            show = submenuShown,
+            onDismissRequest = { submenuOpen = false },
+            anchorBounds = submenuAnchor,
+            backdrop = secondaryBackdrop,
+            materialAnchor = anchor,
+            sizing = sizing.copy(minWidth = primaryWidth),
+            onDismissFinished = { submenuPresent = false },
+        ) {
+            GlassPopupItem(
+                text = stringResource(R.string.library_display_mode),
+                icon = MiuixIcons.Glass.GridView,
+                showArrow = true,
+                onClick = { submenuOpen = false },
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(
+                    horizontal = GlassPopupDefaults.DividerPaddingHorizontal,
+                    vertical = GlassPopupDefaults.DividerPaddingVertical,
+                ),
+                thickness = GlassPopupDefaults.DividerThickness,
+            )
+            GlassPopupItem(
+                text = stringResource(R.string.library_compact),
+                icon = MiuixIcons.Glass.GridView,
+                selected = mode == LibraryDisplayMode.Compact,
+                onClick = {
+                    onDisplayMode(LibraryDisplayMode.Compact)
+                    submenuOpen = false
+                    onDismiss()
+                },
+            )
+            GlassPopupItem(
+                text = stringResource(R.string.library_comfortable),
+                icon = MiuixIcons.Glass.ImageOutline,
+                selected = mode == LibraryDisplayMode.Comfortable,
+                onClick = {
+                    onDisplayMode(LibraryDisplayMode.Comfortable)
+                    submenuOpen = false
+                    onDismiss()
+                },
+            )
+        }
+    }
 }
 
 @Composable
