@@ -19,6 +19,7 @@ from app.modules.books.organization_schemas import (
     OrganizationTarget,
 )
 from app.modules.books.organization_service import BookOrganizationService
+from app.modules.books.schemas import BookShelf
 
 Limit = Annotated[int, Query(ge=1, le=100)]
 Offset = Annotated[int, Query(ge=0, le=1_000_000)]
@@ -56,6 +57,19 @@ def organization_router(
     def reassociate(file_id: UUID, payload: FileReassociation, current: Write) -> Response:
         service.reassociate(file_id, payload)
         return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+    @router.post(
+        "/shelf",
+        operation_id="createOrganizationShelf",
+        responses={
+            200: {
+                "headers": {"Cache-Control": {"schema": {"type": "string", "const": "no-store"}}}
+            },
+        },
+    )
+    def create_shelf(payload: OrganizationName, response: Response, current: Write) -> BookShelf:
+        response.headers["Cache-Control"] = "no-store"
+        return service.create_shelf(payload.name)
 
     @router.get("/{kind}", operation_id="listOrganizationEntries")
     def list_entries(

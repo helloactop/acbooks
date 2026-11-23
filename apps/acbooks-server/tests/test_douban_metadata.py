@@ -46,6 +46,22 @@ def test_extracts_book_fields_without_crossing_person_labels() -> None:
     assert douban.parse_book("<html>无书名</html>", "1") is None
 
 
+@pytest.mark.parametrize(
+    ("label", "value", "expected"),
+    [
+        ("出版年", "2008", "2008"),
+        ("出版日期", "2008-1", "2008-1"),
+        ("出版时间", "2008年1月", "2008年1月"),
+        ("出版年", "2008-01-12T00:00:00.000+08:00", "2008-01-12"),
+    ],
+)
+def test_publication_date_preserves_douban_precision(label: str, value: str, expected: str) -> None:
+    html = BOOK.replace("出版年:</span> 2008-01", f"{label}:</span> {value}")
+    result = douban.parse_book(html, "2567698")
+    assert result is not None
+    assert result.publication_date == expected
+
+
 def test_search_page_unwraps_links_deduplicates_and_excludes_other_hosts() -> None:
     direct = f"{douban.BOOK_ORIGIN}/subject/2567698/"
     wrapped = f"/link2/?url={quote(direct, safe='')}"
@@ -98,15 +114,22 @@ def test_douban_candidate_api_and_fill_preserve_existing_fields(
     result = found.json()[0]
     assert result["doubanId"] == "2567698"
     assert result["publicationDate"] == "2008-01"
-    book = client.post("/api/v1/books", json={"title": "手动书名"}, headers=challenge(client))
+    book = client.post(
+        "/api/v1/books",
+        json={"title": "手动书名", "publicationDate": "2008-01-01T00:00:00Z"},
+        headers=challenge(client),
+    )
     assert book.status_code == 201
     path = f"/api/v1/books/{book.json()['id']}"
     filled = client.post(f"{path}/metadata", json=result, headers=challenge(client))
     assert filled.json() == {
-        "fields": ["translators", "authors", "description", "isbn", "cover", "tags"],
+        "fields": [
+            "translators", "authors", "description", "isbn", "cover", "tags", "publicationDate"
+        ],
     }
     detail = client.get(path).json()
     assert detail["title"] == "手动书名"
+    assert detail["publicationDate"] == "2008-01"
     assert detail["isbn"] == "9787536692930"
     assert set(detail["translators"]) == {"译者甲", "译者乙"}
     assert set(detail["tags"]) == {"科幻", "小说"}

@@ -28,7 +28,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
@@ -90,20 +89,11 @@ internal fun BookEditSheet(
         backdrop = backdrop,
     ) {
         Column(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
-            BookEditHeader(
-                canCancel = editor?.open == true && !saving,
-                ready = ready,
-                onCancel = ::dismiss,
-                onFill = {
-                    focus.clearFocus()
-                    keyboard?.hide()
-                    library.fillBookDraft()
-                },
-                onSave = {
-                    focus.clearFocus()
-                    keyboard?.hide()
-                    library.saveBookEditor()
-                },
+            Text(
+                stringResource(R.string.book_edit_title),
+                modifier = Modifier.fillMaxWidth().semantics { heading() },
+                style = MiuixTheme.textStyles.title4,
+                textAlign = TextAlign.Center,
             )
             val pending = editor?.initial?.let { it.pendingCover || it.retryKeys.isNotEmpty() } == true
             val message = editor?.error ?: if (pending) R.string.book_edit_retry_sync else null
@@ -121,7 +111,7 @@ internal fun BookEditSheet(
             }
             Column(
                 Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(formScroll)
-                    .navigationBarsPadding().padding(top = 12.dp, bottom = 12.dp),
+                    .padding(vertical = 12.dp),
             ) {
                 editor?.draft?.let { draft ->
                     BookEditForm(
@@ -130,8 +120,53 @@ internal fun BookEditSheet(
                         backdrop = backdrop,
                         enabled = ready,
                         onChange = library::editBookDraft,
-                        onChooseCover = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                         onUndoCover = library::undoBookCover,
+                    )
+                }
+            }
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    EditAction(
+                        R.string.book_edit_fill,
+                        onClick = {
+                            focus.clearFocus()
+                            keyboard?.hide()
+                            library.fillBookDraft()
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = ready,
+                    )
+                    EditAction(
+                        R.string.book_edit_choose_cover,
+                        onClick = {
+                            focus.clearFocus()
+                            keyboard?.hide()
+                            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = ready,
+                    )
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    EditAction(
+                        R.string.book_edit_cancel,
+                        onClick = ::dismiss,
+                        modifier = Modifier.weight(1f),
+                        enabled = editor?.open == true && !saving,
+                    )
+                    EditAction(
+                        R.string.book_edit_confirm,
+                        onClick = {
+                            focus.clearFocus()
+                            keyboard?.hide()
+                            library.saveBookEditor()
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = ready,
+                        role = GlassDialogButtonRole.Primary,
                     )
                 }
             }
@@ -171,48 +206,6 @@ internal fun BookEditSheet(
 }
 
 @Composable
-private fun BookEditHeader(
-    canCancel: Boolean,
-    ready: Boolean,
-    onCancel: () -> Unit,
-    onFill: () -> Unit,
-    onSave: () -> Unit,
-) {
-    Layout(
-        modifier = Modifier.fillMaxWidth(),
-        content = {
-            EditAction(R.string.book_edit_cancel, onCancel, enabled = canCancel)
-            Text(
-                stringResource(R.string.book_edit_title),
-                modifier = Modifier.semantics { heading() },
-                style = MiuixTheme.textStyles.title4,
-                textAlign = TextAlign.Center,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                EditAction(R.string.book_edit_fill, onFill, enabled = ready)
-                EditAction(R.string.book_edit_save, onSave, enabled = ready, role = GlassDialogButtonRole.Primary)
-            }
-        },
-    ) { items, constraints ->
-        val width = constraints.maxWidth
-        val gap = 4.dp.roundToPx()
-        val actionConstraints = constraints.copy(minWidth = 0, minHeight = 0)
-        val start = items[0].measure(actionConstraints.copy(maxWidth = (width * 0.28f).toInt()))
-        val end = items[2].measure(actionConstraints.copy(maxWidth = (width * 0.58f).toInt()))
-        val left = start.width + gap
-        val right = (width - end.width - gap).coerceAtLeast(left)
-        val title = items[1].measure(actionConstraints.copy(maxWidth = right - left))
-        val height = maxOf(start.height, title.height, end.height)
-        val titleX = ((width - title.width) / 2).coerceIn(left, right - title.width)
-        layout(width, height) {
-            start.placeRelative(0, (height - start.height) / 2)
-            title.placeRelative(titleX, (height - title.height) / 2)
-            end.placeRelative(width - end.width, (height - end.height) / 2)
-        }
-    }
-}
-
-@Composable
 private fun EditAction(
     label: Int,
     onClick: () -> Unit,
@@ -231,7 +224,7 @@ private fun EditAction(
     ) {
         Text(
             stringResource(label),
-            style = MiuixTheme.textStyles.footnote1,
+            style = MiuixTheme.textStyles.button,
             textAlign = TextAlign.Center,
         )
     }
@@ -244,16 +237,12 @@ private fun BookEditForm(
     backdrop: Backdrop,
     enabled: Boolean,
     onChange: (BookEditDraft) -> Unit,
-    onChooseCover: () -> Unit,
     onUndoCover: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             BookCover(draft.cover ?: cover, Modifier.width(72.dp), title = draft.title)
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                EditAction(R.string.book_edit_choose_cover, onChooseCover, enabled = enabled)
-                if (draft.cover != null) EditAction(R.string.book_edit_undo_cover, onUndoCover, enabled = enabled)
-            }
+            if (draft.cover != null) EditAction(R.string.book_edit_undo_cover, onUndoCover, enabled = enabled)
         }
         EditField(R.string.book_details_book_name, draft.title, enabled) { onChange(draft.copy(title = it)) }
         Text(stringResource(R.string.book_edit_names_hint), style = MiuixTheme.textStyles.footnote1)
@@ -267,7 +256,6 @@ private fun BookEditForm(
         }
         EditField(R.string.book_edit_series, draft.series, enabled) { onChange(draft.copy(series = it)) }
         EditField(R.string.book_details_tags, draft.tags, enabled, multiline = true) { onChange(draft.copy(tags = it)) }
-        EditField(R.string.book_details_shelves, draft.shelves, enabled, multiline = true) { onChange(draft.copy(shelves = it)) }
         Text(stringResource(R.string.book_details_status), modifier = Modifier.semantics { heading() })
         GlassSegmentedTabRow(
             tabs = listOf(

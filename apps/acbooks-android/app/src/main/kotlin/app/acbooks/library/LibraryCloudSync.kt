@@ -63,6 +63,41 @@ internal class LibraryCloudSync(
     suspend fun saveBookEdit(bookId: String, initial: BookEditSession, draft: BookEditDraft): Boolean =
         serialized { library.saveBookEdit(bookId, initial, draft) }
 
+    suspend fun saveBookShelves(bookId: String, shelfIds: Set<String>): Boolean =
+        serialized { library.saveBookShelves(bookId, shelfIds) }
+
+    suspend fun saveShelf(id: String?, name: String): Boolean = serialized {
+        val previous = id?.let { checkNotNull(dao.libraryShelf(it)) }
+        val session = verifiedSession()
+        if (session == null) {
+            if (previous?.serverShelfId != null) throw CloudSignInRequired()
+            return@serialized dao.saveLocalShelf(id, name)
+        }
+        val (profile, client, token) = session
+        val remoteId = previous?.serverShelfId
+        val remote = if (remoteId == null) {
+            client.createShelf(token, name)
+        } else {
+            client.renameShelf(token, remoteId, name)
+            RemoteShelf(remoteId, name)
+        }
+        val sameName = dao.shelfByNameKey(remote.name.lowercase(java.util.Locale.ROOT))
+        dao.cacheManagedShelf(profile.id, previous ?: sameName?.takeIf { it.serverProfileId == null }, remote)
+        true
+    }
+
+    suspend fun deleteShelf(id: String) = serialized {
+        val previous = dao.libraryShelf(id) ?: return@serialized
+        val remoteId = previous.serverShelfId
+        if (remoteId == null) {
+            dao.deleteShelf(id)
+        } else {
+            val (profile, client, token) = verifiedSession() ?: throw CloudSignInRequired()
+            client.deleteShelf(token, remoteId)
+            dao.cacheManagedShelf(profile.id, previous, remote = null)
+        }
+    }
+
     suspend fun login(address: String, username: String, password: String, replaceCurrent: Boolean) = serialized {
         val origin = serverOrigin(address)
         val previous = dao.currentServerProfile()
@@ -121,6 +156,8 @@ internal class LibraryCloudSync(
         val session = verifiedSession() ?: return@serialized null
         val (profile, client, token) = session
         pullCatalog(session)
+        publishLocalShelves(session)
+        refreshShelves(session, emptySet())
         enqueueExistingUploads(profile.id)
         var changed = false
         val createdBooks = mutableSetOf<String>()
@@ -143,7 +180,9 @@ internal class LibraryCloudSync(
         if (changed) pullCatalog(session)
         val completedEdits = uploadBookEdits(session)
         if (completedEdits.isNotEmpty()) pullCatalog(session)
-        refreshShelves(session, completedEdits.mapTo(mutableSetOf()) { it.mutationId })
+        if (changed || completedEdits.isNotEmpty()) {
+            refreshShelves(session, completedEdits.mapTo(mutableSetOf()) { it.mutationId })
+        }
         for (edit in completedEdits) dao.completeBookEdit(edit.bookId, edit.mutationId)
         uploadReadingPositions(session)
         uploadReaderRecords(session)
@@ -180,10 +219,25 @@ internal class LibraryCloudSync(
         return completed
     }
 
+    private suspend fun publishLocalShelves(session: CloudSession) {
+        val (profile, client, token) = session
+        for (shelf in dao.allShelves()) {
+            if (shelf.serverProfileId != null || ':' in shelf.id) continue
+            val remote = try {
+                client.createShelf(token, shelf.name)
+            } catch (failure: CloudHttpException) {
+                if (failure.status in setOf(404, 405)) return
+                if (failure.status == 422) continue
+                throw failure
+            }
+            dao.cacheManagedShelf(profile.id, shelf, remote)
+        }
+    }
+
     private suspend fun refreshShelves(session: CloudSession, completed: Set<String>) {
         val (profile, client, token) = session
         val directory = client.listShelves(token) ?: return
-        val shelves = directory.associateBy { it.id }.toMutableMap()
+        val shelfIds = directory.mapTo(mutableSetOf()) { it.id }
         val shelvesByName = directory.groupBy { it.name }
         val memberships = mutableMapOf<String, Set<String>>()
         for (book in dao.cachedRemoteBooks(profile.id)) {
@@ -191,11 +245,9 @@ internal class LibraryCloudSync(
             val details = book.detailsJson?.let(::JSONObject) ?: continue
             val refs = details.optJSONArray("shelfRefs")
             if (refs != null) {
-                memberships[bookId] = (0 until refs.length()).mapTo(mutableSetOf()) { index ->
-                    val shelf = refs.getJSONObject(index).toRemoteShelf()
-                    shelves.putIfAbsent(shelf.id, shelf)
-                    shelf.id
-                }
+                memberships[bookId] = (0 until refs.length()).map {
+                    refs.getJSONObject(it).getString("id").asUuid()
+                }.filterTo(mutableSetOf()) { it in shelfIds }
             } else {
                 val names = details.optJSONArray("shelves") ?: continue
                 val ids = (0 until names.length()).mapNotNull { shelvesByName[names.getString(it)]?.singleOrNull()?.id }
@@ -205,7 +257,7 @@ internal class LibraryCloudSync(
         val pending = dao.pendingBookEdits(profile.id)
             .filter { it.mutationId !in completed && JSONObject(it.patchJson).has("shelves") }
             .mapTo(mutableSetOf()) { it.bookId }
-        val snapshot = RemoteShelfSnapshot(shelves.values.sortedBy { it.id }, memberships)
+        val snapshot = RemoteShelfSnapshot(directory, memberships)
         dao.replaceRemoteShelves(profile.id, snapshot, pending)
     }
 

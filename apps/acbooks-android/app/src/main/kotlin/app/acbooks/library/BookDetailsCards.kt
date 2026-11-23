@@ -104,7 +104,6 @@ internal fun BookBibliographyCard(book: LocalBookCard, details: BookDetailsData)
         R.string.book_details_publisher to metadata?.publisher,
         R.string.book_details_publish_date to metadata?.publicationDate,
         R.string.book_details_language to metadata?.languages?.joinToString(", "),
-        R.string.book_details_category to metadata?.categories?.joinToString(", "),
         R.string.book_details_status to when (details.readingStatus) {
             BookReadingStatus.Unread -> stringResource(R.string.book_details_status_unread)
             BookReadingStatus.Reading -> stringResource(R.string.book_details_status_reading)
@@ -125,7 +124,7 @@ internal fun BookLibraryCard(book: LocalBookCard, details: BookDetailsData) {
         ImageVector.vectorResource(R.drawable.ic_book_details_shelf),
     ) {
         if (details.shelves.isNotEmpty()) {
-            InformationRow(stringResource(R.string.book_details_shelves), details.shelves.joinToString(", "))
+            InformationRow(stringResource(R.string.book_details_category), details.shelves.joinToString(", "))
             HorizontalDivider()
         }
         if (details.tags.isNotEmpty()) {

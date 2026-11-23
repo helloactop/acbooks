@@ -9,7 +9,7 @@ from bs4.element import NavigableString, Tag
 from bs4.filter import SoupStrainer
 
 from app.core.errors import BusinessError, BusinessErrorCode
-from app.modules.books.normalization import normalize_isbn
+from app.modules.books.normalization import normalize_isbn, publication_date_only
 from app.modules.metadata.extract import _authors, _text
 from app.modules.metadata.schemas import Candidate
 
@@ -102,6 +102,15 @@ def parse_book(html: str, subject: str) -> Candidate | None:
     if title is None:
         return None
     values, people = _info_values(soup)
+    publication_date = _text(
+        values.get("出版年") or values.get("出版日期") or values.get("出版时间"), 80
+    )
+    if publication_date is None:
+        date_tag = soup.select_one(
+            '#info [property="v:datePublished"], #info [itemprop="datePublished"]'
+        )
+        if date_tag is not None:
+            publication_date = _text(date_tag.get_text(strip=True) or date_tag.get("content"), 80)
     subtitle = _text(values.get("副标题"), 500)
     if subtitle and subtitle != title:
         title = _text(f"{title}: {subtitle}", 500) or title
@@ -129,7 +138,7 @@ def parse_book(html: str, subject: str) -> Candidate | None:
             cover_url if isinstance(cover_url, str) and COVER_URL.fullmatch(cover_url) else None
         ),
         publisher=_text(values.get("出版社"), 200),
-        publication_date=_text(values.get("出版年"), 80),
+        publication_date=publication_date_only(publication_date) if publication_date else None,
         rating=round(rating, 1) if 0 < rating <= 10 else None,
     )
 

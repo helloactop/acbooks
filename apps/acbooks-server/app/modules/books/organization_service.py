@@ -31,6 +31,7 @@ from app.modules.books.organization_schemas import (
     OrganizationPage,
 )
 from app.modules.books.repository import BookRecord
+from app.modules.books.schemas import BookShelf
 from app.modules.metadata.locks import (
     AUTHOR,
     COVER,
@@ -179,6 +180,11 @@ class BookOrganizationService:
         self.write_sessions = create_session_factory(
             engine.execution_options(sqlite_begin_immediate=True)
         )
+
+    def create_shelf(self, name: str) -> BookShelf:
+        with self.write_sessions.begin() as session:
+            shelf = repository.find_or_create_shelf(session, name)
+            return BookShelf(id=UUID(shelf.id), name=shelf.name)
 
     def list_entries(self, kind: OrganizationKind, limit: int, offset: int) -> OrganizationPage:
         table, links, key = GROUPS[kind]

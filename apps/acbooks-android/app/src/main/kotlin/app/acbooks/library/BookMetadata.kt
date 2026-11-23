@@ -25,7 +25,6 @@ internal data class BookBibliography(
     val publisher: String? = null,
     val publicationDate: String? = null,
     val languages: List<String> = emptyList(),
-    val categories: List<String> = emptyList(),
     val series: String? = null,
 )
 
@@ -97,7 +96,6 @@ internal fun readEpubBibliography(file: File): BookBibliography = ZipFile(file).
     val contributors = mutableMapOf<String, String>()
     val translatorIds = mutableSetOf<String>()
     val languages = mutableListOf<String>()
-    val categories = mutableListOf<String>()
     parseXml(epub.readEntry(epub.packagePath())) {
         if (depth != 3) return@parseXml
         if (namespace == DublinCore) {
@@ -127,11 +125,10 @@ internal fun readEpubBibliography(file: File): BookBibliography = ZipFile(file).
                 "date" -> if (publicationDate == null) {
                     val event = getAttributeValue(Opf, "event")
                     if (event == null || event == "publication") {
-                        publicationDate = nextText().trim().takeIf(String::isNotEmpty)
+                        publicationDate = nextText().publicationDateOnly().takeIf(String::isNotEmpty)
                     }
                 }
                 "language" -> nextText().trim().takeIf(String::isNotEmpty)?.let(languages::add)
-                "subject" -> nextText().trim().takeIf(String::isNotEmpty)?.let(categories::add)
             }
         } else if (namespace == Opf && name == "meta" && getAttributeValue(null, "property") == "role") {
             val refines = getAttributeValue(null, "refines")
@@ -147,8 +144,15 @@ internal fun readEpubBibliography(file: File): BookBibliography = ZipFile(file).
         publisher = publisher,
         publicationDate = publicationDate,
         languages = languages.distinct(),
-        categories = categories.distinct(),
     )
+}
+
+private val publicationTimestamp =
+    Regex("""([0-9]{4}(?:-[0-9]{1,2}){0,2})(?:[Tt ][0-9]{2}:[0-9]{2}.*|[Zz]|[+-][0-9]{2}:?[0-9]{2})""")
+
+internal fun String.publicationDateOnly(): String {
+    val value = trim()
+    return publicationTimestamp.matchEntire(value)?.groupValues?.get(1) ?: value
 }
 
 private fun RandomAccessFile.readPdfIsbn(filename: String): String? {

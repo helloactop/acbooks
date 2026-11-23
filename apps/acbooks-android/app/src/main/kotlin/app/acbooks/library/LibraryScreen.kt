@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -69,13 +68,14 @@ import top.yukonga.miuix.kmp.icon.glass.Cloud
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 internal val BookCoverCorner = 10.dp
+private const val BookCoverAspectRatio = 3f / 4f
 
 @Composable
 internal fun BookCover(
     file: File?,
     modifier: Modifier = Modifier,
     title: String? = null,
-    aspectRatio: Float = 3f / 4f,
+    aspectRatio: Float = BookCoverAspectRatio,
     cloudOnly: Boolean = false,
 ) {
     var loaded by remember(file) { mutableStateOf(false) }
@@ -228,8 +228,7 @@ internal fun LibraryScreen(
     onDetails: (String) -> Unit,
     onShowMenu: (BookMenuTarget) -> Unit,
 ) {
-    val rootGridState = rememberLazyGridState()
-    val gridState = if (shelfId == null) rootGridState else key(shelfId) { rememberLazyGridState() }
+    val gridState = rememberLazyGridState()
     val entries = remember(catalog.books, catalog.shelves, shelfId) { catalog.gridEntries(shelfId) }
     val compact = mode == LibraryDisplayMode.Compact
     val horizontalGap = if (compact) 12.dp else 16.dp
@@ -310,10 +309,9 @@ private fun LibraryCatalog.gridEntries(shelfId: String?): List<LibraryGridEntry>
     }
 
     val bookOrder = books.withIndex().associateBy { it.value.id }
-    val folders = shelves.mapNotNull { relation ->
+    val folders = shelves.map { relation ->
         val members = relation.bookIds.mapNotNull(bookOrder::get).sortedBy { it.index }.map { it.value }
-        if (members.isEmpty() && relation.shelf.serverNameKey == null) null
-        else LibraryGridEntry.Folder(relation.shelf, members)
+        LibraryGridEntry.Folder(relation.shelf, members)
     }
     val classified = folders.flatMap { folder -> folder.books.map { it.id } }.toSet()
     val foldersByFirstBook = folders.groupBy { it.books.firstOrNull()?.id }
@@ -337,15 +335,16 @@ private fun ShelfGridItem(
         modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick),
     ) {
         Card(
-            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-            insideMargin = PaddingValues(8.dp),
+            modifier = Modifier.fillMaxWidth().aspectRatio(BookCoverAspectRatio)
+                .clip(RoundedCornerShape(BookCoverCorner)),
+            insideMargin = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
         ) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                for (row in 0..1) {
-                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (row in covers.chunked(2)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         for (column in 0..1) {
-                            Box(Modifier.weight(1f).fillMaxSize()) {
-                                covers.getOrNull(row * 2 + column)?.let { cover ->
+                            Box(Modifier.weight(1f).aspectRatio(BookCoverAspectRatio)) {
+                                row.getOrNull(column)?.let { cover ->
                                     AsyncImage(
                                         model = cover,
                                         contentDescription = null,

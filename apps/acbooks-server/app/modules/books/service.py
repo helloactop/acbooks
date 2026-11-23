@@ -27,7 +27,7 @@ from app.modules.books.filtering import (
     InvalidBookFilter,
     parse_filter_expression,
 )
-from app.modules.books.normalization import normalize_name_list
+from app.modules.books.normalization import normalize_name_list, publication_date_only
 from app.modules.books.repository import BookListQuery, BookRecord
 from app.modules.books.schemas import (
     BatchResult,
@@ -150,7 +150,10 @@ class BooksService:
             description=record.book.description,
             series=record.book.series,
             publisher=record.book.publisher,
-            publication_date=record.book.publication_date,
+            publication_date=(
+                publication_date_only(record.book.publication_date)
+                if record.book.publication_date else None
+            ),
             shelf_refs=[
                 BookShelf(id=UUID(shelf_id), name=name) for shelf_id, name in record.shelves
             ],

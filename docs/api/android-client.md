@@ -24,3 +24,8 @@
 - 首次连接按[同步 API](sync.md)分页拉取快照并追赶增量，之后保存游标。应用文件变更时保留本地文件 URI 来自客户端的关联信息。
 - 阅读位置以 `bookFileId` 为键。会话、书签和划线笔记使用稳定 ID，并提供关联的 `bookId` 和适用的 `bookFileId`。离线变更持久化 `mutationId` 和同步外层 `baseRevision`，网络恢复后按顺序批量提交。
 - 重试时沿用原变更 ID。收到版本冲突时以回执的服务器当前记录或删除墓碑为依据进行处理，解决后用新的变更 ID 提交。直接使用 Reader API 保存位置时，使用该记录内部的 `revision`。[阅读数据 API](reader.md)
+
+## 同步书架分类
+
+- Android 分类取自 `GET /api/v1/books/shelves`，包括空书架。书目通过 `shelfRefs` 的 UUID 关联分类，书架改名保留 UUID，删除书架解除关联并保留书目。
+- 已登录时，分类管理通过[书库整理 API](organization.md)写入。登录前创建的分类在连接后发布到同一个书架目录。书目的分类修改可离线保存，并随书目同步推送。

@@ -532,6 +532,49 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
 
     fun coverFile(book: LocalBookCard) = repository.coverFile(book)
 
+    suspend fun saveShelf(id: String?, rawName: String): Int? {
+        val name = rawName.trim()
+        if (name.isEmpty() || !name.validText(200)) return R.string.library_shelf_invalid_name
+        return shelfAction {
+            if (!cloud.saveShelf(id, name)) return@shelfAction R.string.library_shelf_name_conflict
+            CloudSyncJobs.request(getApplication())
+            null
+        }
+    }
+
+    suspend fun deleteShelf(id: String): Int? = shelfAction {
+        cloud.deleteShelf(id)
+        CloudSyncJobs.request(getApplication())
+        null
+    }
+
+    suspend fun saveBookShelves(bookId: String, ids: Set<String>): Int? = shelfAction {
+        if (cloud.saveBookShelves(bookId, ids)) CloudSyncJobs.request(getApplication())
+        null
+    }
+
+    fun observePendingBookShelves(bookId: String) = dao.observePendingBookEdit(bookId).map { edit ->
+        edit?.let { org.json.JSONObject(it.patchJson).has("shelves") } == true
+    }
+
+    private suspend fun shelfAction(action: suspend () -> Int?): Int? = try {
+        action()
+    } catch (failure: CancellationException) {
+        throw failure
+    } catch (_: CloudSignInRequired) {
+        R.string.library_shelf_sign_in
+    } catch (failure: CloudHttpException) {
+        when (failure.status) {
+            401, 403 -> R.string.library_shelf_sign_in
+            409 -> R.string.library_shelf_name_conflict
+            422 -> R.string.library_shelf_invalid_name
+            else -> R.string.library_shelf_save_failed
+        }
+    } catch (failure: Exception) {
+        Log.w("Library", "Could not save shelf change", failure)
+        R.string.library_shelf_save_failed
+    }
+
     fun observeBookDetails(bookId: String) = repository.observeBookDetails(bookId).catch { failure ->
         if (failure !is SQLException) throw failure
         Log.w("Library", "Could not read local book details", failure)

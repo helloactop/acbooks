@@ -14,7 +14,7 @@ from app.db.models.books import Book
 from app.db.models.settings import AppSetting
 from app.db.session import create_session_factory
 from app.modules.books import repository
-from app.modules.books.normalization import normalize_isbn
+from app.modules.books.normalization import normalize_isbn, publication_date_only
 from app.modules.books.service import MAX_COVER_BYTES, publish_cover
 from app.modules.metadata import douban
 from app.modules.metadata.extract import EmbeddedMetadata, _authors, _text, read_metadata
@@ -342,6 +342,12 @@ class MetadataService:
                     set(settings.fields) if require_isbn is not None else None,
                     manual_tags=candidate.tags if not automatic and require_isbn is None else None,
                 )
+                if not automatic and candidate.douban_id and candidate.publication_date:
+                    publication_date = publication_date_only(candidate.publication_date)
+                    if publication_date != book.publication_date:
+                        book.publication_date = publication_date
+                        book.updated_at = max(book.updated_at + 1, time_ns() // 1_000_000)
+                        changed.append("publicationDate")
             keep_cover = "cover" in changed
             return changed
         finally:

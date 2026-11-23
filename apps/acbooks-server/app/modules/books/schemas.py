@@ -19,6 +19,7 @@ from app.modules.books.normalization import (
     clean_text,
     normalize_isbn,
     normalize_name_list,
+    publication_date_only,
 )
 from app.modules.books.types import BookOrder, BookSort, MediaType, ReadingStatus
 
@@ -114,7 +115,9 @@ class BookCreate(ApiModel):
     @field_validator("publication_date")
     @classmethod
     def validate_publication_date(cls, value: str | None) -> str | None:
-        return clean_text(value, "publication_date", max_length=80) if value is not None else None
+        if value is None:
+            return None
+        return publication_date_only(clean_text(value, "publication_date", max_length=80))
 
     @field_validator("description")
     @classmethod
@@ -173,7 +176,9 @@ class BookUpdate(ApiModel):
     @field_validator("publication_date")
     @classmethod
     def validate_publication_date(cls, value: str | None) -> str | None:
-        return clean_text(value, "publication_date", max_length=80) if value is not None else None
+        if value is None:
+            return None
+        return publication_date_only(clean_text(value, "publication_date", max_length=80))
 
     @field_validator("description")
     @classmethod

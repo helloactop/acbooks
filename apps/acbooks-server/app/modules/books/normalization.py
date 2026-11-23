@@ -3,6 +3,9 @@ from unicodedata import category, normalize
 
 _ISBN_10 = re.compile(r"\d{9}[\dX]")
 _ISBN_13 = re.compile(r"\d{13}")
+_PUBLICATION_TIMESTAMP = re.compile(
+    r"([0-9]{4}(?:-[0-9]{1,2}){0,2})(?:[Tt ][0-9]{2}:[0-9]{2}.*|[Zz]|[+-][0-9]{2}:?[0-9]{2})"
+)
 _NAME_MAX = 200
 _NAME_LIMIT = 20
 
@@ -12,6 +15,12 @@ def normalize_isbn(value: str) -> str | None:
     if _ISBN_10.fullmatch(normalized) or _ISBN_13.fullmatch(normalized):
         return normalized
     return None
+
+
+def publication_date_only(value: str) -> str:
+    if match := _PUBLICATION_TIMESTAMP.fullmatch(value):
+        return match[1]
+    return value
 
 
 def clean_text(

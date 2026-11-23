@@ -93,20 +93,31 @@ class RemoteCatalogTest {
             assertEquals(emptyList<String>(), folders.getValue(empty.id).bookIds)
 
             dao.removeMembership(serverShelfKey(profile.id, fiction.id), cloudBook.remoteBookId)
+            val bookId = cloudBook.remoteBookId
+            val mutationId = UUID.randomUUID().toString()
+            dao.queueBookEdit(PendingBookEdit(
+                bookId, profile.id, bookId, mutationId,
+                """{"shelves":["History"],"title":"Pending title"}""",
+                """{"shelves":["Fiction","History"]}""",
+                null, null,
+            ))
             dao.replaceRemoteShelves(profile.id, remote, preserveShelfEditsFor = setOf(cloudBook.remoteBookId))
             assertEquals(listOf(serverShelfKey(profile.id, history.id)), dao.shelfIdsForBook(cloudBook.remoteBookId))
 
             val renamed = history.copy(name = "World history")
-            val updated = RemoteShelfSnapshot(listOf(renamed), mapOf(cloudBook.remoteBookId to emptySet()))
-            dao.replaceRemoteShelves(profile.id, updated)
+            val updated = RemoteShelfSnapshot(listOf(renamed), mapOf(bookId to setOf(history.id)))
+            dao.replaceRemoteShelves(profile.id, updated, preserveShelfEditsFor = setOf(bookId))
             val refreshed = dao.observeLibraryShelves().first().associateBy { it.shelf.id }
-            val fictionKey = serverShelfKey(profile.id, fiction.id)
             val historyKey = serverShelfKey(profile.id, history.id)
-            assertEquals(setOf(fictionKey, historyKey), refreshed.keys)
+            assertEquals(setOf(historyKey), refreshed.keys)
             assertEquals(renamed.name, refreshed.getValue(historyKey).shelf.name)
-            assertEquals(listOf(localBook.id), refreshed.getValue(fictionKey).bookIds)
-            assertNull(refreshed.getValue(fictionKey).shelf.serverNameKey)
-            assertTrue(dao.shelfIdsForBook(cloudBook.remoteBookId).isEmpty())
+            assertEquals(emptyList<String>(), dao.shelfIdsForBook(localBook.id))
+            assertEquals(localBook, dao.book(localBook.id))
+            assertEquals(listOf(historyKey), dao.shelfIdsForBook(bookId))
+            val pending = requireNotNull(dao.pendingBookEdit(bookId))
+            assertEquals("""{"shelves":["World history"],"title":"Pending title"}""", pending.patchJson)
+            assertEquals("""{"shelves":["World history"]}""", pending.baselineJson)
+            assertTrue(pending.mutationId != mutationId)
         } finally {
             database.close()
         }

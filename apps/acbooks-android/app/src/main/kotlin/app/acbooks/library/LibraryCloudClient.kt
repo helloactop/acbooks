@@ -56,7 +56,7 @@ internal fun bookCreatePayload(book: LocalBook, bibliography: BookBibliography? 
     (book.description ?: bibliography?.description)?.takeIf(String::isNotBlank)?.let { data.put("description", it.take(20_000)) }
     book.series?.let { data.put("series", it.take(200)) }
     book.publisher?.let { data.put("publisher", it.take(200)) }
-    book.publicationDate?.let { data.put("publicationDate", it.take(80)) }
+    book.publicationDate?.let { data.put("publicationDate", it.publicationDateOnly().take(80)) }
     isbn?.filterNot { it.isWhitespace() || it == '-' }?.uppercase()
         ?.takeIf { it.matches(Regex("(?:[0-9]{13}|[0-9]{9}[0-9X])")) }?.let { data.put("isbn", it) }
     if (book.readingStatus != "unread") data.put("readingStatus", book.readingStatus)
@@ -243,6 +243,19 @@ internal class LibraryCloudClient(private val origin: String) {
         val cursor = if (after == 0L) pullChanges(token, through, accept) else through
         return CloudCatalogBatch(cursor, books.values.toList(), files.values.toList(), versions.values.toList(),
             positions.values.toList(), readerRecords.values.toList())
+    }
+
+    fun createShelf(token: String, name: String): RemoteShelf =
+        json("/organization/shelf", token, "POST", JSONObject().put("name", name)).toRemoteShelf()
+
+    fun renameShelf(token: String, id: String, name: String) {
+        val body = JSONObject().put("name", name).toString().toByteArray(UTF_8)
+        request("/organization/shelf/${id.asUuid()}", "PATCH", token, setOf(204), "application/json",
+            body.size.toLong(), write = { it.write(body) }) { }
+    }
+
+    fun deleteShelf(token: String, id: String) {
+        request("/organization/shelf/${id.asUuid()}", "DELETE", token, setOf(204, 404)) { }
     }
 
     fun listShelves(token: String): List<RemoteShelf>? {

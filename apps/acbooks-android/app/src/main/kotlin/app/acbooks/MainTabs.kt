@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.acbooks.core.database.LocalBookCard
 import app.acbooks.library.BookEditSheet
 import app.acbooks.library.BookMenuTarget
+import app.acbooks.library.BookShelvesDialog
 import app.acbooks.library.LibraryCatalog
 import app.acbooks.library.LibraryDeleteDialog
 import app.acbooks.library.LibraryImportDialog
@@ -88,6 +89,9 @@ internal fun MainTabs(
     library: LibraryViewModel,
     isCurrentDestination: Boolean,
     onOpenSettings: () -> Unit,
+    onOpenShelf: (String) -> Unit,
+    shelfId: String? = null,
+    onBackFromShelf: () -> Unit = {},
     onOpenBook: (String) -> Unit,
     onReadBook: (String) -> Unit,
 ) {
@@ -97,6 +101,7 @@ internal fun MainTabs(
         GlassNavigationItem(MiuixIcons.Glass.DigitalStatistics, stringResource(R.string.tab_statistics)),
     )
     val pager = rememberPagerState { items.size }
+    val shelfPage = shelfId != null
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val navigationBackdrop = rememberLayerBackdrop()
@@ -105,10 +110,11 @@ internal fun MainTabs(
     val searchBarAlpha = rememberGlassSearchBarAlpha(searchExpanded)
     val topBarTransition = Modifier.glassSearchBarTransition(searchExpanded) { 1f }
     val displayMode by library.displayMode.collectAsStateWithLifecycle()
-    var shelfId by rememberSaveable { mutableStateOf<String?>(null) }
     val currentShelf = remember(catalog.shelves, shelfId) { catalog.shelves.firstOrNull { it.shelf.id == shelfId } }
-    LaunchedEffect(catalog.loaded, catalog.failed, currentShelf) {
-        if (catalog.loaded && !catalog.failed && currentShelf == null) shelfId = null
+    LaunchedEffect(isCurrentDestination, catalog.loaded, catalog.failed, currentShelf) {
+        if (isCurrentDestination && shelfPage && catalog.loaded && !catalog.failed && currentShelf == null) {
+            onBackFromShelf()
+        }
     }
     val importProgress by library.progress.collectAsStateWithLifecycle()
     val cloud by library.cloudState.collectAsStateWithLifecycle()
@@ -119,13 +125,20 @@ internal fun MainTabs(
     val moreAnchor = rememberGlassPopupAnchor()
     var libraryMenu by remember { mutableStateOf<LibraryMenu?>(null) }
     var bookMenuTarget by remember { mutableStateOf<BookMenuTarget?>(null) }
+    var classifyingBookId by rememberSaveable { mutableStateOf<String?>(null) }
     var deleteTarget by remember { mutableStateOf<LocalBookCard?>(null) }
     var deleteDialogShown by remember { mutableStateOf(false) }
     var deletingBook by remember { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments(), library::importBooks)
 
+    LaunchedEffect(classifyingBookId, catalog) {
+        if (catalog.loaded && !catalog.failed && catalog.books.none { it.id == classifyingBookId }) {
+            classifyingBookId = null
+        }
+    }
+
     LaunchedEffect(isCurrentDestination, pager.currentPage, searchExpanded) {
-        if (!isCurrentDestination || pager.currentPage != 1 || searchExpanded) {
+        if (!isCurrentDestination || (!shelfPage && pager.currentPage != 1) || searchExpanded) {
             libraryMenu = null
             deleteDialogShown = false
         }
@@ -148,10 +161,79 @@ internal fun MainTabs(
     }
 
     BackHandler(
-        enabled = isCurrentDestination && !searchExpanded && libraryMenu == null && importProgress == null && editor == null &&
+        enabled = isCurrentDestination && !shelfPage && !searchExpanded && libraryMenu == null &&
+            importProgress == null && editor == null && classifyingBookId == null &&
             (pager.settledPage != 0 || pager.targetPage != 0),
     ) {
-        if (pager.settledPage == 1 && shelfId != null) shelfId = null else selectTab(0)
+        selectTab(0)
+    }
+
+    val tabContent: @Composable (Int, PaddingValues) -> Unit = { page, navigationPadding ->
+        MainTabPage(
+            navigationPadding = navigationPadding,
+            topBar = { backdrop, scrollBehavior ->
+                if (page == 0) {
+                    HomeTopBar(
+                        avatar = avatar,
+                        backdrop = backdrop,
+                        scrollBehavior = scrollBehavior,
+                        onOpenSettings = onOpenSettings,
+                        modifier = topBarTransition,
+                    )
+                } else {
+                    GlassTopAppBar(
+                        title = if (shelfPage) currentShelf?.shelf?.name.orEmpty() else items[page].label.orEmpty(),
+                        modifier = Modifier.semantics { heading() },
+                        contentModifier = topBarTransition,
+                        expandable = true,
+                        progressiveBlur = page == 1,
+                        scrollBehavior = scrollBehavior,
+                        backdrop = backdrop,
+                        navigationIcon = {
+                            if (shelfPage) {
+                                GlassIconButton(onClick = onBackFromShelf, backdrop = backdrop) {
+                                    Icon(MiuixIcons.Glass.Back, stringResource(R.string.library_back_to_root))
+                                }
+                            }
+                        },
+                        actions = {
+                            if (page == 1) {
+                                LibraryTopBarActions(displayAnchor, moreAnchor) { libraryMenu = it }
+                            }
+                        },
+                    )
+                }
+            },
+        ) { scrollBehavior, pagePadding ->
+            when (page) {
+                0 -> HomeScreen(
+                    scrollBehavior = scrollBehavior,
+                    scaffoldPadding = pagePadding,
+                    onOpenLibrary = { selectTab(1) },
+                )
+                1 -> LibraryScreen(
+                    catalog = catalog,
+                    shelfId = shelfId,
+                    mode = displayMode,
+                    scrollBehavior = scrollBehavior,
+                    pagePadding = pagePadding,
+                    coverFile = library::coverFile,
+                    onOpenShelf = onOpenShelf,
+                    onRead = onReadBook,
+                    onDetails = onOpenBook,
+                    onShowMenu = { target ->
+                        bookMenuTarget = target
+                        libraryMenu = LibraryMenu.Book
+                    },
+                )
+                else -> Box(
+                    Modifier.fillMaxSize()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection)
+                        .verticalScroll(rememberScrollState())
+                        .padding(pagePadding),
+                )
+            }
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -164,27 +246,29 @@ internal fun MainTabs(
                     else Modifier,
                 ),
             bottomBar = {
-                val isPagerDragged by pager.interactionSource.collectIsDraggedAsState()
-                GlassNavigationBar(
-                    items = items,
-                    selectedIndex = if (isPagerDragged) pager.settledPage else pager.targetPage,
-                    onSelect = ::selectTab,
-                    backdrop = navigationBackdrop,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    trailingAction = {
-                        GlassIconButton(
-                            onClick = { searchExpanded = true },
-                            size = GlassNavigationBarDefaults.Height,
-                            backdrop = navigationBackdrop,
-                        ) {
-                            Icon(
-                                imageVector = MiuixIcons.Glass.Search,
-                                contentDescription = stringResource(R.string.search_title),
-                                tint = MiuixTheme.colorScheme.onSurface,
-                            )
-                        }
-                    },
-                )
+                if (!shelfPage) {
+                    val isPagerDragged by pager.interactionSource.collectIsDraggedAsState()
+                    GlassNavigationBar(
+                        items = items,
+                        selectedIndex = if (isPagerDragged) pager.settledPage else pager.targetPage,
+                        onSelect = ::selectTab,
+                        backdrop = navigationBackdrop,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        trailingAction = {
+                            GlassIconButton(
+                                onClick = { searchExpanded = true },
+                                size = GlassNavigationBarDefaults.Height,
+                                backdrop = navigationBackdrop,
+                            ) {
+                                Icon(
+                                    imageVector = MiuixIcons.Glass.Search,
+                                    contentDescription = stringResource(R.string.search_title),
+                                    tint = MiuixTheme.colorScheme.onSurface,
+                                )
+                            }
+                        },
+                    )
+                }
             },
         ) { navigationPadding ->
             Box(
@@ -192,80 +276,19 @@ internal fun MainTabs(
                     .layerBackdrop(navigationBackdrop)
                     .background(MiuixTheme.colorScheme.surface),
             ) {
-                HorizontalPager(
-                    state = pager,
-                    modifier = Modifier.fillMaxSize(),
-                    userScrollEnabled = !searchExpanded,
-                    flingBehavior = PagerDefaults.flingBehavior(
+                if (shelfPage) {
+                    tabContent(1, navigationPadding)
+                } else {
+                    HorizontalPager(
                         state = pager,
-                        snapAnimationSpec = PagerNavigationSpringSpec,
-                    ),
-                ) { page ->
-                    MainTabPage(
-                        navigationPadding = navigationPadding,
-                        topBar = { backdrop, scrollBehavior ->
-                            if (page == 0) {
-                                HomeTopBar(
-                                    avatar = avatar,
-                                    backdrop = backdrop,
-                                    scrollBehavior = scrollBehavior,
-                                    onOpenSettings = onOpenSettings,
-                                    modifier = topBarTransition,
-                                )
-                            } else {
-                                GlassTopAppBar(
-                                    title = if (page == 1 && currentShelf != null) currentShelf.shelf.name
-                                    else items[page].label.orEmpty(),
-                                    modifier = Modifier.semantics { heading() },
-                                    contentModifier = topBarTransition,
-                                    expandable = true,
-                                    progressiveBlur = page == 1,
-                                    scrollBehavior = scrollBehavior,
-                                    backdrop = backdrop,
-                                    navigationIcon = {
-                                        if (page == 1 && currentShelf != null) {
-                                            GlassIconButton(onClick = { shelfId = null }, backdrop = backdrop) {
-                                                Icon(MiuixIcons.Glass.Back, stringResource(R.string.library_back_to_root))
-                                            }
-                                        }
-                                    },
-                                    actions = {
-                                        if (page == 1) {
-                                            LibraryTopBarActions(displayAnchor, moreAnchor) { libraryMenu = it }
-                                        }
-                                    },
-                                )
-                            }
-                        },
-                    ) { scrollBehavior, pagePadding ->
-                        when (page) {
-                            0 -> HomeScreen(
-                                scrollBehavior = scrollBehavior,
-                                scaffoldPadding = pagePadding,
-                                onOpenLibrary = { selectTab(1) },
-                            )
-                            1 -> LibraryScreen(
-                                catalog = catalog,
-                                shelfId = currentShelf?.shelf?.id,
-                                mode = displayMode,
-                                scrollBehavior = scrollBehavior,
-                                pagePadding = pagePadding,
-                                coverFile = library::coverFile,
-                                onOpenShelf = { shelfId = it },
-                                onRead = onReadBook,
-                                onDetails = onOpenBook,
-                                onShowMenu = { target ->
-                                    bookMenuTarget = target
-                                    libraryMenu = LibraryMenu.Book
-                                },
-                            )
-                            else -> Box(
-                                Modifier.fillMaxSize()
-                                    .nestedScroll(scrollBehavior.nestedScrollConnection)
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(pagePadding),
-                            )
-                        }
+                        modifier = Modifier.fillMaxSize(),
+                        userScrollEnabled = !searchExpanded,
+                        flingBehavior = PagerDefaults.flingBehavior(
+                            state = pager,
+                            snapAnimationSpec = PagerNavigationSpringSpec,
+                        ),
+                    ) { page ->
+                        tabContent(page, navigationPadding)
                     }
                 }
             }
@@ -277,14 +300,22 @@ internal fun MainTabs(
                 onDismiss = library::dismissImport,
             )
             BookEditSheet(
-                editor = editor,
+                editor = editor.takeIf { isCurrentDestination },
                 cover = editingBook?.let(library::coverFile),
                 backdrop = navigationBackdrop,
                 library = library,
                 onDismissFinished = {
+                    if (!isCurrentDestination) return@BookEditSheet
                     editor?.savedMessage?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
                     library.finishBookEditorDismissal()
                 },
+            )
+            BookShelvesDialog(
+                bookId = classifyingBookId.takeIf { isCurrentDestination },
+                catalog = catalog,
+                backdrop = navigationBackdrop,
+                library = library,
+                onDismiss = { classifyingBookId = null },
             )
             LibraryDeleteDialog(
                 book = deleteTarget,
@@ -361,6 +392,10 @@ internal fun MainTabs(
             onEdit = { id ->
                 libraryMenu = null
                 library.openBookEditor(id)
+            },
+            onChangeShelves = { id ->
+                libraryMenu = null
+                classifyingBookId = id
             },
             onDelete = { book ->
                 libraryMenu = null

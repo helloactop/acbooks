@@ -29,7 +29,8 @@ internal fun parseDoubanCandidates(payload: String): List<DoubanMetadataCandidat
             translators = row.stringList("translators"),
             isbn = row.stringOrNull("isbn"),
             publisher = row.stringOrNull("publisher"),
-            publicationDate = row.stringOrNull("publicationDate"),
+            publicationDate = row.stringOrNull("publicationDate")
+                ?.publicationDateOnly()?.takeIf(String::isNotEmpty),
             series = row.stringOrNull("series"),
             description = row.stringOrNull("description"),
             rating = if (row.isNull("rating")) null else row.getDouble("rating"),

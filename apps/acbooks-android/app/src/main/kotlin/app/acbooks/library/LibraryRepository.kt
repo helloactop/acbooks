@@ -93,7 +93,7 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
         val patchKeys = pending?.let { JSONObject(it.patchJson).fieldNames() }.orEmpty()
         val draft = bookDraft(book, embedded, remote, patchKeys)
         val baseline = remote?.detailsJson?.let { JSONObject(it).editableBookValues().toString() }
-        BookEditSession(draft, baseline, remote?.coverUpdatedAt, patchKeys, pending?.coverKey != null)
+        BookEditSession(draft, baseline, remote?.coverUpdatedAt, patchKeys - "shelves", pending?.coverKey != null)
     }
 
     private suspend fun bookDraft(
@@ -119,7 +119,6 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
             translators = people.filter { it.role == "translator" }.map { it.name },
             isbn = dao.bookIdentifiers(book.id).firstOrNull { it.scheme == "isbn" }?.value,
             tags = dao.bookTags(book.id).map { it.name },
-            shelves = dao.bookShelves(book.id).map { it.name },
         )
         return localBookDraft(book, relations, embedded)
     }
@@ -145,6 +144,17 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                         patch.put(key, newValues.get(key))
                     }
                 }
+                val baseline = cloudValues ?: JSONObject()
+                previous?.let {
+                    val previousPatch = JSONObject(it.patchJson)
+                    if (previousPatch.has("shelves")) {
+                        patch.put("shelves", previousPatch.get("shelves"))
+                        baseline.remove("shelves")
+                        it.baselineJson?.let(::JSONObject)?.optJSONArray("shelves")?.let { shelves ->
+                            baseline.put("shelves", shelves)
+                        }
+                    }
+                }
                 val coverToSync = newCoverKey ?: previous?.coverKey
                 val remoteId = link?.remoteBookId ?: profile?.let {
                     bookId.takeIf { dao.hasQueuedCloudBook(profile.id, bookId) }
@@ -153,7 +163,7 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                     PendingBookEdit(
                         bookId, profile.id, remoteId, uuid(), patch.toString(),
                         // Only compare a new edit against what the editor displayed.
-                        initial.cloudMetadata,
+                        baseline.toString(),
                         coverToSync,
                         initial.cloudCoverVersion,
                     )
@@ -175,7 +185,7 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                                 description = draft.description.trim().ifEmpty { null },
                                 series = draft.series.trim().ifEmpty { null },
                                 publisher = draft.publisher.trim().ifEmpty { null },
-                                publicationDate = draft.publicationDate.trim().ifEmpty { null },
+                                publicationDate = draft.publicationDate.publicationDateOnly().ifEmpty { null },
                                 readingStatus = draft.readingStatus,
                                 editedCoverKey = savedCoverKey,
                                 updatedAt = System.currentTimeMillis(),
@@ -192,6 +202,38 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                         editedCoverFile(oldCoverKey)?.delete()
                     }
                 }
+                pending != null
+            }
+        }
+
+    suspend fun saveBookShelves(bookId: String, shelfIds: Set<String>): Boolean =
+        withContext(Dispatchers.IO) {
+            libraryFilesLock.withLock {
+                val names = shelfIds.map { checkNotNull(dao.libraryShelf(it)).name }
+                require(names.size <= 20)
+                val previous = dao.pendingBookEdit(bookId)
+                if (shelfIds == dao.shelfIdsForBook(bookId).toSet() &&
+                    previous?.let { JSONObject(it.patchJson).has("shelves") } != true
+                ) return@withLock false
+                val profile = dao.currentServerProfile()
+                val remoteId = profile?.let { active ->
+                    dao.remoteBookLink(active.id, bookId)?.remoteBookId
+                        ?: bookId.takeIf { dao.hasQueuedCloudBook(active.id, bookId) }
+                }
+                val pending = if (profile != null && remoteId != null) {
+                    val patch = previous?.let { JSONObject(it.patchJson) } ?: JSONObject()
+                    val baseline = previous?.baselineJson?.let(::JSONObject) ?: JSONObject()
+                    val remote = dao.remoteCatalogBook(profile.id, remoteId)
+                    val remoteValues = remote?.detailsJson?.let(::JSONObject)
+                    baseline.remove("shelves")
+                    remoteValues?.optJSONArray("shelves")?.let { baseline.put("shelves", it) }
+                    patch.put("shelves", JSONArray(names))
+                    PendingBookEdit(
+                        bookId, profile.id, remoteId, uuid(), patch.toString(), baseline.toString(),
+                        previous?.coverKey, previous?.baseCoverVersion,
+                    )
+                } else null
+                dao.writeBookShelves(bookId, shelfIds, pending)
                 pending != null
             }
         }
@@ -514,7 +556,6 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                 publicationDate = draft.publicationDate.ifBlank { null },
                 series = draft.series.ifBlank { null },
             ),
-            shelves = relations.shelves,
             tags = relations.tags,
             readingStatus = when (draft.readingStatus) {
                 "reading" -> BookReadingStatus.Reading
@@ -533,7 +574,7 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
         val relations = readLocalBookEdit(book, bibliography).relations()
         return bookCreatePayload(
             book, bibliography, relations.authors, relations.translators, relations.isbn,
-            relations.tags, relations.shelves,
+            relations.tags, dao.bookShelves(book.id).map { it.name },
         )
     }
 

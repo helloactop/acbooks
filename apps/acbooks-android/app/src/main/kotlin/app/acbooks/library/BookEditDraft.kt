@@ -19,7 +19,6 @@ internal data class BookEditDraft(
     val description: String = "",
     val series: String = "",
     val tags: String = "",
-    val shelves: String = "",
     val readingStatus: String = "unread",
     val cover: File? = null,
 ) {
@@ -40,7 +39,6 @@ internal data class BookEditDraft(
         translators = translators.names(),
         isbn = isbn.normalizedBookIsbn().ifEmpty { null },
         tags = tags.names(),
-        shelves = shelves.names(),
     )
 
     fun values(): JSONObject {
@@ -51,16 +49,15 @@ internal data class BookEditDraft(
             .put("translators", JSONArray(relations.translators))
             .put("isbn", relations.isbn ?: JSONObject.NULL)
             .put("publisher", publisher.trimOrNull() ?: JSONObject.NULL)
-            .put("publicationDate", publicationDate.trimOrNull() ?: JSONObject.NULL)
+            .put("publicationDate", publicationDate.publicationDateOnly().takeIf(String::isNotEmpty) ?: JSONObject.NULL)
             .put("description", description.trimOrNull() ?: JSONObject.NULL)
             .put("series", series.trimOrNull() ?: JSONObject.NULL)
             .put("tags", JSONArray(relations.tags))
-            .put("shelves", JSONArray(relations.shelves))
             .put("readingStatus", readingStatus)
     }
 
     fun validationError(): Int? {
-        val lists = listOf(authors.names(), translators.names(), tags.names(), shelves.names())
+        val lists = listOf(authors.names(), translators.names(), tags.names())
         val publication = listOf(publisher.trim(), series.trim())
         val normalizedIsbn = isbn.normalizedBookIsbn()
         return when {
@@ -111,11 +108,11 @@ internal fun localBookDraft(
         else embedded?.translators.orEmpty().asLines(),
     isbn = (relations.isbn ?: embedded?.isbn.takeUnless { book.metadataEdited }).orEmpty(),
     publisher = (book.publisher ?: embedded?.publisher.takeUnless { book.metadataEdited }).orEmpty(),
-    publicationDate = (book.publicationDate ?: embedded?.publicationDate.takeUnless { book.metadataEdited }).orEmpty(),
+    publicationDate = (book.publicationDate ?: embedded?.publicationDate.takeUnless { book.metadataEdited })
+        .orEmpty().publicationDateOnly(),
     description = (book.description ?: embedded?.description.takeUnless { book.metadataEdited }).orEmpty(),
     series = (book.series ?: embedded?.series.takeUnless { book.metadataEdited }).orEmpty(),
     tags = relations.tags.asLines(),
-    shelves = relations.shelves.asLines(),
     readingStatus = book.readingStatus,
 )
 
@@ -135,11 +132,10 @@ internal fun BookEditDraft.withCloudMetadata(values: JSONObject, local: Set<Stri
         translators = names("translators", translators),
         isbn = text("isbn", isbn),
         publisher = text("publisher", publisher),
-        publicationDate = text("publicationDate", publicationDate),
+        publicationDate = text("publicationDate", publicationDate).publicationDateOnly(),
         description = text("description", description),
         series = text("series", series),
         tags = names("tags", tags),
-        shelves = names("shelves", shelves),
         readingStatus = text("readingStatus", readingStatus),
     )
 }
@@ -171,7 +167,7 @@ internal fun String.bookIsbnMatchKey(): String = when {
 
 private fun JSONArray.nameSet(): Set<String> = List(length()) { getString(it) }.toSet()
 
-private fun String.validText(limit: Int, allowNewlines: Boolean = false): Boolean =
+internal fun String.validText(limit: Int, allowNewlines: Boolean = false): Boolean =
     length <= limit && none { char ->
         (char.isISOControl() || Character.getType(char) == Character.FORMAT.toInt()) &&
             (!allowNewlines || char !in "\n\r\t")

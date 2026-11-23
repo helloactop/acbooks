@@ -96,6 +96,7 @@ internal fun BoxScope.LibraryMenus(
     onRead: (String) -> Unit,
     onDetails: (String) -> Unit,
     onEdit: (String) -> Unit,
+    onChangeShelves: (String) -> Unit,
     onDelete: (LocalBookCard) -> Unit,
 ) {
     GlassIconDropdownMenu(
@@ -157,6 +158,7 @@ internal fun BoxScope.LibraryMenus(
         onRead = onRead,
         onDetails = onDetails,
         onEdit = onEdit,
+        onChangeShelves = onChangeShelves,
         onDelete = onDelete,
     )
 }
@@ -170,6 +172,7 @@ private fun BoxScope.BookContextMenu(
     onRead: (String) -> Unit,
     onDetails: (String) -> Unit,
     onEdit: (String) -> Unit,
+    onChangeShelves: (String) -> Unit,
     onDelete: (LocalBookCard) -> Unit,
 ) {
     val anchor = rememberGlassPopupAnchor()
@@ -219,6 +222,11 @@ private fun BoxScope.BookContextMenu(
                 text = stringResource(R.string.book_edit_title),
                 icon = MiuixIcons.Glass.Edit,
                 onClick = { onEdit(book.id) },
+            )
+            GlassPopupItem(
+                text = stringResource(R.string.library_change_shelves),
+                icon = MiuixIcons.Glass.BookOutline,
+                onClick = { onChangeShelves(book.id) },
             )
             GlassPopupItem(
                 text = stringResource(R.string.library_delete_book),

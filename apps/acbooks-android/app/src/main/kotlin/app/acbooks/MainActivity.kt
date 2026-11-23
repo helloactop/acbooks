@@ -61,6 +61,12 @@ private sealed interface AcbooksRoute : NavKey {
     data object Settings : AcbooksRoute
 
     @Serializable
+    data object ShelfSettings : AcbooksRoute
+
+    @Serializable
+    data class Shelf(val shelfId: String) : AcbooksRoute
+
+    @Serializable
     data object Server : AcbooksRoute
 
     @Serializable
@@ -84,6 +90,58 @@ internal fun AcbooksNavigation(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var downloading by remember { mutableStateOf(false) }
+    val libraryPage: @Composable (AcbooksRoute, String?) -> Unit = { route, shelfId ->
+        MainTabs(
+            avatar = avatar,
+            catalog = catalog,
+            library = library,
+            isCurrentDestination = navController.backStack.lastOrNull() == route,
+            shelfId = shelfId,
+            onOpenShelf = { id ->
+                if (navController.backStack.lastOrNull() == route && route == AcbooksRoute.Main) {
+                    navController.push(AcbooksRoute.Shelf(id))
+                }
+            },
+            onBackFromShelf = {
+                if (navController.backStack.lastOrNull() == route) navController.pop()
+            },
+            onOpenSettings = {
+                if (navController.backStack.lastOrNull() == route) {
+                    navController.push(AcbooksRoute.Settings)
+                }
+            },
+            onOpenBook = { id ->
+                if (navController.backStack.lastOrNull() == route) {
+                    navController.push(AcbooksRoute.BookDetails(id))
+                }
+            },
+            onReadBook = { id ->
+                val book = catalog.books.firstOrNull { it.id == id }
+                if (book != null && navController.backStack.lastOrNull() == route) {
+                    if (book.hasLocalCopy) {
+                        navController.push(AcbooksRoute.Reader(id))
+                    } else if (!downloading && book.canDownload) {
+                        downloading = true
+                        Toast.makeText(context, R.string.cloud_downloading, Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            try {
+                                val downloaded = library.downloadForReading(id)
+                                if (downloaded && navController.backStack.lastOrNull() == route) {
+                                    navController.push(AcbooksRoute.Reader(id))
+                                } else if (!downloaded) {
+                                    Toast.makeText(context, R.string.cloud_download_failed, Toast.LENGTH_SHORT).show()
+                                }
+                            } finally {
+                                downloading = false
+                            }
+                        }
+                    } else if (!book.canDownload) {
+                        Toast.makeText(context, R.string.cloud_download_failed, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+        )
+    }
     NavDisplay(
         navController = navController,
         transition = NavTransitions.MiuixDefault,
@@ -93,57 +151,31 @@ internal fun AcbooksNavigation(
             backdropColor = MiuixTheme.colorScheme.surface,
         ),
     ) {
-        entry<AcbooksRoute.Main> {
-            MainTabs(
-                avatar = avatar,
-                catalog = catalog,
-                library = library,
-                isCurrentDestination = navController.backStack.lastOrNull() == AcbooksRoute.Main,
-                onOpenSettings = {
-                    if (navController.backStack.lastOrNull() == AcbooksRoute.Main) {
-                        navController.push(AcbooksRoute.Settings)
-                    }
-                },
-                onOpenBook = { id ->
-                    if (navController.backStack.lastOrNull() == AcbooksRoute.Main) {
-                        navController.push(AcbooksRoute.BookDetails(id))
-                    }
-                },
-                onReadBook = { id ->
-                    val book = catalog.books.firstOrNull { it.id == id }
-                    if (book != null && navController.backStack.lastOrNull() == AcbooksRoute.Main) {
-                        if (book.hasLocalCopy) {
-                            navController.push(AcbooksRoute.Reader(id))
-                        } else if (!downloading && book.canDownload) {
-                            downloading = true
-                            Toast.makeText(context, R.string.cloud_downloading, Toast.LENGTH_SHORT).show()
-                            scope.launch {
-                                try {
-                                    val downloaded = library.downloadForReading(id)
-                                    if (downloaded && navController.backStack.lastOrNull() == AcbooksRoute.Main) {
-                                        navController.push(AcbooksRoute.Reader(id))
-                                    } else if (!downloaded) {
-                                        Toast.makeText(context, R.string.cloud_download_failed, Toast.LENGTH_SHORT).show()
-                                    }
-                                } finally {
-                                    downloading = false
-                                }
-                            }
-                        } else if (!book.canDownload) {
-                            Toast.makeText(context, R.string.cloud_download_failed, Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                },
-            )
-        }
+        entry<AcbooksRoute.Main> { libraryPage(AcbooksRoute.Main, null) }
+        entry<AcbooksRoute.Shelf> { route -> libraryPage(route, route.shelfId) }
         entry<AcbooksRoute.Settings> {
             AvatarSettingsScreen(
                 avatar = avatar,
                 onBack = { navController.pop() },
                 onChangeAvatar = onChangeAvatar,
+                onOpenShelfSettings = {
+                    if (navController.backStack.lastOrNull() == AcbooksRoute.Settings) {
+                        navController.push(AcbooksRoute.ShelfSettings)
+                    }
+                },
                 onOpenServer = {
                     if (navController.backStack.lastOrNull() == AcbooksRoute.Settings) navController.push(AcbooksRoute.Server)
                 },
+            )
+        }
+        entry<AcbooksRoute.ShelfSettings> {
+            val active = navController.backStack.lastOrNull() == AcbooksRoute.ShelfSettings
+            ShelfSettingsScreen(
+                catalog = catalog,
+                active = active,
+                onBack = { if (active) navController.pop() },
+                onSave = library::saveShelf,
+                onDelete = library::deleteShelf,
             )
         }
         entry<AcbooksRoute.Server> {

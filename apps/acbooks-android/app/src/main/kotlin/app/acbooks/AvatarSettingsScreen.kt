@@ -35,6 +35,7 @@ internal fun AvatarSettingsScreen(
     avatar: ImageBitmap?,
     onBack: () -> Unit,
     onChangeAvatar: (() -> Unit)?,
+    onOpenShelfSettings: () -> Unit,
     onOpenServer: () -> Unit,
 ) {
     SettingsPage(title = stringResource(R.string.settings_title), onBack = onBack) { nestedScroll, padding ->
@@ -65,6 +66,17 @@ internal fun AvatarSettingsScreen(
                         })
                     }
                 },
+            )
+            groupedCardItems(
+                groupKey = "library",
+                title = R.string.tab_library,
+                rows = listOf(SettingsCardItem("shelves") {
+                    ArrowPreference(
+                        title = stringResource(R.string.settings_shelves),
+                        titleColor = BasicComponentDefaults.titleColor(color = LocalContentColor.current),
+                        onClick = onOpenShelfSettings,
+                    )
+                }),
             )
             groupedCardItems(
                 groupKey = "server",

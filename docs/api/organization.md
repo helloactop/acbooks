@@ -5,6 +5,7 @@
 | 方法 | 路径 | 请求与结果 |
 | --- | --- | --- |
 | GET | `/{kind}` | 分页列出条目 ID、名称和关联书籍数 |
+| POST | `/shelf` | `{name}`，新建空书架并返回 200 与 `{id,name}` |
 | GET | `/{kind}/{entry_id}/books` | 按条目 ID 分页查询关联书目 |
 | PATCH | `/{kind}/{entry_id}` | `{name}`，成功返回 204 |
 | POST | `/{kind}/{entry_id}/merge` | `{targetId}`，保留目标条目，成功返回 204 |
@@ -15,6 +16,8 @@
 | POST | `/books/merge` | 预览入参及 `revision`、`useSource`，成功返回 204 |
 
 `kind` 为 `tag`、`shelf`、`author`、`translator`。作者和译者共享姓名表。同一条姓名被多种角色使用时，单角色重命名会拆出一个新条目 ID，其他角色保留原名。合并和删除只处理所选角色。重名或合并到自身返回 `409 ORGANIZATION_CONFLICT`。
+
+新建书架按 Unicode 大小写折叠匹配名称。已有同名书架时返回其现有 UUID 和名称，重试会返回同一个书架。空书架也会出现在书架目录中，删除书架只会解除关联。
 
 候选依据包括按 Unicode 大小写折叠后相同的书名、ISBN、同命名空间外部 ID，以及已入库的 SHA-256。共享作者作为附加依据。候选查看不会修改书目。
 

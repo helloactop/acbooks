@@ -74,6 +74,47 @@ def test_native_bearer_can_sync(management: tuple[TestClient, Path, Path]) -> No
     )
 
 
+def test_shelf_directory_and_book_changes_use_the_same_shelf(
+    management: tuple[TestClient, Path, Path],
+) -> None:
+    client, _, _ = management
+    url = "/api/v1/organization/shelf"
+    client.cookies.clear()
+    login = client.post("/api/v1/auth/device-login", json=CREDENTIALS)
+    assert login.status_code == 200
+    native = {"Authorization": f"Bearer {login.json()['accessToken']}"}
+    request = client.post(url, json={"name": " Fiction "}, headers=native)
+    assert request.status_code == 200
+    assert request.headers["cache-control"] == "no-store"
+    shelf = request.json()
+    assert shelf["name"] == "Fiction"
+    assert client.post(url, json={"name": "FICTION"}, headers=native).json() == shelf
+    assert client.get(f"{BOOKS}/shelves", headers=native).json()["items"] == [shelf]
+    assert client.get(url, headers=native).json()["items"] == [{**shelf, "bookCount": 0}]
+    assert client.post(url, json={"name": " "}, headers=native).status_code == 422
+
+    created = client.post(BOOKS, json={"title": "Example", "shelves": ["fiction"]}, headers=native)
+    assert created.status_code == 201
+    book = created.json()
+    assert book["shelfRefs"] == [shelf]
+    cursor = client.get(f"{SYNC}/changes", params={"after": 0}, headers=native).json()["nextCursor"]
+    shelf_url = f"{url}/{shelf['id']}"
+    assert client.patch(shelf_url, json={"name": "Novels"}, headers=native).status_code == 204
+    renamed = {**shelf, "name": "Novels"}
+    assert client.get(f"{BOOKS}/shelves", headers=native).json()["items"] == [renamed]
+    changes = client.get(f"{SYNC}/changes", params={"after": cursor}, headers=native).json()
+    assert changes["items"][0]["data"]["shelfRefs"] == [renamed]
+
+    assert client.delete(shelf_url, headers=native).status_code == 204
+    assert client.get(f"{BOOKS}/shelves", headers=native).json()["items"] == []
+    changes = client.get(
+        f"{SYNC}/changes", params={"after": changes["nextCursor"]}, headers=native
+    ).json()
+    record = changes["items"][0]["data"]
+    assert record["id"] == book["id"]
+    assert record["shelfRefs"] == []
+
+
 def mutation(action: str, key: str, revision: int = 0, **fields: Any) -> dict[str, Any]:
     return {
         "action": action,

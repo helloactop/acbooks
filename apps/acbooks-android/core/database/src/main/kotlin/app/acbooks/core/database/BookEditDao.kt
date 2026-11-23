@@ -7,6 +7,8 @@ import androidx.room.Transaction
 import androidx.room.Upsert
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
+import org.json.JSONArray
+import org.json.JSONObject
 
 @Entity(
     tableName = "pending_book_edits",
@@ -31,7 +33,6 @@ data class BookEditRelations(
     val translators: List<String>,
     val isbn: String?,
     val tags: List<String>,
-    val shelves: List<String>,
 )
 
 interface BookEditDao : CatalogMetadataDao, ShelfDao, RemoteLibraryDao {
@@ -60,6 +61,14 @@ interface BookEditDao : CatalogMetadataDao, ShelfDao, RemoteLibraryDao {
 
     @Query("DELETE FROM pending_book_edits WHERE bookId = :bookId AND mutationId = :mutationId")
     suspend fun completeBookEdit(bookId: String, mutationId: String)
+
+    @Transaction
+    suspend fun writeBookShelves(bookId: String, shelfIds: Set<String>, pending: PendingBookEdit?) {
+        checkNotNull(book(bookId))
+        check(shelfIds.all { libraryShelf(it) != null })
+        replaceBookShelves(bookId, shelfIds)
+        if (pending != null) queueBookEdit(pending)
+    }
 
     @Query("""
         SELECT c.* FROM remote_catalog c
@@ -143,17 +152,43 @@ interface BookEditDao : CatalogMetadataDao, ShelfDao, RemoteLibraryDao {
         for (id in existingTagIds - tagIds) deleteBookTag(bookId, id)
         for (id in tagIds - existingTagIds) insertBookTag(LocalBookTag(bookId, id))
 
-        val assignedShelves = bookShelves(bookId).groupBy { it.name.shelfNameKey() }
-        val shelfIds = relations.shelves.flatMap { name ->
-            val key = name.shelfNameKey()
-            assignedShelves[key]?.map { it.id } ?: listOf(
-                shelfByNameKey(key)?.id ?: LocalShelf(editId(), name, key).also { addShelf(it) }.id,
-            )
-        }.toSet()
-        replaceBookShelves(bookId, shelfIds)
-
         if (pending != null) queueBookEdit(pending)
     }
+}
+
+internal suspend fun BookEditDao.rebaseShelfEdits(
+    profileId: String,
+    changedNames: Map<String, String?>,
+    bookIds: Set<String>? = null,
+) {
+    if (changedNames.isEmpty()) return
+    for (edit in pendingBookEdits(profileId)) {
+        if (bookIds != null && edit.bookId !in bookIds) continue
+        val patch = JSONObject(edit.patchJson)
+        if (!patch.has("shelves")) continue
+        val baseline = edit.baselineJson?.let(::JSONObject)
+        val patchChanged = patch.updateShelfNames(changedNames)
+        val baselineChanged = baseline?.updateShelfNames(changedNames) == true
+        if (patchChanged || baselineChanged) {
+            queueBookEdit(edit.copy(
+                mutationId = if (patchChanged) editId() else edit.mutationId,
+                patchJson = patch.toString(),
+                baselineJson = baseline?.toString(),
+            ))
+        }
+    }
+}
+
+private fun JSONObject.updateShelfNames(changes: Map<String, String?>): Boolean {
+    val names = optJSONArray("shelves") ?: return false
+    val before = List(names.length()) { names.getString(it) }
+    val after = before.mapNotNull { name ->
+        val key = name.shelfNameKey()
+        if (key in changes) changes[key] else name
+    }.distinct()
+    if (before == after) return false
+    put("shelves", JSONArray(after))
+    return true
 }
 
 private fun editId(): String = UUID.randomUUID().toString()

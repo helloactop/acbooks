@@ -299,6 +299,24 @@ abstract class LibraryDao :
     }
 
     @Transaction
+    open suspend fun cacheManagedShelf(profileId: String, previous: LocalShelf?, remote: RemoteShelf?) {
+        check(currentServerProfile()?.id == profileId)
+        val cachedId = remote?.let { serverShelfKey(profileId, it.id) }
+        if (remote != null && cachedId != null) {
+            upsertShelf(LocalShelf(cachedId, remote.name, "\u0000$cachedId", remote.name.shelfNameKey(), profileId, remote.id))
+        }
+        if (previous != null) {
+            if (previous.name != remote?.name) {
+                rebaseShelfEdits(profileId, mapOf(previous.name.shelfNameKey() to remote?.name))
+            }
+            if (previous.id != cachedId) {
+                if (cachedId != null) copyShelfMemberships(previous.id, cachedId)
+                deleteShelf(previous.id)
+            }
+        }
+    }
+
+    @Transaction
     open suspend fun replaceRemoteShelves(
         profileId: String,
         snapshot: RemoteShelfSnapshot,
@@ -308,7 +326,12 @@ abstract class LibraryDao :
         val existing = allShelves()
         val localByName = existing.filter { it.serverProfileId == null }
             .groupBy { it.name.shelfNameKey() }.toMutableMap()
-        val remoteIds = snapshot.shelves.mapTo(mutableSetOf()) { it.id }
+        val remoteById = snapshot.shelves.associateBy { it.id }
+        val changedNames = existing.asSequence().filter { it.serverProfileId == profileId }.mapNotNull { old ->
+            val name = remoteById[old.serverShelfId]?.name
+            if (old.name == name) null else old.name.shelfNameKey() to name
+        }.toMap()
+        rebaseShelfEdits(profileId, changedNames, preserveShelfEditsFor)
         for (remote in snapshot.shelves) {
             val key = remote.name.shelfNameKey()
             val localId = serverShelfKey(profileId, remote.id)
@@ -322,7 +345,7 @@ abstract class LibraryDao :
 
         val linksByRemoteBook = remoteBookLinks(profileId).groupBy { it.remoteBookId }
         for ((remoteBookId, shelfIds) in snapshot.shelfIdsByRemoteBook) {
-            check(remoteIds.containsAll(shelfIds))
+            check(remoteById.keys.containsAll(shelfIds))
             val desired = shelfIds.mapTo(mutableSetOf()) { serverShelfKey(profileId, it) }
             for (link in linksByRemoteBook[remoteBookId].orEmpty()) {
                 if (link.localBookId !in preserveShelfEditsFor) replaceBookShelves(link.localBookId, desired)
@@ -330,17 +353,7 @@ abstract class LibraryDao :
         }
 
         for (old in existing) {
-            if (old.serverProfileId != profileId || old.serverShelfId in remoteIds) continue
-            val key = checkNotNull(old.serverNameKey)
-            if (hasShelfMembers(old.id)) {
-                // Retain assignments for local-only books and unsynced edits.
-                val replacement = shelfByNameKey(key, excludingId = old.id)
-                if (replacement == null) {
-                    upsertShelf(old.copy(nameKey = key, serverNameKey = null, serverProfileId = null, serverShelfId = null))
-                    continue
-                }
-                copyShelfMemberships(old.id, replacement.id)
-            }
+            if (old.serverProfileId != profileId || old.serverShelfId in remoteById) continue
             deleteShelf(old.id)
         }
     }

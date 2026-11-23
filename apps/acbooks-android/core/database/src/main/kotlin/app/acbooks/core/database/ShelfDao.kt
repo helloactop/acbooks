@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import java.util.Locale
+import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -26,13 +27,29 @@ interface ShelfDao {
     @Query("""
         SELECT * FROM shelves
         WHERE serverProfileId = (SELECT id FROM server_profiles WHERE currentSlot = 1)
-        OR (serverProfileId IS NULL AND EXISTS (SELECT 1 FROM shelf_books WHERE shelfId = shelves.id))
+        OR serverProfileId IS NULL
         ORDER BY COALESCE(serverNameKey, nameKey), id
     """)
     fun observeLibraryShelves(): Flow<List<LibraryShelf>>
 
     @Query("SELECT * FROM shelves")
     suspend fun allShelves(): List<LocalShelf>
+
+    @Query("""
+        SELECT * FROM shelves WHERE id = :id
+        AND (serverProfileId IS NULL OR serverProfileId = (SELECT id FROM server_profiles WHERE currentSlot = 1))
+    """)
+    suspend fun libraryShelf(id: String): LocalShelf?
+
+    @Transaction
+    suspend fun saveLocalShelf(id: String?, name: String): Boolean {
+        val key = name.shelfNameKey()
+        if (shelfByNameKey(key, excludingId = id) != null) return false
+        val current = id?.let { checkNotNull(libraryShelf(it)) }
+        check(current?.serverProfileId == null)
+        upsertShelf(LocalShelf(id ?: UUID.randomUUID().toString(), name, key))
+        return true
+    }
 
     @Query("""
         SELECT * FROM shelves WHERE (nameKey = :key OR serverNameKey = :key)
@@ -50,9 +67,6 @@ interface ShelfDao {
         SELECT :toId, bookId FROM shelf_books WHERE shelfId = :fromId
     """)
     suspend fun copyShelfMemberships(fromId: String, toId: String)
-
-    @Query("SELECT EXISTS (SELECT 1 FROM shelf_books WHERE shelfId = :shelfId)")
-    suspend fun hasShelfMembers(shelfId: String): Boolean
 
     @Query("""
         SELECT sb.shelfId FROM shelf_books sb JOIN shelves s ON s.id = sb.shelfId

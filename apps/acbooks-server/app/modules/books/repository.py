@@ -469,21 +469,18 @@ def _find_or_create_tags(session: Session, names: list[str]) -> list[Tag]:
     return tags
 
 
-def _find_or_create_shelves(session: Session, names: list[str]) -> list[Shelf]:
-    shelves: list[Shelf] = []
-    for name in names:
-        shelf = session.scalars(
-            select(Shelf)
-            .where(func.acbooks_casefold(Shelf.name) == name.casefold())
-            .order_by(Shelf.id)
-            .limit(1)
-        ).first()
-        if shelf is None:
-            shelf = Shelf(id=str(uuid4()), name=name)
-            session.add(shelf)
-            session.flush()
-        shelves.append(shelf)
-    return shelves
+def find_or_create_shelf(session: Session, name: str) -> Shelf:
+    shelf = session.scalars(
+        select(Shelf)
+        .where(func.acbooks_casefold(Shelf.name) == name.casefold())
+        .order_by(Shelf.id)
+        .limit(1)
+    ).first()
+    if shelf is None:
+        shelf = Shelf(id=str(uuid4()), name=name)
+        session.add(shelf)
+        session.flush()
+    return shelf
 
 
 def replace_contributors(
@@ -542,8 +539,8 @@ def replace_shelves(session: Session, book_id: str, names: list[str]) -> None:
     if not names:
         return
     session.add_all(
-        ShelfBook(book_id=book_id, shelf_id=shelf.id)
-        for shelf in _find_or_create_shelves(session, names)
+        ShelfBook(book_id=book_id, shelf_id=find_or_create_shelf(session, name).id)
+        for name in names
     )
 
 
