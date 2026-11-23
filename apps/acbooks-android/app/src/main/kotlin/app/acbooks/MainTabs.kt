@@ -222,10 +222,6 @@ internal fun MainTabs(
                     onOpenLibrary = { selectTab(1) },
                     onReadBook = onReadBook,
                     onOpenBook = onOpenBook,
-                    onShowMenu = { target ->
-                        bookMenuTarget = target
-                        libraryMenu = LibraryMenu.Book
-                    },
                 )
                 1 -> LibraryScreen(
                     catalog = catalog,

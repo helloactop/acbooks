@@ -4,12 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,26 +26,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.acbooks.core.database.LocalBookCard
-import app.acbooks.library.BookCover
-import app.acbooks.library.BookMenuTarget
 import app.acbooks.library.LibraryCatalog
 import app.acbooks.library.RecentBookReading
 import coil3.compose.AsyncImage
@@ -62,7 +57,7 @@ import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.glass.GlassTopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.glass.More
+import top.yukonga.miuix.kmp.icon.glass.Cloud
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -118,14 +113,14 @@ internal fun HomeScreen(
     onOpenLibrary: () -> Unit,
     onReadBook: (String) -> Unit,
     onOpenBook: (String) -> Unit,
-    onShowMenu: (BookMenuTarget) -> Unit,
 ) {
     val booksById = remember(catalog.books) { catalog.books.associateBy { it.id } }
     val recent = remember(booksById, readingHistory) {
-        readingHistory.mapNotNull { history ->
-            booksById[history.bookId]?.let { book -> book to history }
+        readingHistory.mapNotNull { reading ->
+            booksById[reading.bookId]?.let { it to reading }
         }
     }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -134,7 +129,7 @@ internal fun HomeScreen(
             .padding(scaffoldPadding),
         contentAlignment = Alignment.TopCenter,
     ) {
-        Column(Modifier.widthIn(max = 840.dp).fillMaxWidth().padding(vertical = 16.dp)) {
+        Column(Modifier.widthIn(max = 840.dp).fillMaxWidth().padding(vertical = 12.dp)) {
             if (!catalog.loaded || catalog.failed || recent.isEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -159,36 +154,41 @@ internal fun HomeScreen(
                     }
                 }
             } else {
-                val (currentBook, currentReading) = recent.first()
+                val (currentBook, reading) = recent.first()
                 ContinueReadingCard(
                     book = currentBook,
-                    fraction = currentReading.fraction,
+                    fraction = reading.fraction,
                     cover = coverFile(currentBook),
                     onRead = { onReadBook(currentBook.id) },
-                    onMenu = onShowMenu,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 )
+
                 if (recent.size > 1) {
                     Text(
                         text = stringResource(R.string.home_recently_read),
                         modifier = Modifier
-                            .padding(start = 16.dp, end = 16.dp, top = 26.dp, bottom = 16.dp)
+                            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 10.dp)
                             .semantics { heading() },
                         style = MiuixTheme.textStyles.title2,
                         fontWeight = FontWeight.Bold,
                     )
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        items(recent.drop(1), key = { it.first.id }) { (book, _) ->
-                            RecentlyReadBook(
-                                book = book,
-                                cover = coverFile(book),
-                                onRead = { onReadBook(book.id) },
-                                onDetails = { onOpenBook(book.id) },
-                            )
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        // Match mybooks-android's 96dp phone covers and 120dp wide covers.
+                        val itemWidth = if (maxWidth >= 600.dp) 120.dp else 96.dp
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(recent.drop(1), key = { it.first.id }) { (book, _) ->
+                                RecentlyReadBook(
+                                    book = book,
+                                    cover = coverFile(book),
+                                    width = itemWidth,
+                                    onRead = { onReadBook(book.id) },
+                                    onDetails = { onOpenBook(book.id) },
+                                )
+                            }
                         }
                     }
                 }
@@ -197,108 +197,139 @@ internal fun HomeScreen(
     }
 }
 
-/** Cover-tinted, blurred hero with a separate menu action anchored to the existing book popup. */
+/**
+ * The native Miuix Card supplies the squircle and pressed-state behavior.
+ * No custom RoundedCornerShape or separate menu button is needed.
+ */
 @Composable
 private fun ContinueReadingCard(
     book: LocalBookCard,
     fraction: Float?,
     cover: File?,
     onRead: () -> Unit,
-    onMenu: (BookMenuTarget) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(26.dp)
-    val menuPosition = remember(book.id) { arrayOfNulls<LayoutCoordinates>(1) }
-    Box(
-        modifier = modifier
-            .clip(shape)
-            .background(Color(0xFF4C4855))
-            .clickable(
-                role = Role.Button,
-                onClickLabel = stringResource(R.string.reader_open_book, book.title),
-                onClick = onRead,
-            ),
+    val hasCover = cover?.isFile == true
+    val colors = MiuixTheme.colorScheme
+    val primaryTextColor = if (hasCover) Color.White else colors.onSurfaceContainer
+    val secondaryTextColor = primaryTextColor.copy(alpha = 0.78f)
+
+    Card(
+        modifier = modifier,
+        insideMargin = PaddingValues(0.dp),
+        onClick = onRead,
+        showIndication = true,
     ) {
-        if (cover?.isFile == true) {
-            AsyncImage(
-                model = cover,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize().blur(38.dp),
-            )
-        }
-        Box(
-            Modifier.matchParentSize().background(
-                Brush.linearGradient(
-                    listOf(
-                        Color(0xFF726775).copy(alpha = 0.74f),
-                        Color(0xFF413B49).copy(alpha = 0.82f),
+        Box(Modifier.fillMaxWidth()) {
+            if (hasCover) {
+                AsyncImage(
+                    model = cover,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize().blur(24.dp),
+                )
+                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.50f)))
+            } else {
+                Box(
+                    Modifier.matchParentSize().background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                colors.primary.copy(alpha = 0.12f),
+                                colors.surfaceContainer,
+                            ),
+                        ),
                     ),
-                ),
-            ),
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 168.dp).padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            BookCover(
-                file = cover,
-                title = book.title,
-                modifier = Modifier.width(96.dp),
-                cloudOnly = book.cloudBacked && !book.hasLocalCopy,
-            )
-            Column(
-                modifier = Modifier.weight(1f).padding(end = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    book.title,
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                HomeBookCover(
+                    book = book,
+                    cover = cover,
+                    modifier = Modifier.width(72.dp),
                 )
-                Text(
-                    book.author ?: stringResource(R.string.library_unknown_author),
-                    color = Color.White.copy(alpha = 0.82f),
-                    fontSize = 14.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (fraction != null) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Text(
-                        stringResource(R.string.home_percent, (fraction * 100).roundToInt()),
-                        color = Color.White.copy(alpha = 0.95f),
+                        text = book.title,
+                        color = primaryTextColor,
                         fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    Text(
+                        text = book.author ?: stringResource(R.string.library_unknown_author),
+                        color = secondaryTextColor,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (fraction != null) {
+                        Text(
+                            text = stringResource(R.string.home_percent, (fraction * 100).roundToInt()),
+                            color = secondaryTextColor,
+                            fontSize = 13.sp,
+                        )
+                    }
                 }
             }
         }
-        GlassIconButton(
-            modifier = Modifier.align(Alignment.TopEnd)
-                .padding(top = 14.dp, end = 12.dp)
-                .onGloballyPositioned { menuPosition[0] = it },
-            size = 40.dp,
-            onClick = {
-                menuPosition[0]?.takeIf { it.isAttached }?.let { coordinates ->
-                    onMenu(
-                        BookMenuTarget(
-                            book,
-                            coordinates.localToWindow(
-                                Offset(coordinates.size.width / 2f, coordinates.size.height / 2f),
-                            ),
-                        ),
-                    )
+    }
+}
+
+/** The book's native Miuix Card defines its corners; the content only draws the cover. */
+@Composable
+private fun HomeBookCover(
+    book: LocalBookCard,
+    cover: File?,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
+    Card(
+        modifier = modifier.aspectRatio(3f / 4f),
+        insideMargin = PaddingValues(0.dp),
+        onClick = onClick,
+        showIndication = onClick != null,
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (cover?.isFile == true) {
+                AsyncImage(
+                    model = cover,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                Text(
+                    text = book.title,
+                    modifier = Modifier.padding(8.dp),
+                    fontSize = 11.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceContainer,
+                    textAlign = TextAlign.Center,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (book.cloudBacked && !book.hasLocalCopy) {
+                Card(
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp).size(24.dp),
+                    insideMargin = PaddingValues(0.dp),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            MiuixIcons.Glass.Cloud,
+                            stringResource(R.string.cloud_cover_description),
+                            modifier = Modifier.size(17.dp),
+                        )
+                    }
                 }
-            },
-        ) {
-            Icon(
-                imageVector = MiuixIcons.Glass.More,
-                contentDescription = stringResource(R.string.library_book_actions),
-                tint = Color.White,
-            )
+            }
         }
     }
 }
@@ -307,6 +338,7 @@ private fun ContinueReadingCard(
 private fun RecentlyReadBook(
     book: LocalBookCard,
     cover: File?,
+    width: androidx.compose.ui.unit.Dp,
     onRead: () -> Unit,
     onDetails: () -> Unit,
 ) {
@@ -315,44 +347,42 @@ private fun RecentlyReadBook(
         book.cloudBacked -> R.string.home_downloaded
         else -> R.string.home_local_book
     }
-    Column(Modifier.width(122.dp)) {
-        BookCover(
-            file = cover,
-            title = book.title,
-            cloudOnly = book.cloudBacked && !book.hasLocalCopy,
-            modifier = Modifier.fillMaxWidth()
-                .clickable(
-                    role = Role.Button,
-                    onClickLabel = stringResource(R.string.reader_open_book, book.title),
-                    onClick = onRead,
-                ),
+    Column(Modifier.width(width)) {
+        HomeBookCover(
+            book = book,
+            cover = cover,
+            onClick = onRead,
+            modifier = Modifier.fillMaxWidth(),
         )
         Column(
             modifier = Modifier.fillMaxWidth()
                 .clickable(role = Role.Button, onClickLabel = stringResource(R.string.library_book_details), onClick = onDetails)
-                .padding(top = 10.dp),
+                .padding(top = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Text(
-                book.title,
-                fontSize = 14.sp,
+                text = book.title,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
             )
             Text(
-                book.author ?: stringResource(R.string.library_unknown_author),
-                fontSize = 12.sp,
+                text = book.author ?: stringResource(R.string.library_unknown_author),
+                fontSize = 10.sp,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
             )
             Text(
-                stringResource(availability),
-                fontSize = 12.sp,
+                text = stringResource(availability),
+                fontSize = 10.sp,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 maxLines = 1,
+                textAlign = TextAlign.Center,
             )
         }
     }
