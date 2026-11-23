@@ -32,6 +32,7 @@ import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.navigator.util.DirectionalNavigationAdapter
 import org.readium.r2.shared.ExperimentalReadiumApi
+import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.isRestricted
@@ -51,6 +52,25 @@ import org.readium.r2.streamer.parser.DefaultPublicationParser
 internal class EpubDocumentFragment : Fragment() {
     private val library: LibraryViewModel by activityViewModels()
     private var publication: Publication? = null
+    private var activeNavigator: EpubNavigatorFragment? = null
+    private var chapters: List<ReaderChapter>? = null
+    private var currentHref: String? = null
+
+    internal var onContentsChanged: ((List<ReaderChapter>?) -> Unit)? = null
+        set(callback) {
+            field = callback
+            callback?.invoke(chapters)
+        }
+
+    internal var onCurrentHrefChanged: ((String?) -> Unit)? = null
+        set(callback) {
+            field = callback
+            callback?.invoke(currentHref)
+        }
+
+    internal fun goToChapter(link: Link): Boolean =
+        activeNavigator?.go(link, animated = false) ?: false
+
     private val theme: Theme
         get() = if (requireArguments().getBoolean(DARK)) Theme.DARK else Theme.LIGHT
 
@@ -91,6 +111,8 @@ internal class EpubDocumentFragment : Fragment() {
                 null
             }
             if (source == null || opened == null) {
+                chapters = emptyList()
+                onContentsChanged?.invoke(chapters)
                 root.removeView(loading)
                 root.addView(TextView(root.context).apply {
                     setText(R.string.reader_open_failed)
@@ -99,6 +121,8 @@ internal class EpubDocumentFragment : Fragment() {
                 return@launch
             }
             publication = opened
+            chapters = opened.readerChapters()
+            onContentsChanged?.invoke(chapters)
             val navigator = owner.lifecycle.withResumed {
                 val factory = EpubNavigatorFactory(opened).createFragmentFactory(
                     initialLocator = locator,
@@ -120,9 +144,12 @@ internal class EpubDocumentFragment : Fragment() {
                 }
                 fragment
             }
+            activeNavigator = navigator
             var lastPosition: Locator? = null
             owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 navigator.currentLocator.collect { position ->
+                    currentHref = position.href.toString()
+                    onCurrentHrefChanged?.invoke(currentHref)
                     if (lastPosition != null && position != lastPosition) {
                         library.saveReadingPosition(
                             source.id,
@@ -138,6 +165,13 @@ internal class EpubDocumentFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        activeNavigator = null
+        chapters = null
+        currentHref = null
+        onContentsChanged?.invoke(null)
+        onCurrentHrefChanged?.invoke(null)
+        onContentsChanged = null
+        onCurrentHrefChanged = null
         val opened = publication
         publication = null
         try {
@@ -187,6 +221,19 @@ private suspend fun openPublication(context: android.content.Context, file: File
         unownedPublication?.close()
         unownedAsset?.close()
     }
+}
+
+private fun Publication.readerChapters(): List<ReaderChapter> {
+    val result = mutableListOf<ReaderChapter>()
+    fun addLinks(links: List<Link>, depth: Int) {
+        for (link in links) {
+            result += ReaderChapter(link, link.title?.takeIf { it.isNotBlank() }, depth)
+            addLinks(link.children, depth + 1)
+        }
+    }
+    // Some EPUBs have no navigation document; use their reading order as a fallback.
+    addLinks(tableOfContents.ifEmpty { readingOrder }, 0)
+    return result
 }
 
 private object OfflineHttpClient : HttpClient {

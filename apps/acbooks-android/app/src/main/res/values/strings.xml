@@ -94,6 +94,10 @@
     <string name="reader_open_failed">Could not open the local book file.</string>
     <string name="reader_page">Page %1$d of %2$d</string>
     <string name="reader_previous">Previous</string>
+    <string name="reader_contents">Contents</string>
+    <string name="reader_contents_loading">Loading contents…</string>
+    <string name="reader_contents_empty">This book has no table of contents.</string>
+    <string name="reader_chapter_fallback">Section %1$d</string>
     <string name="reader_next">Next</string>
     <string name="library_display_sort">Display and sort</string>
     <string name="library_more">More library actions</string>
