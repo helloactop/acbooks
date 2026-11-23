@@ -225,4 +225,9 @@
     <string name="about_license">软件许可</string>
     <string name="about_feedback">问题反馈</string>
     <string name="about_link_failed">无法打开链接，请检查浏览器</string>
+    <string name="home_recently_read">最近读过</string>
+    <string name="home_percent">%1$d%%</string>
+    <string name="home_cloud_only">仅云端</string>
+    <string name="home_downloaded">已下载</string>
+    <string name="home_local_book">仅本地</string>
 </resources>
