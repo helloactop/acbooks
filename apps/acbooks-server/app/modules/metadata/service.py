@@ -207,6 +207,8 @@ class MetadataService:
         metadata: EmbeddedMetadata,
         cover: Path | None,
         fields: set[str] | None = None,
+        *,
+        manual_tags: list[str] | None = None,
     ) -> list[str]:
         record = repository.load_records(session, [book])[0]
         locks = book.metadata_locks
@@ -251,6 +253,9 @@ class MetadataService:
             book.cover_path = cover.name
             book.cover_updated_at = time_ns() // 1_000_000
             changed.append("cover")
+        if manual_tags and not record.tags:
+            repository.replace_tags(session, book.id, manual_tags)
+            changed.append("tags")
         if changed:
             book.updated_at = time_ns() // 1_000_000
         return changed
@@ -335,6 +340,7 @@ class MetadataService:
                     ),
                     cover,
                     set(settings.fields) if require_isbn is not None else None,
+                    manual_tags=candidate.tags if not automatic and require_isbn is None else None,
                 )
             keep_cover = "cover" in changed
             return changed

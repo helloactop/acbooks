@@ -39,6 +39,8 @@ export function libraryErrorMessage(
       return t("errors.validation");
     case "INVALID_COVER":
       return t("errors.invalidCover");
+    case "METADATA_UNAVAILABLE":
+      return t("metadata.error");
     case "FORBIDDEN":
       return t("errors.forbidden");
     case "RATE_LIMITED":

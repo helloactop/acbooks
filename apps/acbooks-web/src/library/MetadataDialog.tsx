@@ -3,13 +3,12 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { components } from "../../../../packages/acbooks-api-client/schema";
-import { apiRequest, postWithCsrf, toApiError } from "../api/client";
+import { postWithCsrf, toApiError } from "../api/client";
 import { useAppShell } from "../layout/app-shell-context";
 import { getJob } from "../storage/storage-api";
+import { searchMetadata, type Candidate, type MetadataSource } from "./metadata-api";
 import { Modal } from "./Modal";
 
-type Candidate = components["schemas"]["Candidate"];
-type MetadataSource = "douban" | "openlibrary";
 type Job = components["schemas"]["JobStatus"];
 type BatchItem = { bookId: string; status: string; fields?: string[] };
 
@@ -112,8 +111,7 @@ export function MetadataDialog(props: Props) {
               void perform(async () => {
                 setFields(undefined);
                 setCandidates(undefined);
-                const params = new URLSearchParams({ q: query.trim(), source });
-                setCandidates(await apiRequest<Candidate[]>(`/metadata/candidates?${params}`));
+                setCandidates(await searchMetadata(query, source));
               });
             }}>
               <Select ariaLabel={t("metadata.source")} disabled={busy} value={source}

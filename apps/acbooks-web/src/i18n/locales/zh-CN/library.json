@@ -317,6 +317,8 @@
     "translatorsHint": "可添加多个，按回车确认",
     "isbn": "ISBN",
     "isbnPlaceholder": "ISBN-10 或 ISBN-13",
+    "invalidIsbn": "请输入 ISBN-10 或 ISBN-13。",
+    "metadataNotFound": "没有找到与此 ISBN 匹配的书籍。",
     "readingStatus": "阅读状态",
     "tags": "标签",
     "tagsHint": "可添加多个，按回车确认",
@@ -333,6 +335,7 @@
     "filesHint": "支持 EPUB、PDF，单个文件最大 2 GB。",
     "removeFile": "移除文件",
     "filesPartial": "书籍已创建，但以下文件上传失败：{{names}}。可在详情页重新上传。",
+    "fill": "填充",
     "cancel": "取消",
     "close": "关闭",
     "discard": "放弃修改",
@@ -397,6 +400,7 @@
       "series": "系列",
       "description": "简介",
       "isbn": "ISBN",
+      "tags": "标签",
       "cover": "封面"
     },
     "status": {

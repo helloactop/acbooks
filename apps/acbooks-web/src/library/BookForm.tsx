@@ -29,6 +29,7 @@ import { copyDraftToBody, emptyCopyDraft, type CopyDraft } from "./copy-draft";
 import { libraryErrorMessage, libraryRequestId } from "./errors";
 import { uploadBookFile } from "./files-api";
 import { LibraryAlert } from "./LibraryAlert";
+import { findMetadataByIsbn, normalizeIsbn } from "./metadata-api";
 import { formatBytes } from "./presentation";
 
 export type BookFormMode = "create" | "edit";
@@ -58,6 +59,19 @@ function sameNames(left: readonly string[], right: readonly string[]): boolean {
     left.length === right.length &&
     left.every((value, index) => value === right[index])
   );
+}
+
+function mergeTags(current: string[], suggested: string[]): string[] {
+  const tags = [...current];
+  const seen = new Set(current.map((tag) => tag.toLowerCase()));
+  for (const suggestion of suggested) {
+    if (tags.length >= NAME_LIST_LIMIT) break;
+    const key = suggestion.toLowerCase();
+    if (seen.has(key)) continue;
+    tags.push(suggestion);
+    seen.add(key);
+  }
+  return tags;
 }
 
 interface BookFormValues {
@@ -115,6 +129,7 @@ export function BookForm({
   const { t } = useTranslation("library");
   const { resolvedLanguage } = useLanguage();
   const filesInput = useRef<HTMLInputElement>(null);
+  const lookup = useRef<AbortController | null>(null);
   const [title, setTitle] = useState(book?.title ?? "");
   const [series, setSeries] = useState(book?.series ?? "");
   const [description, setDescription] = useState(book?.description ?? "");
@@ -131,8 +146,10 @@ export function BookForm({
   const [copies, setCopies] = useState<CopyDraft[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [titleError, setTitleError] = useState<string | undefined>(undefined);
+  const [isbnError, setIsbnError] = useState<"invalidIsbn" | "metadataNotFound">();
   const [error, setError] = useState<ApiError | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<"save" | "fill" | null>(null);
+  const busy = operation !== null;
 
   const formValues: BookFormValues = {
     title: title.trim(),
@@ -169,6 +186,8 @@ export function BookForm({
     onBusyChange(busy);
   }, [busy, onBusyChange]);
 
+  useEffect(() => () => lookup.current?.abort(), []);
+
   const clearError = () => {
     setError(null);
   };
@@ -178,6 +197,45 @@ export function BookForm({
       current.map((item, itemIndex) => (itemIndex === index ? draft : item)),
     );
     clearError();
+  };
+
+  const handleFill = async () => {
+    if (busy || lookup.current !== null) return;
+    clearError();
+    const normalized = normalizeIsbn(isbn);
+    if (normalized === undefined) {
+      setIsbnError("invalidIsbn");
+      return;
+    }
+
+    const controller = new AbortController();
+    lookup.current = controller;
+    setIsbnError(undefined);
+    setOperation("fill");
+    try {
+      const candidate = await findMetadataByIsbn(normalized, controller.signal);
+      if (controller.signal.aborted) return;
+      if (candidate === undefined) {
+        setIsbnError("metadataNotFound");
+        return;
+      }
+      setTitle((value) => value.trim() ? value : candidate.title);
+      setTitleError(undefined);
+      setIsbn(normalized);
+      setAuthors((values) => values.length > 0 ? values : candidate.authors ?? []);
+      setTranslators((values) => values.length > 0 ? values : candidate.translators ?? []);
+      setSeries((value) => value.trim() ? value : candidate.series ?? "");
+      setDescription((value) => value.trim() ? value : candidate.description ?? "");
+      setTags((values) => mergeTags(values, candidate.tags ?? []));
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      const apiError = toApiError(cause);
+      if (apiError.status === 401) onSessionExpired();
+      else setError(apiError);
+    } finally {
+      lookup.current = null;
+      if (!controller.signal.aborted) setOperation(null);
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -191,7 +249,7 @@ export function BookForm({
       return;
     }
     setTitleError(undefined);
-    setBusy(true);
+    setOperation("save");
     setError(null);
 
     const values: BookFormValues = {
@@ -212,7 +270,7 @@ export function BookForm({
       if (mode === "edit" && book !== undefined) {
         const update = buildUpdate(book, values);
         if (Object.keys(update).length === 0) {
-          setBusy(false);
+          setOperation(null);
           onSaved(book, mode);
           return;
         }
@@ -246,7 +304,7 @@ export function BookForm({
           onFilesFailed?.(failed);
         }
       }
-      setBusy(false);
+      setOperation(null);
       onSaved(saved, mode);
     } catch (cause) {
       const apiError = toApiError(cause);
@@ -255,7 +313,7 @@ export function BookForm({
         return;
       }
       setError(apiError);
-      setBusy(false);
+      setOperation(null);
     }
   };
 
@@ -356,7 +414,7 @@ export function BookForm({
                 />
               </Field>
 
-              <Field htmlFor="book-isbn" label={t("form.isbn")}>
+              <Field error={isbnError && t(`form.${isbnError}`)} htmlFor="book-isbn" label={t("form.isbn")}>
                 <Input
                   autoComplete="off"
                   disabled={busy}
@@ -364,6 +422,7 @@ export function BookForm({
                   maxLength={32}
                   onChange={(event) => {
                     setIsbn(event.target.value);
+                    setIsbnError(undefined);
                     clearError();
                   }}
                   placeholder={t("form.isbnPlaceholder")}
@@ -429,7 +488,7 @@ export function BookForm({
             </div>
 
             <Field htmlFor="book-series" label={t("metadata.fields.series")}>
-              <Input id="book-series" maxLength={200} value={series}
+              <Input disabled={busy} id="book-series" maxLength={200} value={series}
                 onChange={(event) => setSeries(event.target.value)} />
             </Field>
             <Field htmlFor="book-description" label={t("form.description")}>
@@ -577,10 +636,14 @@ export function BookForm({
         </div>
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-border p-4 sm:p-5">
+          <Button disabled={busy || !isbn.trim()} loading={operation === "fill"}
+            onClick={() => void handleFill()} variant="outline">
+            {t("form.fill")}
+          </Button>
           <Button disabled={busy} onClick={onCloseRequest} variant="ghost">
             {t("form.cancel")}
           </Button>
-          <Button loading={busy} type="submit">
+          <Button disabled={busy} loading={operation === "save"} type="submit">
             {t("form.save")}
           </Button>
         </div>

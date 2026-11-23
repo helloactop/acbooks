@@ -102,10 +102,18 @@ def test_douban_candidate_api_and_fill_preserve_existing_fields(
     assert book.status_code == 201
     path = f"/api/v1/books/{book.json()['id']}"
     filled = client.post(f"{path}/metadata", json=result, headers=challenge(client))
-    assert filled.json() == {"fields": ["translators", "authors", "description", "isbn", "cover"]}
+    assert filled.json() == {
+        "fields": ["translators", "authors", "description", "isbn", "cover", "tags"],
+    }
     detail = client.get(path).json()
     assert detail["title"] == "手动书名"
     assert detail["isbn"] == "9787536692930"
     assert set(detail["translators"]) == {"译者甲", "译者乙"}
+    assert set(detail["tags"]) == {"科幻", "小说"}
+    second = client.post(
+        f"{path}/metadata", json={**result, "tags": ["其它标签"]}, headers=challenge(client)
+    )
+    assert second.json() == {"fields": []}
+    assert set(client.get(path).json()["tags"]) == {"科幻", "小说"}
     assert client.get(f"{path}/cover").content == JPEG
     assert douban.download_cover("https://img9.doubanio.com.fake.example/s.jpg", 100) is None
