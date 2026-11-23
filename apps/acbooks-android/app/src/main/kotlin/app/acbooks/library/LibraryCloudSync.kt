@@ -54,6 +54,22 @@ internal class LibraryCloudSync(
 
     suspend fun testConnection(): Boolean = serialized { verifiedSession() != null }
 
+    /** A local unsent selection is authoritative; otherwise fetch newer server profile data. */
+    suspend fun syncAvatar(store: ProfileAvatarStore): Boolean = serialized {
+        val session = verifiedSession() ?: return@serialized false
+        val scope = "${session.profile.origin}:${session.account.id}"
+        val pending = store.pending()
+        if (pending != null) {
+            val uploaded = session.client.uploadAvatar(session.token, pending.bytes)
+            if (uploaded.id != session.account.id) throw CloudIdentityChanged()
+            store.markUploaded(pending.version, scope, uploaded.avatarUpdatedAt)
+        } else if (store.needsRemote(scope, session.account.avatarUpdatedAt)) {
+            val bytes = if (session.account.avatarUpdatedAt == null) null else session.client.avatar(session.token)
+            store.acceptRemote(scope, session.account.avatarUpdatedAt, bytes)
+        }
+        true
+    }
+
     suspend fun searchDoubanMetadata(query: String): List<DoubanMetadataCandidate> = serialized {
         val search = query.trim()
         require(search.length in 1..200)
@@ -508,14 +524,19 @@ internal class LibraryCloudSync(
             credentials.write(profile.id, credential.token, account.username)
             credentials.keepOnly(profile.id)
         }
-        return CloudSession(profile, client, credential.token)
+        return CloudSession(profile, client, credential.token, account)
     }
 
     private suspend fun <T> serialized(action: suspend () -> T): T =
         withContext(Dispatchers.IO) { cloudSyncLock.withLock { action() } }
 }
 
-private class CloudSession(val profile: ServerProfile, val client: LibraryCloudClient, val token: String) {
+private class CloudSession(
+    val profile: ServerProfile,
+    val client: LibraryCloudClient,
+    val token: String,
+    val account: CloudAccount,
+) {
     operator fun component1() = profile
     operator fun component2() = client
     operator fun component3() = token
