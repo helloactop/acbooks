@@ -18,6 +18,51 @@ class ReaderTypographySettingsTest {
     }
 
     @Test
+    fun bookOverrideWinsOverGlobalAndMissingOverrideInherits() {
+        val global = ReaderTypographySettings(fontSize = 1.2, appearance = ReaderAppearance.DARK)
+        val book = ReaderTypographySettings(fontSize = 1.8, appearance = ReaderAppearance.SEPIA)
+
+        assertEquals(global, ReaderTypographyProfile(global).effective)
+        assertEquals(false, ReaderTypographyProfile(global).hasBookOverride)
+        assertEquals(book, ReaderTypographyProfile(global, book).effective)
+        assertEquals(true, ReaderTypographyProfile(global, book).hasBookOverride)
+        // A second book without an override still follows changes to global.
+        assertEquals(
+            ReaderTypographySettings(fontSize = 1.5),
+            ReaderTypographyProfile(ReaderTypographySettings(fontSize = 1.5)).effective,
+        )
+    }
+
+    @Test
+    fun originalLayoutDiscardsConflictingPublisherOverrides() {
+        val customized = ReaderTypographySettings(
+            fontFamily = ReaderFontFamily.SERIF,
+            fontSize = 1.3,
+            lineHeight = 1.7,
+            paragraphIndent = 2.0,
+            paragraphSpacing = 0.3,
+            letterSpacing = 0.2,
+            textAlignment = ReaderTextAlignment.JUSTIFY,
+            pageMargins = 1.5,
+            appearance = ReaderAppearance.SEPIA,
+            publisherStyles = false,
+        )
+
+        val original = customized.withPublisherLayout(original = true)
+        assertEquals(true, original.publisherStyles)
+        assertEquals(ReaderFontFamily.BOOK, original.fontFamily)
+        assertNull(original.lineHeight)
+        assertNull(original.paragraphIndent)
+        assertNull(original.paragraphSpacing)
+        assertNull(original.letterSpacing)
+        assertNull(original.textAlignment)
+        assertEquals(1.3, original.fontSize)
+        assertEquals(1.5, original.pageMargins)
+        assertEquals(ReaderAppearance.SEPIA, original.appearance)
+        assertEquals(false, original.withPublisherLayout(original = false).publisherStyles)
+    }
+
+    @Test
     fun invalidValuesAreDroppedWithoutChangingOtherFields() {
         val settings = ReaderTypographySettings(
             fontSize = Double.NaN,
