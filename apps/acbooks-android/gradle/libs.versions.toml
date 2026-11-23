@@ -10,6 +10,8 @@ compose-bom = "2026.08.00"
 miuix = "0.9.5-beta03"
 ksp = "2.3.14"
 room = "2.8.4"
+androidx-test-runner = "1.7.0"
+junit = "4.13.2"
 datastore = "1.1.7"
 appcompat = "1.7.1"
 fragment = "1.9.1"
@@ -34,6 +36,9 @@ androidx-fragment-compose = { module = "androidx.fragment:fragment-compose", ver
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
+junit = { module = "junit:junit", version.ref = "junit" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 readium-navigator = { module = "org.readium.kotlin-toolkit:readium-navigator", version.ref = "readium" }
 readium-streamer = { module = "org.readium.kotlin-toolkit:readium-streamer", version.ref = "readium" }

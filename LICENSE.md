@@ -43,6 +43,8 @@ acbooks 源码采用 [GPL-3.0-only](LICENSE)。以下为 Android 工程当前直
 | [AndroidX Activity Compose](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 1.13.0 | Apache-2.0 |
 | [Jetpack Compose](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | BOM 2026.08.00 | Apache-2.0 |
 | [AndroidX AppCompat、Fragment Compose、Lifecycle、Room、DataStore](https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt) | 1.7.1 / 1.9.1 / 2.11.0 / 2.8.4 / 1.1.7 | Apache-2.0 |
+| [AndroidX Test Runner](https://github.com/android/android-test/blob/main/LICENSE) 与 Room Testing（仅仪器测试） | 1.7.0 / 2.8.4 | Apache-2.0 |
+| [JUnit 4](https://github.com/junit-team/junit4/blob/r4.13.2/LICENSE-junit.txt)（仅仪器测试） | 4.13.2 | EPL-1.0 |
 | [KSP](https://github.com/google/ksp/blob/2.3.14/LICENSE) | 2.3.14 | Apache-2.0 |
 | [Coil](https://github.com/coil-kt/coil/blob/3.6.3/LICENSE.txt) | 3.6.3 | Apache-2.0 |
 | [Readium Kotlin Toolkit](https://github.com/readium/kotlin-toolkit/blob/3.4.0/LICENSE) | 3.4.0 | BSD-3-Clause |

@@ -1,6 +1,7 @@
 package app.acbooks
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -8,11 +9,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.acbooks.library.BookDetailsScreen
 import app.acbooks.library.LibraryViewModel
 import app.acbooks.reader.LocalReaderScreen
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
@@ -26,6 +32,11 @@ import top.yukonga.miuix.kmp.theme.ThemeController
 
 class MainActivity : AppCompatActivity() {
     private val library: LibraryViewModel by viewModels()
+
+    override fun onStart() {
+        super.onStart()
+        library.syncLibrary()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,6 +60,9 @@ private sealed interface AcbooksRoute : NavKey {
     data object Settings : AcbooksRoute
 
     @Serializable
+    data object Server : AcbooksRoute
+
+    @Serializable
     data class BookDetails(val bookId: String) : AcbooksRoute
 
     @Serializable
@@ -63,6 +77,9 @@ internal fun AcbooksNavigation(
 ) {
     val navController = rememberNavController<AcbooksRoute>(AcbooksRoute.Main)
     val catalog by library.catalog.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var downloading by remember { mutableStateOf(false) }
     NavDisplay(
         navController = navController,
         transition = NavTransitions.MiuixDefault,
@@ -89,8 +106,28 @@ internal fun AcbooksNavigation(
                     }
                 },
                 onReadBook = { id ->
-                    if (navController.backStack.lastOrNull() == AcbooksRoute.Main) {
-                        navController.push(AcbooksRoute.Reader(id))
+                    val book = catalog.books.firstOrNull { it.id == id }
+                    if (book != null && navController.backStack.lastOrNull() == AcbooksRoute.Main) {
+                        if (book.hasLocalCopy) {
+                            navController.push(AcbooksRoute.Reader(id))
+                        } else if (!downloading && book.canDownload) {
+                            downloading = true
+                            Toast.makeText(context, R.string.cloud_downloading, Toast.LENGTH_SHORT).show()
+                            scope.launch {
+                                try {
+                                    val downloaded = library.downloadForReading(id)
+                                    if (downloaded && navController.backStack.lastOrNull() == AcbooksRoute.Main) {
+                                        navController.push(AcbooksRoute.Reader(id))
+                                    } else if (!downloaded) {
+                                        Toast.makeText(context, R.string.cloud_download_failed, Toast.LENGTH_SHORT).show()
+                                    }
+                                } finally {
+                                    downloading = false
+                                }
+                            }
+                        } else if (!book.canDownload) {
+                            Toast.makeText(context, R.string.cloud_download_failed, Toast.LENGTH_SHORT).show()
+                        }
                     }
                 },
             )
@@ -100,6 +137,19 @@ internal fun AcbooksNavigation(
                 avatar = avatar,
                 onBack = { navController.pop() },
                 onChangeAvatar = onChangeAvatar,
+                onOpenServer = {
+                    if (navController.backStack.lastOrNull() == AcbooksRoute.Settings) navController.push(AcbooksRoute.Server)
+                },
+            )
+        }
+        entry<AcbooksRoute.Server> {
+            val state by library.cloudState.collectAsStateWithLifecycle()
+            ServerSettingsScreen(
+                state = state,
+                onBack = { navController.pop() },
+                onConnect = library::connectServer,
+                onSync = library::syncLibrary,
+                onDisconnect = library::disconnectServer,
             )
         }
         entry<AcbooksRoute.BookDetails> { route ->

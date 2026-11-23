@@ -56,6 +56,7 @@ internal fun AvatarSettingsScreen(
     avatar: ImageBitmap?,
     onBack: () -> Unit,
     onChangeAvatar: (() -> Unit)?,
+    onOpenServer: () -> Unit,
 ) {
     val pageBackdrop = rememberLayerBackdrop()
     val scrollBehavior = MiuixScrollBehavior()
@@ -120,6 +121,17 @@ internal fun AvatarSettingsScreen(
                             })
                         }
                     },
+                )
+                groupedCardItems(
+                    groupKey = "server",
+                    title = R.string.settings_services,
+                    rows = listOf(SettingsCardItem("acbooks-server") {
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_server),
+                            titleColor = BasicComponentDefaults.titleColor(color = LocalContentColor.current),
+                            onClick = onOpenServer,
+                        )
+                    }),
                 )
             }
         }

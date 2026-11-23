@@ -24,6 +24,7 @@ internal fun LibraryDeleteDialog(
     book: LocalBookCard?,
     show: Boolean,
     busy: Boolean,
+    cloudConnected: Boolean,
     backdrop: Backdrop,
     onDismiss: () -> Unit,
     onDismissFinished: () -> Unit,
@@ -37,7 +38,12 @@ internal fun LibraryDeleteDialog(
         backdrop = backdrop,
         largeScreen = true,
         title = stringResource(R.string.library_delete_title),
-        summary = book?.let { stringResource(R.string.library_delete_summary, it.title) },
+        summary = book?.let {
+            stringResource(
+                if (it.cloudBacked) R.string.library_delete_summary else R.string.library_delete_unbacked_summary,
+                it.title,
+            )
+        },
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -46,7 +52,7 @@ internal fun LibraryDeleteDialog(
             GlassDialogButton(
                 onClick = onDeleteLocal,
                 modifier = Modifier.weight(1f),
-                enabled = !busy,
+                enabled = !busy && (book?.cloudBacked != true || book.hasLocalCopy),
                 role = GlassDialogButtonRole.Normal,
                 insideMargin = PaddingValues(horizontal = 8.dp),
             ) {
@@ -60,7 +66,7 @@ internal fun LibraryDeleteDialog(
             GlassDialogButton(
                 onClick = onDeleteEverywhere,
                 modifier = Modifier.weight(1f),
-                enabled = !busy,
+                enabled = !busy && cloudConnected && book?.cloudBacked == true,
                 role = GlassDialogButtonRole.Destructive,
                 insideMargin = PaddingValues(horizontal = 8.dp),
             ) {

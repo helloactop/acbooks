@@ -125,7 +125,11 @@ internal class EpubDocumentFragment : Fragment() {
                 navigator.currentLocator.collect { position ->
                     if (position != lastPosition) {
                         lastPosition = position
-                        library.saveReadingPosition(source.id, position.toJSON().toString())
+                        library.saveReadingPosition(
+                            source.id,
+                            position.toJSON().toString(),
+                            position.locations.totalProgression?.times(100.0),
+                        )
                     }
                 }
             }

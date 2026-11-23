@@ -16,6 +16,16 @@ bash ./gradlew :app:assembleDebug :app:lintDebug
 
 从书库的「更多操作」选择「添加书籍」，导入真实 EPUB 和 PDF。检查同一文件重复导入、相同内容确认、不可读文件反馈及无封面占位。点击封面阅读并翻页，返回后重新打开，确认恢复位置。点击信息区打开详情，长按封面打开玻璃菜单。切换显示方式并重启应用，检查选中状态、网格位置、横竖屏列数及深浅色显示。
 
+## Room 数据库测试
+
+连接 API 33 或更高版本的设备，从 Android 工程目录运行以下 Gradle 任务。
+
+```sh
+bash ./gradlew :core:database:connectedDebugAndroidTest :app:connectedDebugAndroidTest
+```
+
+数据库测试使用 Room 导出的 v1 至 v6 Schema 创建旧库，验证升级到 v7 后保留书籍 UUID、作者、文件、书架、旧 Locator 和已有阅读记录。旧云端关联保留在未验证的记录下。DAO 测试覆盖单服务器身份、仅云端条目、移除本机副本、重装同版本与删除后的级联关系。应用测试通过系统内容 URI 导入 PDF，检查共享副本、进度保留、私有副本清理、原始文件保留与重复导入恢复。
+
 ## 旧实现的历史验收
 
 以下记录对应重建前的实现。

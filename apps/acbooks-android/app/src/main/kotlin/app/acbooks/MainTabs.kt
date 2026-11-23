@@ -1,5 +1,6 @@
 package app.acbooks
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
@@ -94,6 +96,7 @@ internal fun MainTabs(
     )
     val pager = rememberPagerState { items.size }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val navigationBackdrop = rememberLayerBackdrop()
     val menuBackdrop = rememberLayerBackdrop()
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
@@ -101,6 +104,7 @@ internal fun MainTabs(
     val topBarTransition = Modifier.glassSearchBarTransition(searchExpanded) { 1f }
     val displayMode by library.displayMode.collectAsStateWithLifecycle()
     val importProgress by library.progress.collectAsStateWithLifecycle()
+    val cloud by library.cloudState.collectAsStateWithLifecycle()
     val displayAnchor = rememberGlassPopupAnchor()
     val moreAnchor = rememberGlassPopupAnchor()
     var libraryMenu by remember { mutableStateOf<LibraryMenu?>(null) }
@@ -256,6 +260,7 @@ internal fun MainTabs(
                 book = deleteTarget,
                 show = deleteDialogShown && isCurrentDestination,
                 busy = deletingBook,
+                cloudConnected = cloud.connected,
                 backdrop = navigationBackdrop,
                 onDismiss = { if (!deletingBook) deleteDialogShown = false },
                 onDismissFinished = { if (!deleteDialogShown) deleteTarget = null },
@@ -265,7 +270,11 @@ internal fun MainTabs(
                         deletingBook = true
                         scope.launch {
                             try {
-                                if (library.deleteLocalBook(target.id)) deleteDialogShown = false
+                                if (library.deleteLocalBook(target.id)) {
+                                    deleteDialogShown = false
+                                } else {
+                                    Toast.makeText(context, R.string.library_delete_local_failed, Toast.LENGTH_SHORT).show()
+                                }
                             } finally {
                                 deletingBook = false
                             }
@@ -278,9 +287,11 @@ internal fun MainTabs(
                         deletingBook = true
                         scope.launch {
                             try {
-                                // The cloud gateway is currently a safe no-op. It is intentionally
-                                // called even when unconfigured, with no extra notice or UI disabling.
-                                if (library.deleteBookEverywhere(target.id)) deleteDialogShown = false
+                                if (library.deleteBookEverywhere(target.id)) {
+                                    deleteDialogShown = false
+                                } else {
+                                    Toast.makeText(context, R.string.library_delete_cloud_failed, Toast.LENGTH_SHORT).show()
+                                }
                             } finally {
                                 deletingBook = false
                             }
@@ -297,11 +308,17 @@ internal fun MainTabs(
             backdrop = menuBackdrop,
             mode = displayMode,
             importing = importProgress?.running == true,
+            cloudConnected = cloud.connected,
+            cloudBusy = cloud.busy,
             onDismiss = { menu -> if (libraryMenu == menu) libraryMenu = null },
             onDisplayMode = library::setDisplayMode,
             onAddBooks = {
                 libraryMenu = null
                 picker.launch(arrayOf("application/epub+zip", "application/pdf"))
+            },
+            onSync = {
+                libraryMenu = null
+                library.syncLibrary()
             },
             onRead = { id ->
                 libraryMenu = null

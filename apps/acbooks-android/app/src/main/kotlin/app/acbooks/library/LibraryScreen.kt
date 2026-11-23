@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +60,7 @@ import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.BookOutline
+import top.yukonga.miuix.kmp.icon.glass.Cloud
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 internal val BookCoverCorner = 10.dp
@@ -69,6 +71,7 @@ internal fun BookCover(
     modifier: Modifier = Modifier,
     title: String? = null,
     aspectRatio: Float = 3f / 4f,
+    cloudOnly: Boolean = false,
 ) {
     var loaded by remember(file) { mutableStateOf(false) }
     val colors = MiuixTheme.colorScheme
@@ -109,6 +112,15 @@ internal fun BookCover(
                 onError = { loaded = false },
             )
         }
+        if (cloudOnly) {
+            Icon(
+                imageVector = MiuixIcons.Glass.Cloud,
+                contentDescription = stringResource(R.string.cloud_cover_description),
+                tint = colors.onSurfaceContainer,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)
+                    .size(20.dp).background(colors.surfaceContainer, CircleShape).padding(4.dp),
+            )
+        }
     }
 }
 
@@ -125,12 +137,15 @@ internal fun BookGridItem(
 ) {
     val coverCoordinates = remember(book.id) { arrayOfNulls<LayoutCoordinates>(1) }
     val pressPosition = remember(book.id) { mutableStateOf<Offset?>(null) }
-    val read = stringResource(R.string.reader_open_book, book.title)
+    val read = if (book.canDownload && !book.hasLocalCopy) {
+        stringResource(R.string.cloud_download_and_read)
+    } else stringResource(R.string.reader_open_book, book.title)
     val actions = stringResource(R.string.library_book_actions)
     Column {
         BookCover(
             file = cover,
             title = book.title,
+            cloudOnly = book.cloudBacked && !book.hasLocalCopy,
             modifier = Modifier.fillMaxWidth()
                 .onGloballyPositioned { coverCoordinates[0] = it }
                 // Record the touch location without consuming pointer events. CombinedClickable
@@ -201,7 +216,7 @@ internal fun LibraryScreen(
     mode: LibraryDisplayMode,
     scrollBehavior: ScrollBehavior,
     pagePadding: PaddingValues,
-    coverFile: (String?) -> File?,
+    coverFile: (LocalBookCard) -> File?,
     onRead: (String) -> Unit,
     onDetails: (String) -> Unit,
     onShowMenu: (BookMenuTarget) -> Unit,
@@ -237,7 +252,7 @@ internal fun LibraryScreen(
             items(catalog.books, key = { it.id }) { book ->
                 BookGridItem(
                     book = book,
-                    cover = coverFile(book.sha256),
+                    cover = coverFile(book),
                     onRead = { onRead(book.id) },
                     onDetails = { onDetails(book.id) },
                     onShowMenu = onShowMenu,

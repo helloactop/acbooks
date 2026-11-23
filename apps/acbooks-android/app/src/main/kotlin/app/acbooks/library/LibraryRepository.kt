@@ -9,14 +9,26 @@ import android.provider.OpenableColumns
 import android.util.Log
 import app.acbooks.core.database.LibraryDao
 import app.acbooks.core.database.BookImportCommit
+import app.acbooks.core.database.FileSourceKind
+import app.acbooks.core.database.FileSourceStatus
 import app.acbooks.core.database.LocalBook
+import app.acbooks.core.database.LocalBookCard
 import app.acbooks.core.database.LocalBookFile
+import app.acbooks.core.database.LocalBookRemoval
 import app.acbooks.core.database.LocalFileObject
-import app.acbooks.core.database.LocalReadingPosition
+import app.acbooks.core.database.LocalFileSource
+import app.acbooks.core.database.RemoteBookLink
+import app.acbooks.core.database.RemoteCatalogBook
+import app.acbooks.core.database.RemoteCatalogFile
+import app.acbooks.core.database.coverCacheKey
+import app.acbooks.core.database.managedObjectPath
+import app.acbooks.core.database.observeReadingStatistics
 import app.acbooks.R
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.security.MessageDigest
+import java.time.ZoneId
 import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +36,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 internal enum class ImportOutcome { Added, Duplicate, MatchingContent, Unsupported, Failed }
@@ -32,20 +46,209 @@ internal data class ReadableBookFile(val id: String, val format: String, val fil
 
 internal class LibraryRepository(context: Context, private val dao: LibraryDao) {
     private val resolver = context.contentResolver
-    private val objects = File(context.filesDir, "library/objects")
+    private val filesRoot = context.filesDir
+    private val objects = File(filesRoot, "library/objects")
     private val covers = File(context.filesDir, "library/covers")
+    private val cloudCovers = File(context.cacheDir, "cloud-covers")
     private val untitled = context.getString(R.string.library_untitled)
     val books = dao.observeBooks()
 
     fun coverFile(sha256: String?): File? = sha256?.takeIf(contentHash::matches)?.let { File(covers, "$it.jpg") }
 
+    fun coverFile(book: LocalBookCard): File? {
+        val cloud = book.cloudCoverKey?.takeIf(cloudCoverName::matches)?.let { File(cloudCovers, it) }
+        return cloud?.takeIf(File::isFile) ?: coverFile(book.sha256)
+    }
+
+    fun cacheCloudCovers(books: List<RemoteCatalogBook>, client: LibraryCloudClient, token: String) {
+        if (!cloudCovers.isDirectory && !cloudCovers.mkdirs()) return
+        for (book in books) {
+            val key = book.coverCacheKey()?.takeIf(cloudCoverName::matches) ?: continue
+            val target = File(cloudCovers, key)
+            if (target.isFile) continue
+            val version = book.coverUpdatedAt ?: continue
+            val pending = try {
+                File.createTempFile("cloud-cover-", ".part", cloudCovers)
+            } catch (_: IOException) {
+                return
+            }
+            try {
+                client.cover(token, book.remoteBookId, version) { response ->
+                    if (response.contentType?.startsWith("image/") != true) throw IOException("Invalid book cover")
+                    response.inputStream.use { input ->
+                        pending.outputStream().use { output ->
+                            val buffer = ByteArray(8192)
+                            var size = 0
+                            while (true) {
+                                val count = input.read(buffer)
+                                if (count < 0) break
+                                size += count
+                                if (size > MaxCloudCoverBytes) throw IOException("Book cover is too large")
+                                output.write(buffer, 0, count)
+                            }
+                        }
+                    }
+                }
+                if (pending.length() > 0) pending.renameTo(target)
+            } catch (_: IOException) {
+                // A missing thumbnail leaves the book usable with its local cover or title.
+            } finally {
+                pending.delete()
+            }
+        }
+        val current = books.mapNotNull(RemoteCatalogBook::coverCacheKey).toSet()
+        cloudCovers.listFiles()?.filter { cloudCoverName.matches(it.name) && it.name !in current }?.forEach { it.delete() }
+    }
+
     suspend fun openBook(bookId: String): ReadableBookFile? = withContext(Dispatchers.IO) {
-        val entry = dao.firstBookFile(bookId) ?: return@withContext null
-        val format = entry.format
-        if ((format != "epub" && format != "pdf") || !contentHash.matches(entry.sha256)) return@withContext null
-        val file = File(objects, "${entry.sha256}.$format")
-        if (!file.isFile) return@withContext null
-        ReadableBookFile(entry.id, format, file)
+        libraryFilesLock.withLock {
+            val preferredId = dao.firstBookFile(bookId)?.id
+            val files = dao.allBookFiles(bookId).sortedBy { it.id != preferredId }
+            for (entry in files) {
+                if (entry.localCopyRemoved) continue
+                val file = ownedObject(entry.sha256, entry.format) ?: continue
+                val present = file.isFile
+                updateLocalCopyStatus(entry.sha256, entry.format, present)
+                if (present) return@withLock ReadableBookFile(entry.id, entry.format, file)
+            }
+            null
+        }
+    }
+
+    suspend fun <T> uploadBookFile(file: LocalBookFile, send: (File) -> T): T = withContext(Dispatchers.IO) {
+        val current = dao.bookFile(file.id)
+        check(current != null && !current.localCopyRemoved)
+        val managed = ownedObject(current.sha256, current.format)?.takeIf(File::isFile)
+        if (managed != null && matchesContent(managed, current.sha256)) return@withContext send(managed)
+
+        val source = dao.fileSources(current.sha256, current.format).firstOrNull {
+            it.kind == FileSourceKind.External && it.location == current.sourceUri &&
+                it.status in setOf(FileSourceStatus.Present, FileSourceStatus.Unknown)
+        } ?: throw IOException("Book file is unavailable")
+        // Stage a readable SAF source without modifying the original document.
+        val temporary = File.createTempFile("upload-", ".part", filesRoot)
+        try {
+            val uri = Uri.parse(source.location)
+            if (uri.scheme != ContentResolver.SCHEME_CONTENT) throw IOException("Invalid book source")
+            val input = resolver.openInputStream(uri) ?: throw IOException("Book source is unavailable")
+            input.use { from -> temporary.outputStream().use { from.copyTo(it) } }
+            if (!matchesContent(temporary, current.sha256)) throw IOException("Book source has changed")
+            send(temporary)
+        } finally {
+            temporary.delete()
+        }
+    }
+
+    suspend fun downloadBookFile(
+        bookId: String,
+        remote: RemoteCatalogFile,
+        client: LibraryCloudClient,
+        token: String,
+    ): ReadableBookFile = withContext(Dispatchers.IO) {
+        if (!objects.isDirectory && !objects.mkdirs() && !objects.isDirectory) throw IOException("Cannot open book storage")
+        if (objects.canonicalFile != File(filesRoot.canonicalFile, "library/objects")) throw IOException("Invalid book storage")
+        val pending = File.createTempFile("download-", ".part", objects)
+        try {
+            val actualHash = client.download(token, remote.remoteFileId) { response ->
+                val responseHash = response.getHeaderField("X-Content-SHA256")
+                val expected = remote.sha256 ?: responseHash ?: throw IOException("Book checksum is unavailable")
+                if (!contentHash.matches(expected) || (responseHash != null && responseHash != expected)) {
+                    throw IOException("Book version changed")
+                }
+                val digest = MessageDigest.getInstance("SHA-256")
+                var size = 0L
+                response.inputStream.use { input ->
+                    pending.outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            ensureActive()
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            size += count
+                            if (size > remote.sizeBytes) throw IOException("Book size changed")
+                            digest.update(buffer, 0, count)
+                            output.write(buffer, 0, count)
+                        }
+                        output.fd.sync()
+                    }
+                }
+                if (size != remote.sizeBytes || digest.digest().hex() != expected) throw IOException("Incomplete book download")
+                expected
+            }
+            libraryFilesLock.withLock {
+                val target = ownedObject(actualHash, remote.format) ?: throw IOException("Cannot open book storage")
+                val published = !target.isFile || !matchesContent(target, actualHash)
+                if (published && !pending.renameTo(target)) throw IOException("Could not publish the book file")
+                try {
+                    val file = dao.attachDownloadedFile(remote, bookId, actualHash, remote.sizeBytes, System.currentTimeMillis())
+                    ReadableBookFile(file.id, file.format, target)
+                } catch (failure: Exception) {
+                    if (published && !dao.hasContent(actualHash, remote.format)) target.delete()
+                    throw failure
+                }
+            }
+        } finally {
+            pending.delete()
+        }
+    }
+
+    /** Evict the app-owned copy while keeping the content object and all book references. */
+    suspend fun removeLocalCopy(sha256: String, format: String): Boolean = withContext(Dispatchers.IO) {
+        libraryFilesLock.withLock {
+            val file = ownedObject(sha256, format) ?: return@withLock false
+            if (file.exists() && (!file.isFile || !file.delete())) return@withLock false
+            updateLocalCopyStatus(sha256, format, present = false)
+            true
+        }
+    }
+
+    suspend fun refreshFolderGrant(folderId: String): Boolean = withContext(Dispatchers.IO) {
+        val folder = dao.authorizedFolder(folderId) ?: return@withContext false
+        val tree = Uri.parse(folder.treeUri)
+        val granted = resolver.persistedUriPermissions.any { it.isReadPermission && it.uri == tree }
+        dao.updateFolderGrant(folderId, granted, System.currentTimeMillis())
+        granted
+    }
+
+    suspend fun refreshExternalSource(source: LocalFileSource): String = withContext(Dispatchers.IO) {
+        require(source.kind == FileSourceKind.External)
+        val uri = Uri.parse(source.location)
+        if (uri.scheme != ContentResolver.SCHEME_CONTENT) return@withContext FileSourceStatus.Unknown
+        val folderId = source.folderId
+        if (folderId != null && !refreshFolderGrant(folderId)) {
+            return@withContext FileSourceStatus.PermissionRequired
+        }
+        val checkedAt = System.currentTimeMillis()
+        val status = try {
+            resolver.openAssetFileDescriptor(uri, "r")?.use { FileSourceStatus.Present } ?: FileSourceStatus.Unknown
+        } catch (_: SecurityException) {
+            FileSourceStatus.PermissionRequired
+        } catch (_: FileNotFoundException) {
+            FileSourceStatus.Missing
+        } catch (_: IOException) {
+            FileSourceStatus.Unknown
+        }
+        dao.updateExternalSourceStatus(source.sha256, source.format, source.location, status, checkedAt)
+        status
+    }
+
+    private suspend fun updateLocalCopyStatus(sha256: String, format: String, present: Boolean) {
+        dao.setLocalCopyStatus(
+            sha256, format, managedObjectPath(sha256, format),
+            if (present) FileSourceStatus.Present else FileSourceStatus.Missing,
+            System.currentTimeMillis(),
+        )
+    }
+
+    private fun ownedObject(sha256: String, format: String): File? {
+        if (!contentHash.matches(sha256) || format !in setOf("epub", "pdf")) return null
+        val relativePath = managedObjectPath(sha256, format)
+        val file = File(filesRoot, relativePath)
+        return try {
+            file.takeIf { it.canonicalFile == File(filesRoot.canonicalFile, relativePath) }
+        } catch (_: IOException) {
+            null
+        }
     }
 
     suspend fun readingPosition(fileId: String) = dao.readingPosition(fileId)
@@ -55,26 +258,69 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
         dao.observeBookShelves(bookId).distinctUntilChanged(),
         dao.observeBookReadingPosition(bookId).distinctUntilChanged(),
         flow { emit(readBookDetailsFile(openBook(bookId))) },
-    ) { formats, shelves, position, detailsFile ->
+        dao.observeReadingStatistics(bookId, ZoneId.systemDefault()),
+    ) { formats, shelves, position, detailsFile, statistics ->
         BookDetailsData(
             metadata = detailsFile?.metadata,
             formats = formats,
             shelves = shelves,
             readingLocation = readBookLocation(position, detailsFile?.pdfPageCount),
+            readingStatistics = statistics?.let {
+                BookReadingStatistics(it.activeSeconds.toLong(), it.sessionCount, it.readingDays, it.lastReadAt)
+            },
+        )
+    }.combine(dao.observeCloudDescription(bookId)) { details, description ->
+        if (description == null) details else details.copy(
+            metadata = details.metadata?.copy(description = description) ?: BookBibliography(description = description),
         )
     }
 
-    suspend fun saveReadingPosition(fileId: String, locator: String) =
-        dao.saveReadingPosition(LocalReadingPosition(fileId, locator))
+    suspend fun saveReadingPosition(fileId: String, locator: String, percent: Double? = null) =
+        dao.writeReadingPosition(fileId, locator, percent, System.currentTimeMillis())
 
     /** Remove the local book record and owned cached files, but never the source URI. */
     suspend fun deleteLocalBook(bookId: String): Boolean = withContext(Dispatchers.IO) {
-        val removal = dao.removeLocalBook(bookId) ?: return@withContext false
+        libraryFilesLock.withLock {
+            val profile = dao.currentServerProfile()
+            val link = profile?.let { dao.remoteBookLink(it.id, bookId) }
+            if (link != null) {
+                val copies = dao.allBookFiles(bookId).filterNot { it.localCopyRemoved }
+                if (copies.isEmpty()) return@withLock true
+                val backedUp = dao.backedUpLocalFileIds(link.profileId, bookId).toSet()
+                if (copies.any { it.id !in backedUp }) return@withLock false
+                for (copy in copies) {
+                    if (!dao.hasOtherOfflineUsers(bookId, copy.sha256, copy.format)) {
+                        val path = ownedObject(copy.sha256, copy.format) ?: return@withLock false
+                        if (path.exists() && (!path.isFile || !path.delete())) return@withLock false
+                        updateLocalCopyStatus(copy.sha256, copy.format, present = false)
+                    }
+                    dao.setBookFileCopyRemoved(copy.id, true)
+                }
+                return@withLock true
+            }
+            val removal = dao.removeLocalBook(bookId) ?: return@withLock false
+            removeBookFiles(removal)
+            true
+        }
+    }
+
+    suspend fun deleteBookAfterCloudConfirmation(link: RemoteBookLink): Boolean =
+        withContext(Dispatchers.IO) {
+            libraryFilesLock.withLock {
+                val removal = dao.applyConfirmedRemoteBookDeletion(link) ?: return@withLock false
+                removeBookFiles(removal)
+                val prefix = "${link.profileId}-${link.remoteBookId}-"
+                cloudCovers.listFiles()?.filter { it.name.startsWith(prefix) && cloudCoverName.matches(it.name) }
+                    ?.forEach { it.delete() }
+                true
+            }
+        }
+
+    private fun removeBookFiles(removal: LocalBookRemoval) {
         // Different book records can share content-addressed objects; only unlink objects
         // which no longer have a database reference after the transaction.
         for (item in removal.unreferencedObjects) {
-            if (contentHash.matches(item.sha256) && (item.format == "epub" || item.format == "pdf")) {
-                val path = File(objects, "${item.sha256}.${item.format}")
+            ownedObject(item.sha256, item.format)?.let { path ->
                 if (path.exists() && !path.delete()) Log.w("LibraryDelete", "Could not remove cached book object")
             }
         }
@@ -84,7 +330,6 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                 if (path.exists() && !path.delete()) Log.w("LibraryDelete", "Could not remove cached book cover")
             }
         }
-        true
     }
 
     suspend fun import(uri: Uri, allowMatchingContent: Boolean): ImportOutcome = withContext(Dispatchers.IO) {
@@ -101,7 +346,12 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                 else -> return@withContext ImportOutcome.Unsupported
             }
             val title = name?.substringBeforeLast('.')?.trim()?.take(512)?.takeIf(String::isNotEmpty) ?: untitled
-            if (!objects.isDirectory && !objects.mkdirs()) throw IOException("Could not create book storage")
+            if (!objects.isDirectory && !objects.mkdirs() && !objects.isDirectory) {
+                throw IOException("Could not create book storage")
+            }
+            if (objects.canonicalFile != File(filesRoot.canonicalFile, "library/objects")) {
+                throw IOException("Could not access book storage")
+            }
             val pending = File.createTempFile("import-", ".part", objects)
             try {
                 val digest = MessageDigest.getInstance("SHA-256")
@@ -123,27 +373,31 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                 }
                 ensureActive()
                 val sha256 = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
-                val objectFile = File(objects, "$sha256.$format")
-                val sourceKey = uri.normalizeScheme().toString()
-                val alreadyImported = dao.hasImported(sourceKey, sha256, format)
-                if (objectFile.isFile && objectFile.length() == size && alreadyImported) {
-                    return@withContext ImportOutcome.Duplicate
-                }
-                if (!alreadyImported && !allowMatchingContent && dao.hasContent(sha256, format)) {
-                    return@withContext ImportOutcome.MatchingContent
-                }
-                val metadata = readBookMetadata(pending, format, title)
-                ensureActive()
-                if (!objectFile.isFile || objectFile.length() != size) {
-                    if (!pending.renameTo(objectFile)) throw IOException("Could not publish book file")
-                }
-                saveCover(sha256, metadata.cover)
-                val book = LocalBook(uuid(), metadata.title, metadata.author, System.currentTimeMillis())
-                val file = LocalBookFile(uuid(), book.id, sha256, format, sourceKey, name?.take(512) ?: "$title.$format")
-                when (dao.importBook(book, file, LocalFileObject(sha256, format, size), allowMatchingContent)) {
-                    BookImportCommit.Added -> ImportOutcome.Added
-                    BookImportCommit.Duplicate -> ImportOutcome.Duplicate
-                    BookImportCommit.MatchingContent -> ImportOutcome.MatchingContent
+                libraryFilesLock.withLock {
+                    val objectFile = ownedObject(sha256, format) ?: throw IOException("Could not access book storage")
+                    val sourceKey = uri.normalizeScheme().toString()
+                    val alreadyImported = dao.hasImported(sourceKey, sha256, format)
+                    if (objectFile.isFile && objectFile.length() == size && alreadyImported) {
+                        dao.restoreImportedCopy(sourceKey, sha256, format)
+                        dao.recordImportedSources(sha256, format, sourceKey, System.currentTimeMillis())
+                        return@withLock ImportOutcome.Duplicate
+                    }
+                    if (!alreadyImported && !allowMatchingContent && dao.hasContent(sha256, format)) {
+                        return@withLock ImportOutcome.MatchingContent
+                    }
+                    val metadata = readBookMetadata(pending, format, title)
+                    ensureActive()
+                    if (!objectFile.isFile || objectFile.length() != size) {
+                        if (!pending.renameTo(objectFile)) throw IOException("Could not publish book file")
+                    }
+                    saveCover(sha256, metadata.cover)
+                    val book = LocalBook(uuid(), metadata.title, metadata.author, System.currentTimeMillis())
+                    val file = LocalBookFile(uuid(), book.id, sha256, format, sourceKey, name?.take(512) ?: "$title.$format")
+                    when (dao.importBook(book, file, LocalFileObject(sha256, format, size), allowMatchingContent, book.importedAt)) {
+                        BookImportCommit.Added -> ImportOutcome.Added
+                        BookImportCommit.Duplicate -> ImportOutcome.Duplicate
+                        BookImportCommit.MatchingContent -> ImportOutcome.MatchingContent
+                    }
                 }
             } finally {
                 pending.delete()
@@ -192,3 +446,22 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
 }
 
 private val contentHash = Regex("[0-9a-f]{64}")
+private val cloudCoverName = Regex("[0-9a-f-]{73}-[0-9]{1,16}")
+private const val MaxCloudCoverBytes = 5 * 1024 * 1024
+
+private fun matchesContent(file: File, sha256: String): Boolean {
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().buffered().use { input ->
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+    }
+    return digest.digest().hex() == sha256
+}
+
+private fun ByteArray.hex(): String = joinToString("") { "%02x".format(it.toInt() and 255) }
+// Keep file publication and reference commits ordered with deletion across repository instances.
+private val libraryFilesLock = Mutex()

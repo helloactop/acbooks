@@ -86,9 +86,12 @@ internal fun BoxScope.LibraryMenus(
     backdrop: Backdrop,
     mode: LibraryDisplayMode,
     importing: Boolean,
+    cloudConnected: Boolean,
+    cloudBusy: Boolean,
     onDismiss: (LibraryMenu) -> Unit,
     onDisplayMode: (LibraryDisplayMode) -> Unit,
     onAddBooks: () -> Unit,
+    onSync: () -> Unit,
     onRead: (String) -> Unit,
     onDetails: (String) -> Unit,
     onDelete: (LocalBookCard) -> Unit,
@@ -128,13 +131,18 @@ internal fun BoxScope.LibraryMenus(
         anchorContent = { LibraryMenuIcon(LibraryMenu.More) },
         entries = listOf(
             DropdownEntry(
-                items = listOf(
-                    DropdownItem(
+                items = buildList {
+                    add(DropdownItem(
                         text = stringResource(R.string.library_add_books),
                         enabled = !importing,
                         onClick = onAddBooks,
-                    ),
-                ),
+                    ))
+                    if (cloudConnected) add(DropdownItem(
+                        text = stringResource(R.string.cloud_sync_now),
+                        enabled = !cloudBusy,
+                        onClick = onSync,
+                    ))
+                },
             ),
         ),
         backdrop = backdrop,
@@ -192,7 +200,9 @@ private fun BoxScope.BookContextMenu(
         ) {
             val book = target?.book ?: return@GlassTransformPopup
             GlassPopupItem(
-                text = stringResource(R.string.library_read_book),
+                text = stringResource(
+                    if (book.canDownload && !book.hasLocalCopy) R.string.cloud_download_and_read else R.string.library_read_book,
+                ),
                 icon = MiuixIcons.Glass.BookOutline,
                 onClick = { onRead(book.id) },
             )

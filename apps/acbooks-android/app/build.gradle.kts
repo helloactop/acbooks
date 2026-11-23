@@ -18,6 +18,7 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -61,4 +62,6 @@ dependencies {
     implementation(libs.readium.navigator)
     implementation(libs.readium.streamer)
     implementation(libs.coil.compose)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.junit)
 }

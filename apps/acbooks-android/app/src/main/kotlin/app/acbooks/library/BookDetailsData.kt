@@ -32,13 +32,13 @@ internal data class BookReadingStatistics(
 internal sealed interface BookReadingLocation {
     val fraction: Float?
 
-    data class Epub(val locator: Locator) : BookReadingLocation {
-        override val fraction: Float? get() = locator.locations.totalProgression?.toFloat()
+    data class Epub(val locator: Locator, val savedFraction: Float?) : BookReadingLocation {
+        override val fraction: Float? get() = savedFraction ?: locator.locations.totalProgression?.toFloat()
     }
 
-    data class Pdf(val page: Int, val pageCount: Int?) : BookReadingLocation {
+    data class Pdf(val page: Int, val pageCount: Int?, val savedFraction: Float?) : BookReadingLocation {
         override val fraction: Float?
-            get() = pageCount?.takeIf { page in 1..it }?.let { page.toFloat() / it }
+            get() = savedFraction ?: pageCount?.takeIf { page in 1..it }?.let { page.toFloat() / it }
     }
 }
 
@@ -54,10 +54,11 @@ internal fun readBookLocation(position: LocalBookReadingPosition?, pdfPageCount:
     } catch (_: JSONException) {
         return null
     }
+    val savedFraction = position.percent?.let { (it / 100.0).toFloat() }
     return when (position.format) {
-        "epub" -> Locator.fromJSON(json)?.let { BookReadingLocation.Epub(it) }
+        "epub" -> Locator.fromJSON(json)?.let { BookReadingLocation.Epub(it, savedFraction) }
         "pdf" -> json.optInt("page", -1).takeIf { it in 0 until Int.MAX_VALUE }
-            ?.let { BookReadingLocation.Pdf(it + 1, pdfPageCount) }
+            ?.let { BookReadingLocation.Pdf(it + 1, pdfPageCount, savedFraction) }
         else -> null
     }
 }

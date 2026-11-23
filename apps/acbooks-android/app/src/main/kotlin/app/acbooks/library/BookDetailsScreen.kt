@@ -109,7 +109,7 @@ internal fun BookDetailsScreen(
                             .collectAsStateWithLifecycle(BookDetailsData())
                         BookDetailsContent(
                             book = book,
-                            cover = library.coverFile(book.sha256),
+                            cover = library.coverFile(book),
                             details = details,
                             backdrop = backdrop,
                             scrollBehavior = if (expandableTitle) scrollBehavior else null,
@@ -214,7 +214,10 @@ private fun BookDetailsSummary(
     modifier: Modifier = Modifier,
 ) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        BookCover(cover, Modifier.size(width = 72.dp, height = 100.dp), aspectRatio = 72f / 100f)
+        BookCover(
+            cover, Modifier.size(width = 72.dp, height = 100.dp), aspectRatio = 72f / 100f,
+            cloudOnly = book.cloudBacked && !book.hasLocalCopy,
+        )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 book.title,

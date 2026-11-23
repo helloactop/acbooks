@@ -11,11 +11,12 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.acbooks.R
 import app.acbooks.core.database.LibraryDatabase
 import app.acbooks.core.database.LocalBookCard
-import app.acbooks.core.database.CloudBookLink
 import java.io.IOException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,13 @@ internal data class LibraryCatalog(
     val books: List<LocalBookCard> = emptyList(),
     val loaded: Boolean = false,
     val failed: Boolean = false,
+)
+
+internal data class CloudLibraryState(
+    val origin: String? = null,
+    val connected: Boolean = false,
+    val busy: Boolean = false,
+    val message: Int? = null,
 )
 
 internal enum class LibraryDisplayMode(val preference: String) {
@@ -63,8 +71,10 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     private val database = LibraryDatabase.open(application)
     private val dao = database.library()
     private val repository = LibraryRepository(application, dao)
-    private val cloudDeletion: CloudBookDeletionGateway =
-        HttpCloudBookDeletionGateway(RoomCloudBookConnectionProvider(dao))
+    private val cloud = LibraryCloudSync(application, dao, repository)
+    private val cloudActions = Mutex()
+    private val _cloudState = MutableStateFlow(CloudLibraryState())
+    val cloudState = _cloudState.asStateFlow()
     private val preferences = application.libraryDisplayPreferences
     val catalog = repository.books
         .map { books -> LibraryCatalog(books, loaded = true) }
@@ -89,6 +99,58 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     val progress = _progress.asStateFlow()
     private var importJob: Job? = null
     private val matches = mutableListOf<Uri>()
+
+    fun connectServer(address: String, username: String, password: String) {
+        launchCloudAction(R.string.cloud_connect_failed) {
+            cloud.login(address, username, password)
+            syncLibrary()
+            null
+        }
+    }
+
+    fun disconnectServer() {
+        launchCloudAction(R.string.cloud_disconnect_warning) {
+            cloud.logout()
+            null
+        }
+    }
+
+    fun syncLibrary() {
+        launchCloudAction(R.string.cloud_sync_failed) { syncMessage(cloud.sync()) }
+    }
+
+    private fun syncMessage(result: Boolean?): Int? = when (result) {
+        true -> R.string.cloud_sync_done
+        false -> R.string.cloud_sync_partial
+        null -> null
+    }
+
+    private fun launchCloudAction(errorMessage: Int, action: suspend () -> Int?) {
+        viewModelScope.launch {
+            cloudActions.withLock {
+                if (_cloudState.value.connected || errorMessage != R.string.cloud_sync_failed) {
+                    _cloudState.value = _cloudState.value.copy(busy = true, message = null)
+                }
+                val message = try {
+                    action()
+                } catch (failure: CancellationException) {
+                    throw failure
+                } catch (_: CloudIdentityChanged) {
+                    R.string.cloud_identity_changed
+                } catch (_: Exception) {
+                    errorMessage
+                }
+                val connection = try {
+                    cloud.connection()
+                } catch (failure: CancellationException) {
+                    throw failure
+                } catch (_: Exception) {
+                    _cloudState.value.origin to false
+                }
+                _cloudState.value = CloudLibraryState(connection.first, connection.second, message = message)
+            }
+        }
+    }
 
     fun setDisplayMode(mode: LibraryDisplayMode) {
         viewModelScope.launch {
@@ -120,6 +182,7 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
                 }
             } finally {
                 _progress.value = progress.copy(running = false)
+                if (progress.added > 0 || progress.duplicate > 0) syncLibrary()
             }
         }
     }
@@ -134,7 +197,7 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
         _progress.value = null
     }
 
-    fun coverFile(sha256: String?) = repository.coverFile(sha256)
+    fun coverFile(book: LocalBookCard) = repository.coverFile(book)
 
     fun observeBookDetails(bookId: String) = repository.observeBookDetails(bookId).catch { failure ->
         if (failure !is SQLException) throw failure
@@ -142,25 +205,8 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
         emit(BookDetailsData())
     }
 
-    /**
-     * Server-login and sync will use these integration hooks. Never treat a local UUID
-     * as a remote UUID without an explicit verified server association.
-     */
-    fun onCloudSessionChanged(origin: String?, bearerToken: String?) {
-        CloudBookSessions.setAuthenticatedConnection(
-            if (origin.isNullOrBlank() || bearerToken.isNullOrBlank()) null
-            else CloudBookConnection(origin.trimEnd('/'), bearerToken),
-        )
-    }
-
-    suspend fun bindCloudBook(localId: String, remoteId: String, serverOrigin: String) {
-        // The association is only supplied by an authenticated sync operation.
-        val remoteUuid = java.util.UUID.fromString(remoteId).toString()
-        dao.bindCloudBook(CloudBookLink(localId, remoteUuid, serverOrigin.trimEnd('/')))
-    }
-
     suspend fun deleteLocalBook(bookId: String): Boolean = try {
-        repository.deleteLocalBook(bookId)
+        cloud.removeLocal(bookId)
     } catch (failure: Exception) {
         if (failure is kotlinx.coroutines.CancellationException) throw failure
         Log.e("LibraryDelete", "Local book deletion failed", failure)
@@ -169,8 +215,7 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
 
     /** Remote deletion must succeed before removing the local copy. */
     suspend fun deleteBookEverywhere(bookId: String): Boolean = try {
-        if (!cloudDeletion.deleteRemoteBook(bookId)) false
-        else deleteLocalBook(bookId)
+        cloud.deleteEverywhere(bookId)
     } catch (failure: Exception) {
         if (failure is kotlinx.coroutines.CancellationException) throw failure
         Log.e("LibraryDelete", "Cloud book deletion failed", failure)
@@ -178,6 +223,14 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     }
 
     suspend fun openBook(bookId: String) = repository.openBook(bookId)
+
+    suspend fun downloadForReading(bookId: String): Boolean = try {
+        cloud.openOrDownload(bookId)
+    } catch (failure: CancellationException) {
+        throw failure
+    } catch (_: Exception) {
+        false
+    }
 
     private val readingPositionLock = Mutex()
 
@@ -189,12 +242,12 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
         }
     }
 
-    fun saveReadingPosition(fileId: String, locator: String) {
+    fun saveReadingPosition(fileId: String, locator: String, percent: Double?) {
         // Finish writes after the reader's view is gone; reopening waits for queued positions.
         viewModelScope.launch {
             readingPositionLock.withLock {
                 try {
-                    repository.saveReadingPosition(fileId, locator)
+                    repository.saveReadingPosition(fileId, locator, percent)
                 } catch (_: SQLException) {
                     Log.w("Reader", "Could not save the reading position")
                 }
@@ -203,7 +256,6 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     }
 
     override fun onCleared() {
-        CloudBookSessions.setAuthenticatedConnection(null)
         database.close()
     }
 }

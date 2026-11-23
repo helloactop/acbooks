@@ -115,7 +115,11 @@ private fun PdfBook(ready: ReaderState.Ready, model: LibraryViewModel) {
             undelivered = null
             lastReadPage = page.index
             requestedPage = page.index
-            model.saveReadingPosition(source.id, JSONObject().put("page", page.index).toString())
+            model.saveReadingPosition(
+                source.id,
+                JSONObject().put("page", page.index).toString(),
+                (page.index + 1) * 100.0 / page.count,
+            )
         } catch (failure: Exception) {
             if (failure !is IOException && failure !is SecurityException && failure !is IllegalArgumentException) {
                 throw failure
