@@ -18,6 +18,10 @@
     <string name="navigate_back">Back</string>
     <string name="settings_avatar">Avatar</string>
     <string name="settings_change_avatar">Change avatar</string>
+    <string name="settings_avatar_syncing">Updating avatar…</string>
+    <string name="settings_avatar_pending">Saved on this device; awaiting server sync</string>
+    <string name="settings_avatar_select_failed">Could not open this image</string>
+    <string name="settings_avatar_sync_failed">Avatar sync failed. Tap to choose another image.</string>
     <string name="library_untitled">Untitled book</string>
     <string name="library_import_progress">Importing %1$d of %2$d files</string>
     <string name="library_import_cancelled">Import stopped after %1$d of %2$d files</string>
