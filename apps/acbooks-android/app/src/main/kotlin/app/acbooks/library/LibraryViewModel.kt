@@ -17,6 +17,8 @@ import app.acbooks.core.database.LibraryDatabase
 import app.acbooks.core.database.LibraryShelf
 import app.acbooks.core.database.LocalBookCard
 import app.acbooks.core.database.LocalReadingSession
+import app.acbooks.reader.ReaderTypographySettings
+import app.acbooks.reader.ReaderTypographyStore
 import java.io.IOException
 import java.util.UUID
 import kotlinx.coroutines.Job
@@ -30,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -104,6 +107,23 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     private val _cloudState = MutableStateFlow(CloudLibraryState())
     val cloudState = _cloudState.asStateFlow()
     private val preferences = application.libraryDisplayPreferences
+    private val readerTypographyStore = ReaderTypographyStore(application)
+    val readerTypography = readerTypographyStore.settings
+
+    /** Read from the store before creating Readium; avoid applying an optimistic default. */
+    suspend fun loadReaderTypographySettings(): ReaderTypographySettings = readerTypography.first()
+
+    /** Called by the future typography sheet. Existing EPUBs can observe readerTypography. */
+    fun saveReaderTypographySettings(value: ReaderTypographySettings) {
+        viewModelScope.launch {
+            try {
+                readerTypographyStore.save(value)
+            } catch (failure: IOException) {
+                Log.w("Reader", "Could not save typography preferences", failure)
+            }
+        }
+    }
+
     val catalog = combine(repository.books, dao.observeLibraryShelves()) { books, shelves ->
         LibraryCatalog(books = books, shelves = shelves, loaded = true)
     }
