@@ -116,6 +116,7 @@ internal fun MainTabs(
     val searchBarAlpha = rememberGlassSearchBarAlpha(searchExpanded)
     val topBarTransition = Modifier.glassSearchBarTransition(searchExpanded) { 1f }
     val displayMode by library.displayMode.collectAsStateWithLifecycle()
+    val recentReading by library.recentReading.collectAsStateWithLifecycle()
     val currentShelf = remember(catalog.shelves, shelfId) { catalog.shelves.firstOrNull { it.shelf.id == shelfId } }
     LaunchedEffect(isCurrentDestination, catalog.loaded, catalog.failed, currentShelf) {
         if (isCurrentDestination && shelfPage && catalog.loaded && !catalog.failed && currentShelf == null) {
@@ -213,9 +214,18 @@ internal fun MainTabs(
         ) { scrollBehavior, pagePadding ->
             when (page) {
                 0 -> HomeScreen(
+                    catalog = catalog,
+                    readingHistory = recentReading,
+                    coverFile = library::coverFile,
                     scrollBehavior = scrollBehavior,
                     scaffoldPadding = pagePadding,
                     onOpenLibrary = { selectTab(1) },
+                    onReadBook = onReadBook,
+                    onOpenBook = onOpenBook,
+                    onShowMenu = { target ->
+                        bookMenuTarget = target
+                        libraryMenu = LibraryMenu.Book
+                    },
                 )
                 1 -> LibraryScreen(
                     catalog = catalog,
