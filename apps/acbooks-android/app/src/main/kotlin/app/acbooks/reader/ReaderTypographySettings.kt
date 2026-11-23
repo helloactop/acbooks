@@ -44,11 +44,35 @@ internal data class ReaderTypographySettings(
 }
 
 /**
+ * First-use EPUB layout, styled after the clean, dense Chinese reading experience
+ * popularized by WeChat Reading. This is an acbooks approximation, not a copy of
+ * WeChat Reading's proprietary styles.
+ *
+ * Readium fontSize and pageMargins are relative multipliers, NOT px or dp.
+ * 1.3 is about 130% of the engine's base type size; the actual rendered size
+ * depends on the publication and the device.
+ */
+internal fun defaultReaderTypographySettings(): ReaderTypographySettings =
+    ReaderTypographySettings(
+        fontFamily = ReaderFontFamily.SANS_SERIF,
+        fontSize = 1.3,
+        lineHeight = 1.5,
+        pageMargins = 1.0,
+        paragraphIndent = 2.0,
+        paragraphSpacing = 0.0,
+        letterSpacing = 0.0,
+        textAlignment = ReaderTextAlignment.JUSTIFY,
+        publisherStyles = false,
+        scroll = false,
+        appearance = ReaderAppearance.SYSTEM,
+    )
+
+/**
  * A complete per-book snapshot overrides the global profile. A missing override
  * inherits global changes; creating one copies the currently effective values.
  */
 internal data class ReaderTypographyProfile(
-    val global: ReaderTypographySettings = ReaderTypographySettings(),
+    val global: ReaderTypographySettings = defaultReaderTypographySettings(),
     val bookOverride: ReaderTypographySettings? = null,
 ) {
     val effective: ReaderTypographySettings get() = bookOverride ?: global
