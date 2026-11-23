@@ -106,8 +106,18 @@ private fun bookOverrideKey(bookId: String): Preferences.Key<String> {
     return stringPreferencesKey("book_override_$bookId")
 }
 
-private fun Preferences.readGlobalTypography(): ReaderTypographySettings =
-    ReaderTypographySettings(
+/**
+ * A saved global profile always contains at least fontFamily, scroll and
+ * appearance (written by save() in previous releases). Preserve any such
+ * profile verbatim. Only a never-configured reader gets the new first-use
+ * style; per-book keys alone do not count as a saved global preference.
+ */
+internal fun Preferences.readGlobalTypography(): ReaderTypographySettings {
+    if (this[Keys.fontFamily] == null &&
+        this[Keys.scroll] == null &&
+        this[Keys.appearance] == null
+    ) return defaultReaderTypographySettings()
+    return ReaderTypographySettings(
         fontFamily = this[Keys.fontFamily].enumOr(ReaderFontFamily.BOOK),
         fontSize = this[Keys.fontSize],
         fontWeight = this[Keys.fontWeight],
@@ -124,6 +134,7 @@ private fun Preferences.readGlobalTypography(): ReaderTypographySettings =
         backgroundArgb = this[Keys.backgroundArgb],
         textArgb = this[Keys.textArgb],
     ).normalized()
+}
 
 private inline fun <reified T : Enum<T>> String?.enumOrNull(): T? =
     enumValues<T>().firstOrNull { it.name == this }

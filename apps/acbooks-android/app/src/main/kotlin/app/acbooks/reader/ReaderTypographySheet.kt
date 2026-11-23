@@ -232,11 +232,11 @@ internal fun ReaderTypographySheet(
                     GlassDialogButton(
                         onClick = {
                             if (editingScope == TypographyEditingScope.GLOBAL) {
-                                save(ReaderTypographySettings())
+                                save(defaultReaderTypographySettings())
                             } else {
                                 onClearBook()
                                 editingScope = TypographyEditingScope.GLOBAL
-                                draft = profile?.global ?: ReaderTypographySettings()
+                                draft = profile?.global ?: defaultReaderTypographySettings()
                             }
                         },
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
