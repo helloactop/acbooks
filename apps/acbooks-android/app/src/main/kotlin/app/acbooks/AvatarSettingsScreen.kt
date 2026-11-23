@@ -38,6 +38,7 @@ internal fun AvatarSettingsScreen(
     onChangeAvatar: () -> Unit,
     onOpenShelfSettings: () -> Unit,
     onOpenServer: () -> Unit,
+    onOpenAbout: () -> Unit,
 ) {
     SettingsPage(title = stringResource(R.string.settings_title), onBack = onBack) { nestedScroll, padding ->
         LazyColumn(
@@ -82,6 +83,18 @@ internal fun AvatarSettingsScreen(
                         title = stringResource(R.string.settings_server),
                         titleColor = BasicComponentDefaults.titleColor(color = LocalContentColor.current),
                         onClick = onOpenServer,
+                    )
+                }),
+            )
+            groupedCardItems(
+                groupKey = "about",
+                title = R.string.settings_other,
+                rows = listOf(SettingsCardItem("about") {
+                    ArrowPreference(
+                        title = stringResource(R.string.about_title),
+                        summary = stringResource(R.string.settings_about_summary),
+                        titleColor = BasicComponentDefaults.titleColor(color = LocalContentColor.current),
+                        onClick = onOpenAbout,
                     )
                 }),
             )
