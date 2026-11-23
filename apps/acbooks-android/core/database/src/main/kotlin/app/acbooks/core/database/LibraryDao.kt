@@ -19,6 +19,16 @@ data class LocalBookRemoval(
     val editedCoverKey: String? = null,
 )
 
+/** One locally saved reading event or synced reading position. */
+data class LocalReadingActivity(
+    val bookId: String,
+    val occurredAt: Long,
+    val progress: Double?,
+)
+
+/** Server reading sessions are parsed outside SQLite to avoid requiring JSON1. */
+data class CloudHomeSession(val bookId: String, val payload: String)
+
 @Dao
 abstract class LibraryDao :
     ReadingSyncDao(), BookEditDao, ReadingSessionDao, ReadingMarkDao,
@@ -109,6 +119,40 @@ abstract class LibraryDao :
         ORDER BY b.importedAt DESC, b.id
     """)
     abstract fun observeBooks(): Flow<List<LocalBookCard>>
+
+    /**
+     * Recent reading is not the import order. Include local sessions and positions as
+     * well as positions for remote books whose content has never been downloaded.
+     * Current-profile joins prevent history leaking from another server identity.
+     */
+    @Query("""
+        SELECT f.bookId AS bookId, p.updatedAt AS occurredAt, p.percent AS progress
+        FROM reading_positions p
+        JOIN book_files f ON f.id = p.fileId
+        WHERE p.updatedAt > 0
+        UNION ALL
+        SELECT s.bookId AS bookId, s.endedAt AS occurredAt, NULL AS progress
+        FROM reading_sessions s
+        WHERE s.endedAt IS NOT NULL AND s.activeSeconds > 0
+        UNION ALL
+        SELECT l.localBookId AS bookId, p.updatedAt AS occurredAt, p.percent AS progress
+        FROM cloud_reading_positions p
+        JOIN server_profiles sp ON sp.id = p.profileId AND sp.currentSlot = 1
+        JOIN remote_catalog_files rf ON rf.profileId = p.profileId AND rf.remoteFileId = p.fileId
+        JOIN remote_book_links l ON l.profileId = p.profileId AND l.remoteBookId = rf.remoteBookId
+        WHERE p.locator IS NOT NULL AND p.updatedAt > 0
+    """)
+    abstract fun observeReadingActivity(): Flow<List<LocalReadingActivity>>
+
+    /** Only the currently connected account contributes remote reading sessions. */
+    @Query("""
+        SELECT l.localBookId AS bookId, r.payload AS payload
+        FROM cloud_reader_records r
+        JOIN server_profiles sp ON sp.id = r.profileId AND sp.currentSlot = 1
+        JOIN remote_book_links l ON l.profileId = r.profileId AND l.remoteBookId = r.remoteBookId
+        WHERE r.kind = 'reading_session' AND r.payload IS NOT NULL
+    """)
+    abstract fun observeHomeCloudSessions(): Flow<List<CloudHomeSession>>
 
     @Query("""
         SELECT f.* FROM books b
