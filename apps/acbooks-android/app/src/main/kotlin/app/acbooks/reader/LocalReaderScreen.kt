@@ -110,7 +110,7 @@ internal fun LocalReaderScreen(
             // layerBackdrop causes repeated re-rendering and visible EPUB flicker.
             Box(Modifier.matchParentSize().layerBackdrop(backdrop).background(colors.background))
             when (val reader = state) {
-            ReaderState.Loading -> CircularProgressIndicator()
+                ReaderState.Loading -> CircularProgressIndicator()
                 ReaderState.Unavailable -> Text(stringResource(R.string.reader_open_failed))
                 is ReaderState.Ready -> {
                     LifecycleResumeEffect(bookId, reader.file.id) {
