@@ -29,6 +29,8 @@ import org.json.JSONObject
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubPreferences
+import org.readium.r2.navigator.input.InputListener
+import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.navigator.util.DirectionalNavigationAdapter
 import org.readium.r2.shared.ExperimentalReadiumApi
@@ -56,14 +58,19 @@ internal class EpubDocumentFragment : Fragment() {
     private var chapters: List<ReaderChapter>? = null
     private var currentHref: String? = null
 
+    // Readium's content tap callbacks preserve page-turn and selection gestures.
+    internal var onCenterTap: (() -> Unit)? = null
+
     internal var onContentsChanged: ((List<ReaderChapter>?) -> Unit)? = null
         set(callback) {
+            if (field === callback) return
             field = callback
             callback?.invoke(chapters)
         }
 
     internal var onCurrentHrefChanged: ((String?) -> Unit)? = null
         set(callback) {
+            if (field === callback) return
             field = callback
             callback?.invoke(currentHref)
         }
@@ -129,7 +136,7 @@ internal class EpubDocumentFragment : Fragment() {
                     initialPreferences = EpubPreferences(theme = theme, scroll = false),
                     paginationListener = object : EpubNavigatorFragment.PaginationListener {
                         override fun onPageLoaded() {
-                            root.removeView(loading)
+                            if (loading.parent === root) root.removeView(loading)
                         }
                     },
                 )
@@ -138,6 +145,20 @@ internal class EpubDocumentFragment : Fragment() {
                     EpubNavigatorFragment::class.java.name,
                 ) as EpubNavigatorFragment
                 fragment.addInputListener(DirectionalNavigationAdapter(fragment, animatedTransition = false))
+                fragment.addInputListener(object : InputListener {
+                    override fun onTap(event: TapEvent): Boolean {
+                        val width = fragment.publicationView.width
+                        val height = fragment.publicationView.height
+                        if (width <= 0 || height <= 0) return false
+                        // Only central taps toggle the chrome; side taps keep turning pages.
+                        if (event.point.x < width * 0.30f || event.point.x > width * 0.70f ||
+                            event.point.y < height * 0.20f || event.point.y > height * 0.80f
+                        ) return false
+                        val callback = onCenterTap ?: return false
+                        callback()
+                        return true
+                    }
+                })
                 childFragmentManager.commitNow {
                     setReorderingAllowed(true)
                     replace(R.id.reader_epub_container, fragment)
@@ -172,6 +193,7 @@ internal class EpubDocumentFragment : Fragment() {
         onCurrentHrefChanged?.invoke(null)
         onContentsChanged = null
         onCurrentHrefChanged = null
+        onCenterTap = null
         val opened = publication
         publication = null
         try {
