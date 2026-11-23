@@ -3,7 +3,6 @@ package app.acbooks.reader
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -93,9 +92,6 @@ internal fun LocalReaderScreen(
     val readerInsets = WindowInsets.navigationBarsIgnoringVisibility
         .union(WindowInsets.displayCutout)
         .union(WindowInsets.ime)
-    BackHandler(enabled = toolbarVisible && !showContents) {
-        toolbarVisible = false
-    }
     // Miuix glass sheets use the Scaffold overlay host; keep the reader's own insets.
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -137,11 +133,8 @@ internal fun LocalReaderScreen(
             }
             val ready = state as? ReaderState.Ready
             if (ready?.file?.format == "epub") {
-                if (toolbarVisible && !showContents) GlassIconButton(
-                    onClick = {
-                        toolbarVisible = false
-                        showContents = true
-                    },
+                if (toolbarVisible) GlassIconButton(
+                    onClick = { showContents = true },
                     modifier = Modifier.align(Alignment.BottomStart)
                         .padding(start = 16.dp, bottom = 16.dp),
                     backdrop = backdrop,
@@ -160,7 +153,6 @@ internal fun LocalReaderScreen(
                     onSelect = { chapter ->
                         if (epubFragment?.goToChapter(chapter.link) == true) {
                             showContents = false
-                            toolbarVisible = false
                         }
                     },
                 )
