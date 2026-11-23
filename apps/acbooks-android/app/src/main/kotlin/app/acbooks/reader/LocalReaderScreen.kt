@@ -44,6 +44,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.glass.GlassIconButton
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.glass.Menu
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -66,6 +72,11 @@ internal fun LocalReaderScreen(
         value = if (source == null) ReaderState.Unavailable
         else ReaderState.Ready(source, if (source.format == "pdf") model.readingPosition(source.id) else null)
     }
+    val backdrop = rememberLayerBackdrop()
+    var showContents by rememberSaveable(bookId) { mutableStateOf(false) }
+    var chapters by remember(bookId) { mutableStateOf<List<ReaderChapter>?>(null) }
+    var currentHref by remember(bookId) { mutableStateOf<String?>(null) }
+    var epubFragment by remember(bookId) { mutableStateOf<EpubDocumentFragment?>(null) }
     val readerInsets = WindowInsets.navigationBarsIgnoringVisibility
         .union(WindowInsets.displayCutout)
         .union(WindowInsets.ime)
@@ -75,22 +86,61 @@ internal fun LocalReaderScreen(
             .windowInsetsPadding(readerInsets),
         contentAlignment = Alignment.Center,
     ) {
-        when (val reader = state) {
-            ReaderState.Loading -> CircularProgressIndicator()
-            ReaderState.Unavailable -> Text(stringResource(R.string.reader_open_failed))
-            is ReaderState.Ready -> {
-                LifecycleResumeEffect(bookId, reader.file.id) {
-                    model.startReadingSession(bookId, reader.file.id)
-                    onPauseOrDispose { model.finishReadingSession(reader.file.id) }
-                }
-                if (reader.file.format == "epub") {
-                    val dark = colors.background.luminance() < 0.5f
-                    val args = remember(bookId, dark) { EpubDocumentFragment.arguments(bookId, dark) }
-                    AndroidFragment<EpubDocumentFragment>(modifier = Modifier.fillMaxSize(), arguments = args)
-                } else {
-                    PdfBook(reader, model)
+        Box(
+            Modifier.fillMaxSize().layerBackdrop(backdrop),
+            contentAlignment = Alignment.Center,
+        ) {
+            when (val reader = state) {
+                ReaderState.Loading -> CircularProgressIndicator()
+                ReaderState.Unavailable -> Text(stringResource(R.string.reader_open_failed))
+                is ReaderState.Ready -> {
+                    LifecycleResumeEffect(bookId, reader.file.id) {
+                        model.startReadingSession(bookId, reader.file.id)
+                        onPauseOrDispose { model.finishReadingSession(reader.file.id) }
+                    }
+                    if (reader.file.format == "epub") {
+                        val dark = colors.background.luminance() < 0.5f
+                        val args = remember(bookId, dark) { EpubDocumentFragment.arguments(bookId, dark) }
+                        AndroidFragment<EpubDocumentFragment>(
+                            modifier = Modifier.fillMaxSize(),
+                            arguments = args,
+                            onUpdate = { fragment ->
+                                epubFragment = fragment
+                                fragment.onContentsChanged = { chapters = it }
+                                fragment.onCurrentHrefChanged = { currentHref = it }
+                            },
+                        )
+                    } else {
+                        PdfBook(reader, model)
+                    }
                 }
             }
+        }
+        val ready = state as? ReaderState.Ready
+        if (ready?.file?.format == "epub") {
+            GlassIconButton(
+                onClick = { showContents = true },
+                modifier = Modifier.align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 16.dp),
+                backdrop = backdrop,
+            ) {
+                Icon(
+                    MiuixIcons.Glass.Menu,
+                    stringResource(R.string.reader_contents),
+                )
+            }
+            ReaderContentsSheet(
+                show = showContents,
+                chapters = chapters,
+                currentHref = currentHref,
+                backdrop = backdrop,
+                onDismiss = { showContents = false },
+                onSelect = { chapter ->
+                    if (epubFragment?.goToChapter(chapter.link) == true) {
+                        showContents = false
+                    }
+                },
+            )
         }
     }
 }
