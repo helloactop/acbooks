@@ -80,6 +80,16 @@ internal fun LocalReaderScreen(
     var chapters by remember(bookId) { mutableStateOf<List<ReaderChapter>?>(null) }
     var currentHref by remember(bookId) { mutableStateOf<String?>(null) }
     var epubFragment by remember(bookId) { mutableStateOf<EpubDocumentFragment?>(null) }
+    // Stable callbacks prevent navigator updates from repeatedly re-registering listeners.
+    val contentsObserver: (List<ReaderChapter>?) -> Unit = remember(bookId) {
+        { value -> chapters = value }
+    }
+    val hrefObserver: (String?) -> Unit = remember(bookId) {
+        { value -> currentHref = value }
+    }
+    val centerTapHandler: () -> Unit = remember(bookId) {
+        { if (!showContents) toolbarVisible = !toolbarVisible }
+    }
     val readerInsets = WindowInsets.navigationBarsIgnoringVisibility
         .union(WindowInsets.displayCutout)
         .union(WindowInsets.ime)
@@ -100,38 +110,31 @@ internal fun LocalReaderScreen(
             // layerBackdrop causes repeated re-rendering and visible EPUB flicker.
             Box(Modifier.matchParentSize().layerBackdrop(backdrop).background(colors.background))
             when (val reader = state) {
-                    ReaderState.Loading -> CircularProgressIndicator()
-                    ReaderState.Unavailable -> Text(stringResource(R.string.reader_open_failed))
-                    is ReaderState.Ready -> {
-                        LifecycleResumeEffect(bookId, reader.file.id) {
-                            model.startReadingSession(bookId, reader.file.id)
-                            onPauseOrDispose { model.finishReadingSession(reader.file.id) }
-                        }
-                        if (reader.file.format == "epub") {
-                            val dark = colors.background.luminance() < 0.5f
-                            val args = remember(bookId, dark) { EpubDocumentFragment.arguments(bookId, dark) }
-                            AndroidFragment<EpubDocumentFragment>(
-                                modifier = Modifier.fillMaxSize(),
-                                arguments = args,
-                                onUpdate = { fragment ->
-                                    // Callback registration belongs to the Fragment lifetime.
-                                    // Re-registering on every Compose update feeds reader events
-                                    // back into composition and causes redundant invalidations.
-                                    if (epubFragment !== fragment) {
-                                        epubFragment = fragment
-                                        fragment.onContentsChanged = { chapters = it }
-                                        fragment.onCurrentHrefChanged = { currentHref = it }
-                                    }
-                                    fragment.onCenterTap = {
-                                        if (!showContents) toolbarVisible = !toolbarVisible
-                                    }
-                                },
-                            )
-                        } else {
-                            PdfBook(reader, model)
-                        }
+            ReaderState.Loading -> CircularProgressIndicator()
+                ReaderState.Unavailable -> Text(stringResource(R.string.reader_open_failed))
+                is ReaderState.Ready -> {
+                    LifecycleResumeEffect(bookId, reader.file.id) {
+                        model.startReadingSession(bookId, reader.file.id)
+                        onPauseOrDispose { model.finishReadingSession(reader.file.id) }
+                    }
+                    if (reader.file.format == "epub") {
+                        val dark = colors.background.luminance() < 0.5f
+                        val args = remember(bookId, dark) { EpubDocumentFragment.arguments(bookId, dark) }
+                        AndroidFragment<EpubDocumentFragment>(
+                            modifier = Modifier.fillMaxSize(),
+                            arguments = args,
+                            onUpdate = { fragment ->
+                                if (epubFragment !== fragment) epubFragment = fragment
+                                fragment.onContentsChanged = contentsObserver
+                                fragment.onCurrentHrefChanged = hrefObserver
+                                fragment.onCenterTap = centerTapHandler
+                            },
+                        )
+                    } else {
+                        PdfBook(reader, model)
                     }
                 }
+            }
             val ready = state as? ReaderState.Ready
             if (ready?.file?.format == "epub") {
                 if (toolbarVisible && !showContents) GlassIconButton(
