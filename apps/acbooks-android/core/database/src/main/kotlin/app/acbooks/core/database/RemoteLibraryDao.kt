@@ -28,6 +28,9 @@ interface RemoteLibraryDao {
     @Query("SELECT * FROM remote_catalog WHERE profileId = :profileId AND remoteBookId = :remoteBookId")
     suspend fun remoteCatalogBook(profileId: String, remoteBookId: String): RemoteCatalogBook?
 
+    @Query("SELECT * FROM remote_catalog WHERE profileId = :profileId")
+    suspend fun cachedRemoteBooks(profileId: String): List<RemoteCatalogBook>
+
     @Upsert
     suspend fun cacheRemoteBooks(books: List<RemoteCatalogBook>)
 
@@ -79,11 +82,17 @@ interface RemoteLibraryDao {
     @Upsert
     suspend fun cacheRemoteFiles(files: List<RemoteCatalogFile>)
 
+    @Query("SELECT * FROM remote_catalog_files WHERE profileId = :profileId AND remoteFileId = :remoteFileId")
+    suspend fun remoteCatalogFile(profileId: String, remoteFileId: String): RemoteCatalogFile?
+
     @Query("DELETE FROM remote_catalog_files WHERE profileId = :profileId AND remoteFileId = :remoteFileId")
     suspend fun removeCachedRemoteFile(profileId: String, remoteFileId: String): Int
 
     @Query("SELECT * FROM remote_book_links WHERE profileId = :profileId AND localBookId = :localBookId")
     suspend fun remoteBookLink(profileId: String, localBookId: String): RemoteBookLink?
+
+    @Query("SELECT * FROM remote_book_links WHERE profileId = :profileId")
+    suspend fun remoteBookLinks(profileId: String): List<RemoteBookLink>
 
     @Query("SELECT * FROM remote_book_links WHERE profileId = :profileId ORDER BY localBookId LIMIT :limit OFFSET :offset")
     fun observeRemoteBookLinks(profileId: String, limit: Int, offset: Int = 0): Flow<List<RemoteBookLink>>
@@ -107,6 +116,9 @@ interface RemoteLibraryDao {
 
     @Query("SELECT * FROM remote_file_links WHERE profileId = :profileId AND localFileId = :localFileId")
     suspend fun remoteFileLink(profileId: String, localFileId: String): RemoteFileLink?
+
+    @Query("SELECT * FROM remote_file_links WHERE profileId = :profileId")
+    suspend fun remoteFileLinks(profileId: String): List<RemoteFileLink>
 
     @Query("SELECT * FROM remote_file_links WHERE profileId = :profileId AND remoteFileId = :remoteFileId")
     suspend fun localFileLink(profileId: String, remoteFileId: String): RemoteFileLink?

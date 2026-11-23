@@ -16,8 +16,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LocalFileSource::class, LocalAuthorizedFolder::class, LocalFolderEntry::class,
         ServerProfile::class, RemoteCatalogBook::class, RemoteCatalogFile::class,
         RemoteBookLink::class, RemoteFileLink::class,
+        CloudSyncState::class, CloudCatalogVersion::class, PendingCloudUpload::class,
     ],
-    version = 7,
+    version = 8,
 )
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun library(): LibraryDao

@@ -149,6 +149,45 @@ class LibraryMigrationTest {
         }
     }
 
+    @Test
+    fun version7PreservesCloudLinksAndInitializesSyncStorageOnUpgrade() = runBlocking {
+        val profileId = ShelfId
+        helper.createDatabase(DatabaseName, 7).use { old ->
+            old.execSQL("INSERT INTO books(id, title, importedAt) VALUES (?, 'Existing', 1000)", arrayOf(BookId))
+            old.execSQL("INSERT INTO file_objects VALUES (?, 'pdf', 123)", arrayOf(Hash))
+            old.execSQL("INSERT INTO book_files VALUES (?, ?, ?, 'pdf', ?, 'book.pdf', 0)", arrayOf(FileId, BookId, Hash, SourceUri))
+            old.execSQL("INSERT INTO reading_positions VALUES (?, 'locator', 50, 2, 1000)", arrayOf(FileId))
+            old.execSQL("""
+                INSERT INTO server_profiles (id,serverInstanceId,accountId,deviceId,origin,updatedAt,verification,currentSlot)
+                VALUES (?, ?, ?, ?, ?, 1000, 'verified', 1)
+            """.trimIndent(), arrayOf(profileId, RecordId, RecordId, FileId, ServerOrigin))
+            old.execSQL("INSERT INTO remote_book_links VALUES (?, ?, ?)", arrayOf(profileId, BookId, RemoteBookId))
+            old.execSQL("INSERT INTO remote_file_links VALUES (?, ?, ?)", arrayOf(profileId, FileId, FileId))
+            old.execSQL("""
+                INSERT INTO remote_catalog (profileId,remoteBookId,title,available,updatedAt,cachedAt)
+                VALUES (?, ?, 'Cloud', 1, 1000, 1000)
+            """.trimIndent(), arrayOf(profileId, RemoteBookId))
+        }
+        helper.runMigrationsAndValidate(DatabaseName, 8, true, migration7To8).use { upgraded ->
+            assertEquals(0, upgraded.rowCount("sync_state"))
+            assertEquals(0, upgraded.rowCount("sync_baselines"))
+            assertEquals(0, upgraded.rowCount("sync_outbox"))
+            upgraded.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
+        }
+        val database = Room.databaseBuilder(context, LibraryDatabase::class.java, DatabaseName).configureLibrary().build()
+        try {
+            val dao = database.library()
+            assertEquals(profileId, dao.currentServerProfile()?.id)
+            assertEquals(RemoteBookLink(profileId, BookId, RemoteBookId), dao.remoteBookLink(profileId, BookId))
+            assertEquals(RemoteFileLink(profileId, FileId, FileId), dao.remoteFileLink(profileId, FileId))
+            assertEquals("Cloud", dao.remoteCatalogBook(profileId, RemoteBookId)?.title)
+            assertEquals(LocalReadingPosition(FileId, "locator", 50.0, 2, 1000), dao.readingPositionRecord(FileId))
+            assertNull(dao.cloudSyncCursor(profileId))
+        } finally {
+            database.close()
+        }
+    }
+
     private fun migrateAndVerify(startVersion: Int, expectedLocator: String?) = runBlocking {
         helper.createDatabase(DatabaseName, startVersion).use { old ->
             old.execSQL("INSERT INTO books VALUES (?, ?, ?, ?)", arrayOf<Any>(BookId, "旧版书籍", "作者", 9876L))
@@ -186,8 +225,8 @@ class LibraryMigrationTest {
             }
         }
 
-        helper.runMigrationsAndValidate(DatabaseName, 7, true, *libraryMigrations).use { upgraded ->
-            assertEquals(7, upgraded.version)
+        helper.runMigrationsAndValidate(DatabaseName, 8, true, *libraryMigrations).use { upgraded ->
+            assertEquals(8, upgraded.version)
             assertEquals(if (startVersion >= 3) 1 else 0, upgraded.rowCount("remote_book_links"))
             upgraded.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
             upgraded.query("SELECT sha256, format, size FROM file_objects").use { objects ->

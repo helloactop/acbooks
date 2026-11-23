@@ -21,7 +21,7 @@ data class LocalBookRemoval(
 @Dao
 abstract class LibraryDao :
     ShelfDao, ReadingPositionDao, ReadingSessionDao, ReadingMarkDao, CatalogMetadataDao,
-    FileSourceDao, FolderDao, RemoteLibraryDao {
+    FileSourceDao, FolderDao, RemoteLibraryDao, CloudSyncDao {
     @Upsert
     protected abstract suspend fun upsertServerProfile(profile: ServerProfile)
 
@@ -122,6 +122,9 @@ abstract class LibraryDao :
     @Query("DELETE FROM books WHERE id = :bookId")
     abstract suspend fun deleteBookRow(bookId: String): Int
 
+    @Query("DELETE FROM book_files WHERE id = :fileId")
+    protected abstract suspend fun deleteBookFileRow(fileId: String): Int
+
     @Query("""
         DELETE FROM file_objects WHERE sha256 = :sha256 AND format = :format
         AND NOT EXISTS (
@@ -138,7 +141,10 @@ abstract class LibraryDao :
         val files = allBookFiles(bookId)
         if (deleteBookRow(bookId) == 0) return null
 
-        // Room foreign keys cascade to book_files, reading_positions and shelf_books.
+        return releaseUnreferencedFiles(files)
+    }
+
+    private suspend fun releaseUnreferencedFiles(files: List<LocalBookFile>): LocalBookRemoval {
         val unreferencedObjects = files.distinctBy { it.sha256 to it.format }
             .filter { deleteObjectIfUnreferenced(it.sha256, it.format) > 0 }
             .map { LocalFileObject(it.sha256, it.format, 0L) }
@@ -156,12 +162,14 @@ abstract class LibraryDao :
         return removeLocalBook(link.localBookId)
     }
 
-    @Query("""
-        SELECT * FROM books b
-        WHERE EXISTS(SELECT 1 FROM book_files f WHERE f.bookId = b.id AND f.localCopyRemoved = 0)
-        ORDER BY b.importedAt, b.id
-    """)
-    abstract suspend fun booksWithOfflineCopies(): List<LocalBook>
+    @Transaction
+    open suspend fun applyConfirmedRemoteFileDeletion(link: RemoteFileLink): LocalBookRemoval? {
+        removeCachedRemoteFile(link.profileId, link.remoteFileId)
+        if (remoteFileLink(link.profileId, link.localFileId) != link) return null
+        val file = bookFile(link.localFileId) ?: return null
+        if (deleteBookFileRow(file.id) == 0) return null
+        return releaseUnreferencedFiles(listOf(file))
+    }
 
     @Transaction
     open suspend fun replaceRemoteCatalog(
@@ -172,8 +180,52 @@ abstract class LibraryDao :
         check(currentServerProfile()?.id == profileId)
         require(books.all { it.profileId == profileId } && files.all { it.profileId == profileId })
         clearRemoteCatalog(profileId)
-        cacheRemoteBooks(books)
+        cacheCatalogBooks(profileId, books)
         cacheRemoteFiles(files)
+    }
+
+    @Transaction
+    open suspend fun applyCloudCatalog(
+        profileId: String,
+        expectedCursor: Long?,
+        rebuild: Boolean,
+        batch: CloudCatalogBatch,
+    ): List<LocalBookRemoval> {
+        check(currentServerProfile()?.id == profileId && cloudSyncCursor(profileId) == expectedCursor)
+        val after = if (rebuild) 0L else checkNotNull(expectedCursor)
+        require(batch.cursor >= after && batch.versions.all { it.profileId == profileId && it.revision in (after + 1)..batch.cursor })
+        require(batch.books.all { it.profileId == profileId } && batch.files.all { it.profileId == profileId })
+
+        if (rebuild) {
+            clearRemoteCatalog(profileId)
+            clearCloudCatalogVersions(profileId)
+        }
+        val removals = mutableListOf<LocalBookRemoval>()
+        val deletedBookIds = batch.versions.filter { it.deleted && it.entityType == "book" }.map { it.entityId }.toSet()
+        if (deletedBookIds.isNotEmpty()) {
+            for (link in remoteBookLinks(profileId).filter { it.remoteBookId in deletedBookIds }) {
+                applyConfirmedRemoteBookDeletion(link)?.let(removals::add)
+            }
+            if (!rebuild) for (id in deletedBookIds) removeCachedRemoteBook(profileId, id)
+        }
+        val deletedFileIds = batch.versions.filter { it.deleted && it.entityType == "book_file" }.map { it.entityId }.toSet()
+        if (deletedFileIds.isNotEmpty()) {
+            for (link in remoteFileLinks(profileId).filter { it.remoteFileId in deletedFileIds }) {
+                applyConfirmedRemoteFileDeletion(link)?.let(removals::add)
+            }
+            if (!rebuild) for (id in deletedFileIds) removeCachedRemoteFile(profileId, id)
+        }
+
+        // A missing parent rolls back the batch and cursor so a later pull can include the parent.
+        cacheCatalogBooks(profileId, batch.books)
+        cacheRemoteFiles(batch.files.filterNot { it.remoteBookId in deletedBookIds })
+        saveCloudCatalogVersions(batch.versions)
+        saveCloudSyncState(CloudSyncState(profileId, batch.cursor))
+        return removals
+    }
+
+    private suspend fun cacheCatalogBooks(profileId: String, books: List<RemoteCatalogBook>) {
+        cacheRemoteBooks(books)
         for (remote in books) {
             if (!remote.available || localBookLinks(profileId, remote.remoteBookId).isNotEmpty()) continue
             // An existing local UUID may be awaiting its idempotent create receipt.
@@ -182,6 +234,13 @@ abstract class LibraryDao :
             addBook(LocalBook(id, remote.title, remote.author, remote.cachedAt, description = remote.description))
             linkRemoteBook(RemoteBookLink(profileId, id, remote.remoteBookId))
         }
+    }
+
+    @Transaction
+    open suspend fun acknowledgeCloudUpload(upload: PendingCloudUpload, remoteId: String) {
+        if (removeCloudUpload(upload.profileId, upload.id) == 0) return
+        if (upload.fileId == null) linkRemoteBook(RemoteBookLink(upload.profileId, upload.bookId, remoteId))
+        else linkRemoteFile(RemoteFileLink(upload.profileId, upload.fileId, remoteId))
     }
 
     @Transaction
@@ -261,6 +320,7 @@ abstract class LibraryDao :
         content: LocalFileObject,
         allowMatchingContent: Boolean,
         verifiedAt: Long? = null,
+        bookUploadPayload: String? = null,
     ): BookImportCommit {
         if (hasImported(file.sourceUri, file.sha256, file.format)) {
             if (verifiedAt != null) {
@@ -279,6 +339,12 @@ abstract class LibraryDao :
         }
         addFile(file)
         recordImportedSources(file.sha256, file.format, file.sourceUri, verifiedAt)
+        if (bookUploadPayload != null) currentServerProfile()?.let { profile ->
+            enqueueCloudUploads(listOf(
+                PendingCloudUpload.createBook(profile.id, book.id, bookUploadPayload),
+                PendingCloudUpload.uploadFile(profile.id, file),
+            ))
+        }
         return BookImportCommit.Added
     }
 

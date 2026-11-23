@@ -9,11 +9,14 @@ import android.provider.DocumentsContract
 import android.provider.MediaStore
 import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
+import app.acbooks.core.database.CloudCatalogBatch
+import app.acbooks.core.database.CloudCatalogVersion
 import app.acbooks.core.database.FileSourceKind
 import app.acbooks.core.database.FileSourceStatus
 import app.acbooks.core.database.FolderScanState
 import app.acbooks.core.database.LibraryDatabase
 import app.acbooks.core.database.LocalAuthorizedFolder
+import app.acbooks.core.database.LocalBookmark
 import app.acbooks.core.database.RemoteBookLink
 import app.acbooks.core.database.RemoteCatalogBook
 import app.acbooks.core.database.RemoteCatalogFile
@@ -36,6 +39,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.json.JSONObject
 
 class LibraryRepositoryTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -138,6 +142,93 @@ class LibraryRepositoryTest {
         assertEquals("""{"page":1}""", repository.readingPosition(local.id))
         assertEquals(2, repository.books.first().size)
         assertArrayEquals(pdf, requireNotNull(resolver.openInputStream(source)).use { it.readBytes() })
+    }
+
+    @Test
+    fun cloudDeletionsRemoveOnlyLinkedBooksAndFilesAndKeepSharedBytesUntilTheLastReference() = runBlocking {
+        val pdf = pdfBytes()
+        val firstSource = addSource(pdf)
+        val secondSource = addSource(pdf)
+        assertEquals(ImportOutcome.Added, repository.import(firstSource, allowMatchingContent = false))
+        val firstBook = repository.books.first().single()
+        assertEquals(ImportOutcome.Added, repository.import(secondSource, allowMatchingContent = true))
+        val secondBook = repository.books.first().single { it.id != firstBook.id }
+        val firstFile = requireNotNull(repository.openBook(firstBook.id))
+        val secondFile = requireNotNull(repository.openBook(secondBook.id))
+        assertEquals(firstFile.file, secondFile.file)
+
+        val dao = database.library()
+        val account = UUID.randomUUID().toString()
+        val profile = dao.saveCurrentServerProfile(account, account, UUID.randomUUID().toString(), "https://example.invalid", 1)
+        val bookLink = RemoteBookLink(profile.id, firstBook.id, UUID.randomUUID().toString())
+        val fileLink = RemoteFileLink(profile.id, firstFile.id, UUID.randomUUID().toString())
+        dao.linkRemoteBook(bookLink)
+        dao.linkRemoteFile(fileLink)
+        val cloudBook = RemoteCatalogBook(profile.id, bookLink.remoteBookId, firstBook.title, null, null, true, 2, 2)
+        val cloudFile = RemoteCatalogFile(profile.id, fileLink.remoteFileId, bookLink.remoteBookId,
+            "pdf", pdf.size.toLong(), firstBook.sha256, RemoteFileStatus.Present, 2)
+        repository.applyCloudCatalog(profile.id, null, true, CloudCatalogBatch(3, listOf(cloudBook), listOf(cloudFile), listOf(
+            CloudCatalogVersion(profile.id, "book", bookLink.remoteBookId, 2, false),
+            CloudCatalogVersion(profile.id, "book_file", fileLink.remoteFileId, 3, false),
+        )))
+        val locator = """{"page":1}"""
+        val bookmark = LocalBookmark(UUID.randomUUID().toString(), firstBook.id, firstFile.id, locator, null, 2, 2)
+        dao.insertBookmark(bookmark)
+        repository.saveReadingPosition(firstFile.id, locator, 50.0)
+
+        repository.applyCloudCatalog(profile.id, 3, false, CloudCatalogBatch(4, emptyList(), emptyList(), listOf(
+            CloudCatalogVersion(profile.id, "book_file", fileLink.remoteFileId, 4, true),
+        )))
+
+        assertNull(dao.bookFile(firstFile.id))
+        assertNull(dao.remoteFileLink(profile.id, firstFile.id))
+        assertTrue(dao.cloudFilesForBook(profile.id, firstBook.id).isEmpty())
+        assertNull(repository.readingPosition(firstFile.id))
+        assertEquals(bookmark.copy(fileId = null), dao.bookmark(bookmark.id))
+        assertEquals(cloudBook, dao.remoteCatalogBook(profile.id, bookLink.remoteBookId))
+        assertArrayEquals(pdf, secondFile.file.readBytes())
+
+        repository.applyCloudCatalog(profile.id, 4, false, CloudCatalogBatch(5, emptyList(), emptyList(), listOf(
+            CloudCatalogVersion(profile.id, "book", bookLink.remoteBookId, 5, true),
+        )))
+        repository.applyCloudCatalog(profile.id, 5, false, CloudCatalogBatch(5, emptyList(), emptyList(), emptyList()))
+        assertNull(dao.book(firstBook.id))
+        assertNull(dao.bookmark(bookmark.id))
+        assertEquals(secondBook.id, repository.books.first().single().id)
+        assertArrayEquals(pdf, secondFile.file.readBytes())
+
+        val secondLink = RemoteBookLink(profile.id, secondBook.id, UUID.randomUUID().toString())
+        dao.linkRemoteBook(secondLink)
+        repository.applyCloudCatalog(profile.id, 5, false, CloudCatalogBatch(6, emptyList(), emptyList(), listOf(
+            CloudCatalogVersion(profile.id, "book", secondLink.remoteBookId, 6, true),
+        )))
+        assertTrue(repository.books.first().isEmpty())
+        assertFalse(secondFile.file.exists())
+        for (source in listOf(firstSource, secondSource)) {
+            assertArrayEquals(pdf, requireNotNull(resolver.openInputStream(source)).use { it.readBytes() })
+        }
+    }
+
+    @Test
+    fun anOfflineImportQueuesTheBookRequestAndItsFileBeforeAnyNetworkCall() = runBlocking {
+        val dao = database.library()
+        val account = UUID.randomUUID().toString()
+        val profile = dao.saveCurrentServerProfile(account, account, UUID.randomUUID().toString(), "https://example.invalid", 1)
+        val source = addSource(pdfBytes())
+        assertEquals(ImportOutcome.Added, repository.import(source, allowMatchingContent = false))
+        val book = repository.books.first().single()
+        val file = requireNotNull(repository.openBook(book.id))
+
+        val queue = dao.pendingCloudUploads(profile.id)
+        assertEquals(2, queue.size)
+        val payload = JSONObject(requireNotNull(queue[0].payload))
+        assertEquals("book.create", payload.getString("action"))
+        assertEquals(book.id, payload.getString("entityId"))
+        assertEquals(0, payload.getInt("baseRevision"))
+        assertEquals(book.title, payload.getJSONObject("data").getString("title"))
+        assertEquals(file.id, queue[1].fileId)
+        assertEquals(ImportOutcome.Duplicate, repository.import(source, allowMatchingContent = true))
+        assertEquals(queue, dao.pendingCloudUploads(profile.id))
     }
 
     @Test

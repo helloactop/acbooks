@@ -9,6 +9,7 @@ import android.provider.OpenableColumns
 import android.util.Log
 import app.acbooks.core.database.LibraryDao
 import app.acbooks.core.database.BookImportCommit
+import app.acbooks.core.database.CloudCatalogBatch
 import app.acbooks.core.database.FileSourceKind
 import app.acbooks.core.database.FileSourceStatus
 import app.acbooks.core.database.LocalBook
@@ -32,6 +33,7 @@ import java.time.ZoneId
 import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -307,14 +309,26 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
     suspend fun deleteBookAfterCloudConfirmation(link: RemoteBookLink): Boolean =
         withContext(Dispatchers.IO) {
             libraryFilesLock.withLock {
-                val removal = dao.applyConfirmedRemoteBookDeletion(link) ?: return@withLock false
-                removeBookFiles(removal)
-                val prefix = "${link.profileId}-${link.remoteBookId}-"
-                cloudCovers.listFiles()?.filter { it.name.startsWith(prefix) && cloudCoverName.matches(it.name) }
-                    ?.forEach { it.delete() }
-                true
+                withContext(NonCancellable) cleanup@ {
+                    val removal = dao.applyConfirmedRemoteBookDeletion(link) ?: return@cleanup false
+                    removeBookFiles(removal)
+                    val prefix = "${link.profileId}-${link.remoteBookId}-"
+                    cloudCovers.listFiles()?.filter { it.name.startsWith(prefix) && cloudCoverName.matches(it.name) }
+                        ?.forEach { it.delete() }
+                    true
+                }
             }
         }
+
+    suspend fun applyCloudCatalog(profileId: String, expectedCursor: Long?, rebuild: Boolean, batch: CloudCatalogBatch) {
+        withContext(Dispatchers.IO) {
+            libraryFilesLock.withLock {
+                withContext(NonCancellable) {
+                    dao.applyCloudCatalog(profileId, expectedCursor, rebuild, batch).forEach(::removeBookFiles)
+                }
+            }
+        }
+    }
 
     private fun removeBookFiles(removal: LocalBookRemoval) {
         // Different book records can share content-addressed objects; only unlink objects
@@ -393,7 +407,8 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                     saveCover(sha256, metadata.cover)
                     val book = LocalBook(uuid(), metadata.title, metadata.author, System.currentTimeMillis())
                     val file = LocalBookFile(uuid(), book.id, sha256, format, sourceKey, name?.take(512) ?: "$title.$format")
-                    when (dao.importBook(book, file, LocalFileObject(sha256, format, size), allowMatchingContent, book.importedAt)) {
+                    when (dao.importBook(book, file, LocalFileObject(sha256, format, size), allowMatchingContent,
+                        book.importedAt, bookCreatePayload(book))) {
                         BookImportCommit.Added -> ImportOutcome.Added
                         BookImportCommit.Duplicate -> ImportOutcome.Duplicate
                         BookImportCommit.MatchingContent -> ImportOutcome.MatchingContent

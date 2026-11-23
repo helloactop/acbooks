@@ -5,8 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import app.acbooks.core.database.LibraryDao
-import app.acbooks.core.database.RemoteBookLink
-import app.acbooks.core.database.RemoteFileLink
+import app.acbooks.core.database.PendingCloudUpload
 import app.acbooks.core.database.RemoteFileStatus
 import app.acbooks.core.database.ServerProfile
 import java.io.IOException
@@ -71,57 +70,107 @@ internal class LibraryCloudSync(
         if (token != null) LibraryCloudClient(checkNotNull(profile.origin)).logout(token)
     }
 
-    /** False indicates at least one book still needs to be uploaded. Null indicates a signed-out device. */
+    /** False indicates that some uploads are pending. Null indicates a signed-out device. */
     suspend fun sync(): Boolean? = serialized {
         val session = verifiedSession() ?: return@serialized null
         val (profile, client, token) = session
-        val initial = client.catalog(token, profile.id)
-        val remoteBooks = initial.books.mapTo(mutableSetOf()) { it.remoteBookId }
-        val remoteFiles = initial.files.associateBy { it.remoteFileId }
-        var complete = true
+        pullCatalog(session)
+        enqueueExistingUploads(profile.id)
         var changed = false
+        val createdBooks = mutableSetOf<String>()
 
-        for (book in dao.booksWithOfflineCopies()) {
+        for (upload in dao.pendingCloudUploads(profile.id)) {
+            if (upload.blocked) continue
             try {
-                val existingLink = dao.remoteBookLink(profile.id, book.id)
-                val link = if (existingLink == null) {
-                    client.createBook(token, checkNotNull(profile.deviceId), book)
-                    changed = true
-                    RemoteBookLink(profile.id, book.id, book.id).also { dao.linkRemoteBook(it) }
-                } else if (existingLink.remoteBookId !in remoteBooks) {
-                    // The server may have explicitly deleted this book. Keep its local copy.
-                    complete = false
-                    continue
-                } else existingLink
-                for (file in dao.allBookFiles(book.id).filterNot { it.localCopyRemoved }) {
-                    val fileLink = dao.remoteFileLink(profile.id, file.id)
-                    val existing = remoteFiles[fileLink?.remoteFileId]
-                    if (existing != null && existing.remoteBookId == link.remoteBookId && existing.sha256 == file.sha256 &&
-                        existing.fileStatus == RemoteFileStatus.Present
-                    ) continue
-                    val remoteFileId = library.uploadBookFile(file) { source ->
-                        val receipt = client.upload(token, link.remoteBookId, file.format, source)
-                        if (receipt.getString("fileStatus") != RemoteFileStatus.Present ||
-                            receipt.getString("format") != file.format || receipt.getLong("sizeBytes") != source.length()
-                        ) throw IOException("Server did not confirm the file upload")
-                        receipt.getString("id").asUuid()
-                    }
-                    dao.linkRemoteFile(RemoteFileLink(profile.id, file.id, remoteFileId))
-                    changed = true
-                }
+                if (sendUpload(session, upload, createdBooks)) changed = true
+            } catch (failure: CloudMutationRejected) {
+                dao.recordCloudUploadFailure(profile.id, upload.id, failure.code, blocked = true)
             } catch (failure: CloudHttpException) {
-                if (failure.status == 401 || failure.status == 403 || failure.status == 429 || failure.status >= 500) throw failure
-                complete = false
+                dao.recordCloudUploadFailure(profile.id, upload.id, "HTTP_${failure.status}")
+                if (failure.status in setOf(401, 403, 429) || failure.status >= 500) throw failure
             } catch (_: IOException) {
-                complete = false
+                dao.recordCloudUploadFailure(profile.id, upload.id, "IO_ERROR")
             } catch (_: SecurityException) {
-                complete = false
+                dao.recordCloudUploadFailure(profile.id, upload.id, "SOURCE_PERMISSION_REQUIRED")
             }
         }
-        val snapshot = if (changed) client.catalog(token, profile.id) else initial
-        library.cacheCloudCovers(snapshot.books, client, token)
-        dao.replaceRemoteCatalog(profile.id, snapshot.books, snapshot.files)
-        complete
+        if (changed) pullCatalog(session)
+        library.cacheCloudCovers(dao.cachedRemoteBooks(profile.id), client, token)
+        !dao.hasPendingCloudUploads(profile.id)
+    }
+
+    private suspend fun pullCatalog(session: CloudSession) {
+        val (profile, client, token) = session
+        val cursor = dao.cloudSyncCursor(profile.id)
+        var rebuild = cursor == null
+        val batch = try {
+            client.catalog(token, profile.id, cursor ?: 0L)
+        } catch (failure: CloudHttpException) {
+            if (failure.status != 422 || cursor == null || cursor == 0L) throw failure
+            rebuild = true
+            client.catalog(token, profile.id, 0L)
+        }
+        library.applyCloudCatalog(profile.id, cursor, rebuild, batch)
+    }
+
+    private suspend fun enqueueExistingUploads(profileId: String) {
+        val books = dao.unqueuedCloudBooks(profileId).map { book ->
+            PendingCloudUpload.createBook(profileId, book.id, bookCreatePayload(book))
+        }
+        val files = dao.unqueuedCloudFiles(profileId).map { PendingCloudUpload.uploadFile(profileId, it) }
+        dao.enqueueCloudUploads(books + files)
+    }
+
+    private suspend fun sendUpload(session: CloudSession, upload: PendingCloudUpload, createdBooks: MutableSet<String>): Boolean {
+        val (profile, client, token) = session
+        val bookLink = dao.remoteBookLink(profile.id, upload.bookId)
+        val fileId = upload.fileId
+        if (fileId == null) {
+            if (bookLink != null) {
+                dao.acknowledgeCloudUpload(upload, bookLink.remoteBookId)
+                return false
+            }
+            if (dao.cloudCatalogVersion(profile.id, "book", upload.bookId)?.deleted == true) {
+                throw CloudMutationRejected("REMOTE_BOOK_DELETED")
+            }
+            client.createBook(token, checkNotNull(profile.deviceId), upload.bookId, checkNotNull(upload.payload))
+            dao.acknowledgeCloudUpload(upload, upload.bookId)
+            createdBooks.add(upload.bookId)
+            return true
+        }
+
+        val file = dao.bookFile(fileId)
+        if (file == null || file.localCopyRemoved) {
+            dao.removeCloudUpload(profile.id, upload.id)
+            return false
+        }
+        if (bookLink == null || (upload.bookId !in createdBooks && dao.remoteCatalogBook(profile.id, bookLink.remoteBookId) == null)) {
+            dao.recordCloudUploadFailure(profile.id, upload.id, "REMOTE_BOOK_NOT_CONFIRMED")
+            return false
+        }
+        val fileLink = dao.remoteFileLink(profile.id, file.id)
+        if (fileLink != null) {
+            val remote = dao.remoteCatalogFile(profile.id, fileLink.remoteFileId)
+            if (remote == null || remote.remoteBookId != bookLink.remoteBookId || remote.sha256 != file.sha256 ||
+                remote.format != file.format
+            ) {
+                dao.recordCloudUploadFailure(profile.id, upload.id, "REMOTE_FILE_CHANGED")
+                return false
+            }
+            if (remote.fileStatus == RemoteFileStatus.Present) {
+                dao.acknowledgeCloudUpload(upload, fileLink.remoteFileId)
+                return false
+            }
+        }
+        val remoteFileId = library.uploadBookFile(file) { source ->
+            val receipt = client.upload(token, bookLink.remoteBookId, file.format, source)
+            if (receipt.getString("fileStatus") != RemoteFileStatus.Present ||
+                receipt.getString("format") != file.format || receipt.getLong("sizeBytes") != source.length()
+            ) throw IOException("Server did not confirm the file upload")
+            receipt.getString("id").asUuid()
+        }
+        dao.acknowledgeCloudUpload(upload, remoteFileId)
+        return true
     }
 
     suspend fun openOrDownload(bookId: String): Boolean = serialized {

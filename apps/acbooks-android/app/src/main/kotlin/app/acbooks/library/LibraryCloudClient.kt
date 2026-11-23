@@ -1,5 +1,7 @@
 package app.acbooks.library
 
+import app.acbooks.core.database.CloudCatalogBatch
+import app.acbooks.core.database.CloudCatalogVersion
 import app.acbooks.core.database.LocalBook
 import app.acbooks.core.database.RemoteCatalogBook
 import app.acbooks.core.database.RemoteCatalogFile
@@ -25,6 +27,17 @@ internal fun serverOrigin(value: String): String {
 }
 
 internal class CloudHttpException(val status: Int) : IOException("Server responded with HTTP $status")
+internal class CloudMutationRejected(val code: String) : IOException("Server rejected the book creation")
+
+internal fun bookCreatePayload(book: LocalBook): String {
+    val mutationId = UUID.nameUUIDFromBytes("acbooks:book.create:${book.id}".toByteArray(UTF_8)).toString()
+    val data = JSONObject().put("title", book.title.take(500))
+    book.author?.takeIf(String::isNotBlank)?.let { data.put("authors", JSONArray().put(it.take(200))) }
+    book.description?.let { data.put("description", it.take(20_000)) }
+    book.series?.let { data.put("series", it.take(200)) }
+    return JSONObject().put("mutationId", mutationId).put("entityId", book.id.asUuid())
+        .put("baseRevision", 0).put("action", "book.create").put("data", data).toString()
+}
 
 internal class LibraryCloudClient(private val origin: String) {
     fun login(username: String, password: String): String = json(
@@ -46,20 +59,21 @@ internal class LibraryCloudClient(private val origin: String) {
         request("/auth/logout", "POST", token, setOf(204)) { }
     }
 
-    fun createBook(token: String, deviceId: String, book: LocalBook) {
-        val name = UUID.nameUUIDFromBytes("acbooks:book.create:${book.id}".toByteArray(UTF_8)).toString()
-        val data = JSONObject().put("title", book.title.take(500))
-        book.author?.takeIf(String::isNotBlank)?.let { data.put("authors", JSONArray().put(it.take(200))) }
-        book.description?.let { data.put("description", it.take(20_000)) }
-        book.series?.let { data.put("series", it.take(200)) }
-        val mutation = JSONObject().put("mutationId", name).put("entityId", book.id.asUuid())
-            .put("baseRevision", 0).put("action", "book.create").put("data", data)
+    fun createBook(token: String, deviceId: String, bookId: String, payload: String) {
+        val mutation = JSONObject(payload)
+        check(mutation.getString("entityId") == bookId)
         val response = json("/sync/mutations", token, "POST",
             JSONObject().put("deviceId", deviceId).put("mutations", JSONArray().put(mutation)))
         val receipt = response.getJSONArray("receipts").getJSONObject(0)
+        if (receipt.getString("mutationId") != mutation.getString("mutationId")) throw IOException("Invalid mutation receipt")
+        val status = receipt.getString("status")
+        if (status == "conflict" || status == "rejected") {
+            val code = receipt.optString("code").takeIf { it.matches(Regex("[A-Z_]{1,64}")) }
+            throw CloudMutationRejected(code ?: status.uppercase())
+        }
         val current = receipt.optJSONObject("current")
-        if (receipt.getString("mutationId") != name || receipt.getString("status") != "accepted" ||
-            current == null || current.getString("entityId") != book.id || current.getString("operation") != "upsert"
+        if (status != "accepted" || current == null || current.getString("entityType") != "book" ||
+            current.getString("entityId") != bookId || current.getString("operation") != "upsert"
         ) throw IOException("Server did not confirm that the book was created")
     }
 
@@ -87,34 +101,41 @@ internal class LibraryCloudClient(private val origin: String) {
         request("/books/${bookId.asUuid()}", "DELETE", token, setOf(204)) { }
     }
 
-    fun catalog(token: String, profileId: String): CatalogSnapshot {
+    fun catalog(token: String, profileId: String, after: Long): CloudCatalogBatch {
         val books = mutableMapOf<String, RemoteCatalogBook>()
         val files = mutableMapOf<String, RemoteCatalogFile>()
+        val versions = mutableMapOf<Pair<String, String>, CloudCatalogVersion>()
         val cachedAt = System.currentTimeMillis()
-        val through = pull(token, "snapshot", 0) { record ->
-            applyCatalogRecord(record, profileId, cachedAt, books, files)
+        val accept: (JSONObject) -> Unit = { record ->
+            applyCatalogRecord(record, profileId, cachedAt, books, files, versions)
         }
-        pull(token, "changes", through) { record ->
-            applyCatalogRecord(record, profileId, cachedAt, books, files)
-        }
-        return CatalogSnapshot(books.values.toList(), files.values.filter { it.remoteBookId in books })
+        // Bootstrapping from the change stream retains historical deletions for existing local links.
+        val through = pullChanges(token, after, accept)
+        val cursor = if (after == 0L) pullChanges(token, through, accept) else through
+        return CloudCatalogBatch(cursor, books.values.toList(), files.values.toList(), versions.values.toList())
     }
 
-    private fun pull(token: String, route: String, start: Long, accept: (JSONObject) -> Unit): Long {
+    private fun pullChanges(token: String, start: Long, accept: (JSONObject) -> Unit): Long {
         var after = start
         var through: Long? = null
         while (true) {
             val boundary = through?.let { "&through=$it" }.orEmpty()
-            val page = json("/sync/$route?after=$after$boundary&limit=100", token)
+            val page = json("/sync/changes?after=$after$boundary&limit=100", token)
             val end = page.getLong("through")
             val next = page.getLong("nextCursor")
             val more = page.getBoolean("hasMore")
-            if ((through != null && end != through) || next !in after..end || (more && next <= after)) {
+            if ((through != null && end != through) || next !in after..end ||
+                (more && next <= after) || (!more && next != end)
+            ) {
                 throw IOException("Invalid server catalog page")
             }
             val items = page.getJSONArray("items")
-            for (index in 0 until items.length()) accept(items.getJSONObject(index))
-            if (!more) return end
+            for (index in 0 until items.length()) {
+                val record = items.getJSONObject(index)
+                if (record.getLong("revision") !in (after + 1)..next) throw IOException("Invalid catalog revision")
+                accept(record)
+            }
+            if (!more) return next
             after = next
             through = end
         }
@@ -167,8 +188,6 @@ internal class LibraryCloudClient(private val origin: String) {
     }
 }
 
-internal data class CatalogSnapshot(val books: List<RemoteCatalogBook>, val files: List<RemoteCatalogFile>)
-
 private fun readJson(connection: HttpsURLConnection): JSONObject =
     connection.inputStream.bufferedReader(UTF_8).use { JSONObject(it.readText()) }
 
@@ -178,11 +197,13 @@ private fun applyCatalogRecord(
     cachedAt: Long,
     books: MutableMap<String, RemoteCatalogBook>,
     files: MutableMap<String, RemoteCatalogFile>,
+    versions: MutableMap<Pair<String, String>, CloudCatalogVersion>,
 ) {
     val type = record.getString("entityType")
     if (type != "book" && type != "book_file") return
     val id = record.getString("entityId").asUuid()
-    when (record.getString("operation")) {
+    val operation = record.getString("operation")
+    when (operation) {
         "delete" -> if (type == "book") books.remove(id) else files.remove(id)
         "upsert" -> {
             val data = record.getJSONObject("data")
@@ -201,6 +222,7 @@ private fun applyCatalogRecord(
         }
         else -> throw IOException("Invalid server catalog operation")
     }
+    versions[type to id] = CloudCatalogVersion(profileId, type, id, record.getLong("revision"), operation == "delete")
 }
 
 internal fun String.asUuid(): String = UUID.fromString(this).toString().also { require(it == this) }
