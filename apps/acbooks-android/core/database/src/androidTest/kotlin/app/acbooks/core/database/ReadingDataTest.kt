@@ -108,6 +108,32 @@ class ReadingDataTest {
         }
     }
 
+    @Test
+    fun homeReadingActivityCombinesSavedPositionsAndCompletedSessions() = runBlocking {
+        val database = Room.inMemoryDatabaseBuilder(context, LibraryDatabase::class.java).configureLibrary().build()
+        try {
+            val dao = database.library()
+            val completed = LocalBook(uuid(), "Completed", null, 1000)
+            val positioned = LocalBook(uuid(), "Positioned", null, 2000)
+            val file = LocalBookFile(uuid(), positioned.id, "recenthash", "epub", "content://test/recent", "recent.epub")
+            dao.addBook(completed)
+            assertEquals(
+                BookImportCommit.Added,
+                dao.importBook(positioned, file, LocalFileObject("recenthash", "epub", 100), true),
+            )
+            dao.insertReadingSession(manualSession(completed.id, 1_000, 20, 10))
+            dao.insertReadingSession(manualSession(completed.id, 40_000, 10, 0))
+            dao.writeReadingPosition(file.id, """{"locator":"test"}""", 32.0, 80_000)
+            val activity = dao.observeReadingActivity().first()
+            assertTrue(activity.contains(LocalReadingActivity(completed.id, 21_000, null)))
+            assertTrue(activity.contains(LocalReadingActivity(positioned.id, 80_000, 32.0)))
+            assertEquals(2, activity.size)
+            assertEquals(emptyList<CloudHomeSession>(), dao.observeHomeCloudSessions().first())
+        } finally {
+            database.close()
+        }
+    }
+
     private fun manualSession(bookId: String, start: Long, span: Long, active: Long) =
         LocalReadingSession(uuid(), bookId, null, null, start, start + span * 1000, active, "manual")
 

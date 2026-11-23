@@ -17,6 +17,8 @@ import app.acbooks.R
 import app.acbooks.core.database.LibraryDatabase
 import app.acbooks.core.database.LibraryShelf
 import app.acbooks.core.database.LocalBookCard
+import app.acbooks.core.database.LocalReadingActivity
+import app.acbooks.core.database.CloudHomeSession
 import app.acbooks.core.database.LocalReadingSession
 import app.acbooks.reader.ReaderTypographySettings
 import app.acbooks.reader.ReaderTypographyProfile
@@ -43,6 +45,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONException
+import org.json.JSONObject
 
 internal data class LibraryCatalog(
     val books: List<LocalBookCard> = emptyList(),
@@ -50,6 +54,43 @@ internal data class LibraryCatalog(
     val loaded: Boolean = false,
     val failed: Boolean = false,
 )
+
+internal data class RecentBookReading(
+    val bookId: String,
+    val lastReadAt: Long,
+    val fraction: Float?,
+)
+
+/** Local and server history use the same book identity; progress comes from positions, not sessions. */
+internal fun recentBookReadings(
+    events: List<LocalReadingActivity>,
+    cloudSessions: List<CloudHomeSession>,
+): List<RecentBookReading> {
+    val sessions = cloudSessions.mapNotNull { record ->
+        try {
+            val payload = JSONObject(record.payload)
+            if (payload.isNull("endedAt")) return@mapNotNull null
+            val endedAt = payload.optLong("endedAt")
+            if (endedAt <= 0L) null else LocalReadingActivity(record.bookId, endedAt, null)
+        } catch (_: JSONException) {
+            null
+        }
+    }
+    return (events + sessions).asSequence()
+        .filter { it.occurredAt > 0 }
+        .groupBy { it.bookId }
+        .map { (bookId, reads) ->
+            val lastPosition = reads.asSequence()
+                .filter { it.progress?.isFinite() == true }
+                .maxByOrNull { it.occurredAt }
+            RecentBookReading(
+                bookId,
+                reads.maxOf { it.occurredAt },
+                lastPosition?.progress?.let { (it / 100.0).toFloat().coerceIn(0f, 1f) },
+            )
+        }
+        .sortedWith(compareByDescending<RecentBookReading> { it.lastReadAt }.thenBy { it.bookId })
+}
 
 internal enum class ServerConnectionStatus { Unknown, SignedOut, Connected, Unavailable }
 internal enum class ServerOperation { Checking, Syncing, SigningOut }
@@ -240,6 +281,14 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
             emit(LibraryCatalog(loaded = true, failed = true))
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryCatalog())
+    val recentReading = combine(dao.observeReadingActivity(), dao.observeHomeCloudSessions(), ::recentBookReadings)
+        .catch { failure ->
+            if (failure is CancellationException) throw failure
+            Log.e("Home", "Could not load reading history", failure)
+            emit(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val displayMode = preferences.data
         .catch { failure ->
             if (failure !is IOException) throw failure
