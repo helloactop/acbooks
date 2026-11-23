@@ -22,14 +22,15 @@ bash ./gradlew :app:installDebug
 
 仓库通过 Actions Secrets 提供 `ANDROID_RELEASE_KEYSTORE_BASE64` 和 `ANDROID_RELEASE_KEYSTORE_PASSWORD`。前者是长期 PKCS#12 签名库的 Base64，后者是其密码。签名别名为 `acbooks-release`，工作流在上传前用 `apksigner` 验证 APK 并核对固定的证书 SHA-256 指纹。签名库与密码需在 GitHub 之外保留私密备份。
 
-## 重建基线
+## 本地检查与设备验收
 
-当前工程包含 `:app` 与 `:core:database`。入口为包名 `app.acbooks` 下的 `MainActivity`，保留品牌启动图标。界面使用官方 `MiuixTheme`、`Scaffold` 和 `GlassTopAppBar`，默认跟随系统浅色与深色。首页、书库与统计共用 `GlassNavigationBar`，右侧圆形 `GlassIconButton` 打开搜索浮层。
+从 `apps/acbooks-android/` 执行（Windows PowerShell 使用 `.\\gradlew.bat`）：
 
-首页、书库、统计和设置均使用可折叠的 `GlassTopAppBar`，通过各自的 `MiuixScrollBehavior` 与正文滚动联动。首页展开和折叠均显示问候语，按设备本地时间在 `Good morning`、`Good afternoon` 和 `Good evening` 之间切换。正文提供阅读历史空状态和书库入口。右上角头像按钮打开独立的设置页。`AcbooksNavigation` 接收头像图片和更换头像回调，供后续头像选择与上传接入。
+```sh
+bash ./gradlew :app:assembleDebug :app:lintDebug
+bash ./gradlew :core:database:connectedDebugAndroidTest :app:connectedDebugAndroidTest
+```
 
-书库通过系统文件选择器导入 EPUB/PDF，沿用 `acbooks-reader.db` 与应用私有书库。Coil 加载本地封面，显示模式保存在 DataStore。EPUB 使用 Readium，PDF 使用平台 `PdfRenderer`，阅读位置保存在 Room。搜索使用官方 `GlassSearchOverlay` 匹配本地书名和作者，关闭后恢复原先的 Tab 与页面状态。
+设备测试需要连接 API 33 或更新版本的模拟器/真机。按改动范围检查 Room 迁移与旧数据保留、本地 EPUB/PDF 导入和进度恢复、服务器登录与离线同步、返回手势、玻璃菜单及中英文/深浅色布局。**不将旧版本的历史测试结果视为当前验证结果**；本次检查结果在 PR 中单独报告。
 
-`:app` 直接依赖官方 `miuix-ui-android`、`miuix-glass-android`、`miuix-glass-icons-android`、`miuix-nav-android` 和 `miuix-preference-android`，统一锁定 [Miuix 0.9.5-beta03](https://github.com/compose-miuix-ui/miuix/releases/tag/v0.9.5-beta03)。设置、详情和阅读器由 `NavDisplay` 管理，使用 `NavTransitions.MiuixDefault` 和可恢复的返回栈。登录和同步按后续阶段重建。
-
-后续页面遵循 [Android UI 规范](../ui/android-ui.md) 和 [Android 阅读器架构](../architecture/android-reader.md)。当前检查命令见 [Android 测试说明](../testing/android.md)。
+Android 架构与 UI 规则见 [阅读器架构](../architecture/android-reader.md)、[Android UI](../ui/android-ui.md) 和 [页面规范](../ui/android-ui-pages.md)。

@@ -129,15 +129,3 @@ apps/acbooks-server/app/
 5. `external` 根不可写；上传、改名、跨卷移动、冲突、无空间、程序崩溃后的恢复与不覆盖。
 6. 既有 `Book`/`BookFile` 的 ID 在安全移动后保持；手动删除原件不级联清除阅读会话与笔记。
 7. API、Worker、WebDAV 使用同一授权规则；扫描任务可查询进度及失败，不触发长 HTTP 阻塞。
-
-## 8. 开源借鉴（仅参考设计，不复制代码）
-
-| 项目 | 源码/文档 | 借鉴点 |
-| --- | --- | --- |
-| **BookLore** | [BookDrop 与网络存储说明](https://github.com/booklore-app/booklore) · [事件处理](https://github.com/booklore-app/booklore/blob/develop/booklore-api/src/main/java/org/booklore/service/watcher/LibraryFileEventProcessor.java) | 入库审查、文件稳定性、监听去抖、网络挂载写回限制 |
-| **Komga** | [书库扫描设置](https://komga.org/docs/guides/libraries/) · [文件扫描器](https://github.com/gotson/komga/blob/master/komga/src/main/kotlin/org/gotson/komga/domain/service/FileSystemScanner.kt) | 目录排除、增量与深度扫描、可选哈希 |
-| **Kavita** | [扫描说明](https://wiki.kavitareader.com/guides/scanner/) · [挂载轮询](https://github.com/Kareadita/Kavita/blob/develop/Kavita.Services/Scanner/FolderPollerService.cs) | 不可靠监听的轮询回退、不可达时保留旧状态 |
-| **Ermao Library** | [事件合并](https://github.com/GMD170629/ermao-library/blob/main/apps/api-python/app/modules/imports/infrastructure/library_scan_watcher.py) · [安全发布](https://github.com/GMD170629/ermao-library/blob/main/apps/api-python/app/modules/imports/infrastructure/uploaded_file_publication.py) | 局部扫描合并、文件身份复核、临时文件发布 |
-| **Tome** | [scanner.py](https://github.com/bndct-devops/tome/blob/main/backend/services/scanner.py) | 元数据/哈希与 SQLite 写入分离、限制并发 |
-
-**执行原则：先可靠索引、不误删、不误合并，再考虑自动整理和批量写回。新增表、状态字段或端点前，先更新对应权威规范并添加迁移/契约测试。**

@@ -69,8 +69,7 @@ pnpm e2e
 | Playwright | 阅读统计：全局补录、单书编辑与删除、统计自动刷新、全部时间、自定义范围、月历热力分级、键盘打开每日详情、深浅色切换、窄屏图表布局 |
 
 测试使用 pytest 的临时目录创建数据库，不需要真实书库、NAS 挂载或服务凭据。
-前端测试使用 jsdom，不连接真实 API。Android 的本地构建和设备测试见
-[Android 基础测试](android.md)。
+前端测试使用 jsdom，不连接真实 API。Android 的构建、Lint 和设备测试命令见 [Android 开发环境](../development/android.md)。
 
 ## 验收要求
 
