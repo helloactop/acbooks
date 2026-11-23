@@ -81,7 +81,7 @@ internal fun recentBookReadings(
         .groupBy { it.bookId }
         .map { (bookId, reads) ->
             val lastPosition = reads.asSequence()
-                .filter { it.progress != null && it.progress.isFinite() }
+                .filter { it.progress?.isFinite() == true }
                 .maxByOrNull { it.occurredAt }
             RecentBookReading(
                 bookId,
