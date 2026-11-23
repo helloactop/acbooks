@@ -85,10 +85,3 @@ HTTP Router / OPDS / WebDAV / Worker
 3. 仅改动必要代码；涉及数据结构先准备迁移，涉及接口同步更新 OpenAPI 契约。
 4. 运行最小充分的真实测试与静态检查；失败先定位原因，不绕过检查。
 5. 汇报改动、验证证据和剩余问题；不自行扩大任务范围。
-
-## 参考项目（参考工程实践，不直接复制代码）
-
-- [Ermao Library · 工程规范](https://github.com/GMD170629/ermao-library/blob/main/docs/engineering-standards.md)：模块边界、短事务、测试选择。
-- [BookLore · CONTRIBUTING](https://github.com/booklore-app/booklore/blob/develop/CONTRIBUTING.md)：小范围提交、测试证据、迁移不可改写。
-- [Tome · 扫描实现](https://github.com/bndct-devops/tome/blob/main/backend/services/scanner.py)：文件处理和数据库写入分离。
-- [Komga · TaskProcessor](https://github.com/gotson/komga/blob/master/komga/src/main/kotlin/org/gotson/komga/application/tasks/TaskProcessor.kt)：后台任务生命周期。

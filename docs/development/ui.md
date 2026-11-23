@@ -1,17 +1,10 @@
-# acbooks — UI 规范 v4.1
+# acbooks — Web / Windows UI 规范
 
-> 修订：2026-11-14 · v4.1
 > 路径：`docs/development/ui.md`
 > 范围：Web / Windows 共享 UI。Android 界面直接使用 Miuix，见 [Android UI 设计规范](../ui/android-ui.md)。
-> 本文合并并取代原 `ui.md`（v3）、`ui-components.md`、`ui-pages.md`，是 Web / Windows UI 的唯一规范。后两份已删除；`book-detail-spec.md`、`management-layout-spec.md` 只保留迁移指引，不再定义规则。旧版内容见 git 历史。
+> 本文是 Web / Windows UI 的唯一规范；Android 另见 `docs/ui/android-ui.md`。
 > 工程约束见 [standards.md](./standards.md)；实施顺序与验收见第 12 节。本文描述目标规范，不代表现有代码已经全部实现。
 > 本文只定义界面与交互，不改变架构、业务模型、认证、API 或测试规范。冲突先报告，不另造规则。
-
-## 0. 怎么读这份文档
-
-- **人**：先看第 1 节"一句话原则"，再按需查后面的章节。第 14 节列出了 v4 相对 v3 的变化和已做的决定。
-- **AI**：每条规则有编号（如 `R-BTN-3`），改动或评审时引用编号。**必须**、**禁止**是硬约束；**建议**可在说明理由后偏离。动手前先读 `AGENTS.md`，一次只处理一个明确目标。第 8 节明确写出的页面例外优先于通用组件选择规则；数据、安全、无障碍和真实功能边界不因此放宽。未列明的冲突先报告。
-- 章节地图：2 全局约束 · 3 主题与颜色 · 4 尺寸 · 5 图标 · 6 组件 · 7 应用框架与导航 · 8 页面 · 9 国际化 · 10 无障碍 · 11 路由与数据 · 12 工程与验收 · 13 参考 · 14 决定与变化。
 
 ## 1. 一句话原则
 
@@ -446,12 +439,10 @@
 - **R-ENG-3** 按实际需求逐步建立组件预览（现有预览路由或开发工具），展示全部变体和正常、悬停、焦点、选中、禁用、加载、错误状态。
 - **R-ENG-4** 目录参考：`layout/`（`AppShell`、`AppRail`、`AppTopBar`、`MobileNavigation`、`GlobalSearch`、`PageHeader`、`navigation.ts`、`routes.ts`、`scroll-restoration.ts`）、`library/`、`dashboard/`、`settings/`、`storage/`、`locations/`。
 
-### 12.1 实施顺序与迁移边界
+### 12.1 实施与规则维护
 
-- 本次文档迁移统一规则与阅读入口，不代表 UI 已完成升级；旧实现与目标差异应在实际改动时逐项验收。
 - 建议顺序：公共控件与令牌 → 框架断点及导航 → 书库工具栏/当前筛选/批量操作 → 详情头部与编辑 → 设置与首页。每轮只交付一个明确目标。
 - 规则编号是稳定引用：新增规则使用新编号，不为调整段落顺序重编号；明确例外应同时出现在通用规则和页面规则中。
-- `book-detail-spec.md`、`management-layout-spec.md` 是旧链接的迁移指引，不能补充或覆盖本文；新增链接直接指向本文对应章节。
 
 ### 12.2 验收
 
@@ -471,53 +462,3 @@
 - [ ] 响应式截图（真实运行 + 测试数据）：1440×900、1024×768、768×1024、390×844、844×390；浅/深色、中/英文；覆盖书库、详情、设置、抽屉打开与搜索结果；测试书含长书名、多作者/译者、长简介、缺简介、缺封面、零/多副本与文件。
 - [ ] 运行了 `pnpm lint`、`pnpm typecheck`、`pnpm i18n:check`、`pnpm test`（页面流程再跑 `pnpm e2e`），并如实报告；未运行的检查不得声称通过。
 - [ ] 交付说明：改了什么、涉及文件、复用组件、检查结果、未验证事项。未经要求不提交、不推送、不合并、不部署。
-
-## 13. 参考（仅借鉴机制，不复制实现）
-
-- [Readest DESIGN.md](https://github.com/readest/readest/blob/main/apps/readest-app/DESIGN.md)、[Radix Colors](https://www.radix-ui.com/colors/docs/palette-composition/understanding-the-scale)、[Mantine 按钮](https://mantine.dev/core/button/)、[Stump 共享组件](https://github.com/stumpapp/stump/tree/main/packages/components)、[Tome ShellFrame](https://github.com/bndct-devops/tome/blob/main/frontend/src/components/ShellFrame.tsx)。
-- [二猫书库 ermao-library](https://github.com/GMD170629/ermao-library)（提交 `21b5715`）：借鉴全局导航、详情页布局与响应式、设置中心的信息层级；不照搬其暖色主题、橙色按钮或多用户权限体系。
-- [Lucide](https://lucide.dev/guide/packages/lucide-react)、[Radix Primitives](https://www.radix-ui.com/primitives/docs/overview/accessibility)、[shadcn/ui](https://github.com/shadcn-ui/ui)。
-
-## 14. 已确认的决定与 v4 的变化
-
-**已确认的决定（2026-11-13）**
-
-| 问题 | 决定 | 规则 |
-| --- | --- | --- |
-| 页面标题对齐 | 统一靠左 | R-PAGE-2 |
-| 产品名称 | 统一叫 acbooks | R-NAV-4 |
-| 书库页名称 | 全站叫"书库"，不再叫"图书库" | R-NAV-4 |
-| 顶栏账户入口 | 保持点击直接进入设置，不展开菜单 | R-TOP-2 |
-| 设置页结构 | 设置首页显示入口，点击进入具体设置页 | R-SET-1、R-SET-2 |
-| 卡片格式角标 | 默认不加，确有需要再加 | R-CARD-2 |
-
-**相对 v3 的变化**
-
-| 主题 | v3 | v4 |
-| --- | --- | --- |
-| 文档 | 五份分散文档 | 三份基础规范合并为本文；两份专项文档改为迁移指引 |
-| 下拉框 | 只有无障碍名称 | 必须带可见标签（R-SEL-3） |
-| 视图切换 | 放在视图菜单里 | 工具栏直接显示分段图标控件（R-LIB-2） |
-| 搜索词标签 | 标题旁 | 与筛选合并成"当前筛选"一行（R-LIB-3） |
-| "清除全部筛选" | ⋯ 菜单里 | 当前筛选行里（R-LIB-4） |
-| 页面宽度与对齐 | 未规定，居中与不限宽混用 | 两档容器，统一靠左（R-PAGE-1/2） |
-| 侧栏 | 4 项平铺，标签 10px，叫"图书库" | 内容/管理两组，标签 11–12px，叫"书库"（R-NAV-2/3/4） |
-| 删除入口 | 未明确 | `danger`，菜单底部（R-BTN-3、R-MENU-2） |
-| 详情页 | 允许"暂未开放"标签；删除为常驻大按钮 | 未实现标签不显示；删除收入 ⋯；状态用分段控件（R-DETAIL-3/7） |
-| 阅读状态徽标 | 样式不统一 | 同形状，图标 + 色阶（R-BADGE-2） |
-| 设置页 | 桌面一页展开并带标签栏，移动是入口卡片 | 两端一致：入口列表 → 具体设置页（R-SET-1） |
-| 分页当前页 | `soft` | 中性样式（R-BTN-7） |
-| 横向滚动 | 隐藏滚动条 | 必须有可见提示（R-HOME-2、R-A11Y-3） |
-| 快捷键提示 | 写死 `Ctrl K` | 按系统显示（R-TOP-1） |
-
-### v4.1 澄清（2026-11-14）
-
-| 主题 | 已确定的规则 |
-| --- | --- |
-| 手机横屏与低窗口 | 宽 ≥ 768 且高 ≥ 480 才用图标轨，其他用抽屉；所有触发与清理共用条件 |
-| 对齐 | 全局靠左；窄屏详情头部、认证面板为明确例外 |
-| 控件选择 | 简短互斥选项优先分段；书库筛选/排序与编辑表单状态允许有标签的下拉 |
-| 详情菜单 | 单项删除也保留在菜单中，不增加占位功能 |
-| 字号 | 可读文字不得低于 11px；过小缩略图省略文字 |
-| 网格尺寸入口 | 仅网格显示，列表保留偏好，切回时恢复 |
-| 文档验收 | 文档改动验证链接与一致性；应用截图和测试只报告实际运行结果 |
