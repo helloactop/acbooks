@@ -21,12 +21,9 @@ import androidx.compose.ui.unit.dp
 import app.acbooks.R
 import app.acbooks.core.database.LocalBookCard
 import kotlin.math.roundToInt
-import top.yukonga.miuix.kmp.basic.DropdownEntry
-import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.glass.GlassIconButton
-import top.yukonga.miuix.kmp.glass.GlassIconDropdownMenu
 import top.yukonga.miuix.kmp.glass.GlassPopupAnchor
 import top.yukonga.miuix.kmp.glass.GlassPopupItem
 import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
@@ -35,11 +32,14 @@ import top.yukonga.miuix.kmp.glass.glassPopupAnchor
 import top.yukonga.miuix.kmp.glass.glassPopupAnchorContent
 import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.glass.Add
 import top.yukonga.miuix.kmp.icon.glass.BookOutline
+import top.yukonga.miuix.kmp.icon.glass.GridView
 import top.yukonga.miuix.kmp.icon.glass.Delete
 import top.yukonga.miuix.kmp.icon.glass.Edit
 import top.yukonga.miuix.kmp.icon.glass.Info
 import top.yukonga.miuix.kmp.icon.glass.More
+import top.yukonga.miuix.kmp.icon.glass.Refresh
 import top.yukonga.miuix.kmp.icon.glass.Tune
 
 internal enum class LibraryMenu { Display, More, Book }
@@ -99,57 +99,56 @@ internal fun BoxScope.LibraryMenus(
     onChangeShelves: (String) -> Unit,
     onDelete: (LocalBookCard) -> Unit,
 ) {
-    GlassIconDropdownMenu(
+    // The Miuix GlassIconDropdownMenu does not forward DropdownItem.icon to the
+    // underlying GlassPopupItem, so use GlassTransformPopup for visible icon + text rows.
+    GlassTransformPopup(
         show = activeMenu == LibraryMenu.Display,
         onDismissRequest = { onDismiss(LibraryMenu.Display) },
         anchor = displayAnchor,
         anchorContent = { LibraryMenuIcon(LibraryMenu.Display) },
-        entries = listOf(
-            DropdownEntry(
-                items = listOf(
-                    DropdownItem(
-                        text = stringResource(R.string.library_display_mode),
-                        children = listOf(
-                            DropdownItem(
-                                text = stringResource(R.string.library_compact),
-                                selected = mode == LibraryDisplayMode.Compact,
-                                onClick = { onDisplayMode(LibraryDisplayMode.Compact) },
-                            ),
-                            DropdownItem(
-                                text = stringResource(R.string.library_comfortable),
-                                selected = mode == LibraryDisplayMode.Comfortable,
-                                onClick = { onDisplayMode(LibraryDisplayMode.Comfortable) },
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        ),
         backdrop = backdrop,
-    )
-    GlassIconDropdownMenu(
+    ) {
+        GlassPopupItem(
+            text = stringResource(R.string.library_compact),
+            icon = MiuixIcons.Glass.GridView,
+            selected = mode == LibraryDisplayMode.Compact,
+            onClick = {
+                onDisplayMode(LibraryDisplayMode.Compact)
+                onDismiss(LibraryMenu.Display)
+            },
+        )
+        GlassPopupItem(
+            text = stringResource(R.string.library_comfortable),
+            icon = MiuixIcons.Glass.BookOutline,
+            selected = mode == LibraryDisplayMode.Comfortable,
+            onClick = {
+                onDisplayMode(LibraryDisplayMode.Comfortable)
+                onDismiss(LibraryMenu.Display)
+            },
+        )
+    }
+    GlassTransformPopup(
         show = activeMenu == LibraryMenu.More,
         onDismissRequest = { onDismiss(LibraryMenu.More) },
         anchor = moreAnchor,
         anchorContent = { LibraryMenuIcon(LibraryMenu.More) },
-        entries = listOf(
-            DropdownEntry(
-                items = buildList {
-                    add(DropdownItem(
-                        text = stringResource(R.string.library_add_books),
-                        enabled = !importing,
-                        onClick = onAddBooks,
-                    ))
-                    if (cloudConnected) add(DropdownItem(
-                        text = stringResource(R.string.cloud_sync_now),
-                        enabled = !cloudBusy,
-                        onClick = onSync,
-                    ))
-                },
-            ),
-        ),
         backdrop = backdrop,
-    )
+    ) {
+        GlassPopupItem(
+            text = stringResource(R.string.library_add_books),
+            icon = MiuixIcons.Glass.Add,
+            enabled = !importing,
+            onClick = onAddBooks,
+        )
+        if (cloudConnected) {
+            GlassPopupItem(
+                text = stringResource(R.string.cloud_sync_now),
+                icon = MiuixIcons.Glass.Refresh,
+                enabled = !cloudBusy,
+                onClick = onSync,
+            )
+        }
+    }
     BookContextMenu(
         target = bookTarget,
         show = activeMenu == LibraryMenu.Book,
