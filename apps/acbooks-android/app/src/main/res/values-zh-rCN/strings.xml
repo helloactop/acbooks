@@ -92,6 +92,14 @@
     <string name="reader_previous">上一页</string>
     <string name="reader_contents">目录</string>
     <string name="reader_typography_title">阅读排版</string>
+    <string name="reader_typography_scope">设置范围</string>
+    <string name="reader_typography_scope_global">全局默认</string>
+    <string name="reader_typography_scope_book">仅此书</string>
+    <string name="reader_typography_global_note">全局默认适用于没有单独排版设置的书籍。</string>
+    <string name="reader_typography_global_override_note">本书正在使用独立排版；修改全局默认不会改变本书显示效果。</string>
+    <string name="reader_typography_book_note">此处的排版设置仅对本书生效，优先于全局默认。</string>
+    <string name="reader_typography_book_new_note">在这里调整任意设置后，将为本书创建独立排版配置。</string>
+    <string name="reader_typography_book_inherit">本书恢复使用全局设置</string>
     <string name="reader_typography_font">字体</string>
     <string name="reader_typography_font_book">原书</string>
     <string name="reader_typography_font_serif">衬线</string>
