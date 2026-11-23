@@ -3,6 +3,7 @@ package app.acbooks.reader
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -75,12 +76,16 @@ internal fun LocalReaderScreen(
     }
     val backdrop = rememberLayerBackdrop()
     var showContents by rememberSaveable(bookId) { mutableStateOf(false) }
+    var toolbarVisible by rememberSaveable(bookId) { mutableStateOf(false) }
     var chapters by remember(bookId) { mutableStateOf<List<ReaderChapter>?>(null) }
     var currentHref by remember(bookId) { mutableStateOf<String?>(null) }
     var epubFragment by remember(bookId) { mutableStateOf<EpubDocumentFragment?>(null) }
     val readerInsets = WindowInsets.navigationBarsIgnoringVisibility
         .union(WindowInsets.displayCutout)
         .union(WindowInsets.ime)
+    BackHandler(enabled = toolbarVisible && !showContents) {
+        toolbarVisible = false
+    }
     // Miuix glass sheets use the Scaffold overlay host; keep the reader's own insets.
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -88,16 +93,13 @@ internal fun LocalReaderScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { _ ->
         Box(
-            Modifier.fillMaxSize()
-                .background(colors.background)
-                .windowInsetsPadding(readerInsets),
+            Modifier.fillMaxSize().windowInsetsPadding(readerInsets),
             contentAlignment = Alignment.Center,
         ) {
-            Box(
-                Modifier.fillMaxSize().layerBackdrop(backdrop),
-                contentAlignment = Alignment.Center,
-            ) {
-                when (val reader = state) {
+            // Record only the static paper surface. Capturing Readium's WebView inside
+            // layerBackdrop causes repeated re-rendering and visible EPUB flicker.
+            Box(Modifier.matchParentSize().layerBackdrop(backdrop).background(colors.background))
+            when (val reader = state) {
                     ReaderState.Loading -> CircularProgressIndicator()
                     ReaderState.Unavailable -> Text(stringResource(R.string.reader_open_failed))
                     is ReaderState.Ready -> {
@@ -112,9 +114,17 @@ internal fun LocalReaderScreen(
                                 modifier = Modifier.fillMaxSize(),
                                 arguments = args,
                                 onUpdate = { fragment ->
-                                    epubFragment = fragment
-                                    fragment.onContentsChanged = { chapters = it }
-                                    fragment.onCurrentHrefChanged = { currentHref = it }
+                                    // Callback registration belongs to the Fragment lifetime.
+                                    // Re-registering on every Compose update feeds reader events
+                                    // back into composition and causes redundant invalidations.
+                                    if (epubFragment !== fragment) {
+                                        epubFragment = fragment
+                                        fragment.onContentsChanged = { chapters = it }
+                                        fragment.onCurrentHrefChanged = { currentHref = it }
+                                    }
+                                    fragment.onCenterTap = {
+                                        if (!showContents) toolbarVisible = !toolbarVisible
+                                    }
                                 },
                             )
                         } else {
@@ -122,11 +132,13 @@ internal fun LocalReaderScreen(
                         }
                     }
                 }
-            }
             val ready = state as? ReaderState.Ready
             if (ready?.file?.format == "epub") {
-                GlassIconButton(
-                    onClick = { showContents = true },
+                if (toolbarVisible && !showContents) GlassIconButton(
+                    onClick = {
+                        toolbarVisible = false
+                        showContents = true
+                    },
                     modifier = Modifier.align(Alignment.BottomStart)
                         .padding(start = 16.dp, bottom = 16.dp),
                     backdrop = backdrop,
@@ -145,6 +157,7 @@ internal fun LocalReaderScreen(
                     onSelect = { chapter ->
                         if (epubFragment?.goToChapter(chapter.link) == true) {
                             showContents = false
+                            toolbarVisible = false
                         }
                     },
                 )
