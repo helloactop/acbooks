@@ -18,6 +18,7 @@ from app.modules.books.schemas import (
     BookFilterSchema,
     BookOrder,
     BookPage,
+    BookShelfPage,
     BookSort,
     BookUpdate,
     MediaType,
@@ -190,6 +191,24 @@ def books_router(
     ) -> BatchResult:
         response.headers["Cache-Control"] = "no-store"
         return service.batch_delete(payload)
+
+    @router.get(
+        "/shelves",
+        operation_id="listBookShelves",
+        response_model=BookShelfPage,
+        responses={
+            200: {"headers": no_store},
+            **{status: problem_openapi(status) for status in (401, 403, 422, 500)},
+        },
+    )
+    def list_shelves(
+        response: Response,
+        current: Annotated[AuthIdentity, Depends(dependencies.require_session)],
+        after: Annotated[UUID | None, Query()] = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 100,
+    ) -> BookShelfPage:
+        response.headers["Cache-Control"] = "no-store"
+        return service.list_shelves(after=after, limit=limit)
 
     @router.get(
         "/{bookId}",

@@ -9,6 +9,7 @@ import app.acbooks.core.database.PendingCloudUpload
 import app.acbooks.core.database.ReadingPositionChange
 import app.acbooks.core.database.RemoteCatalogBook
 import app.acbooks.core.database.RemoteCatalogFile
+import app.acbooks.core.database.RemoteShelf
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
@@ -54,6 +55,8 @@ internal fun bookCreatePayload(book: LocalBook, bibliography: BookBibliography? 
     }
     (book.description ?: bibliography?.description)?.takeIf(String::isNotBlank)?.let { data.put("description", it.take(20_000)) }
     book.series?.let { data.put("series", it.take(200)) }
+    book.publisher?.let { data.put("publisher", it.take(200)) }
+    book.publicationDate?.let { data.put("publicationDate", it.take(80)) }
     isbn?.filterNot { it.isWhitespace() || it == '-' }?.uppercase()
         ?.takeIf { it.matches(Regex("(?:[0-9]{13}|[0-9]{9}[0-9X])")) }?.let { data.put("isbn", it) }
     if (book.readingStatus != "unread") data.put("readingStatus", book.readingStatus)
@@ -110,15 +113,49 @@ internal class LibraryCloudClient(private val origin: String) {
         ) throw IOException("Server did not confirm that the book was created")
     }
 
+    fun updateBook(token: String, deviceId: String, bookId: String, revision: Long, editId: String, data: JSONObject): Boolean {
+        val mutationId = UUID.nameUUIDFromBytes("acbooks:book.update:$editId:$revision".toByteArray(UTF_8)).toString()
+        val mutation = JSONObject().put("mutationId", mutationId).put("entityId", bookId.asUuid())
+            .put("baseRevision", revision).put("action", "book.update").put("data", data)
+        val response = json("/sync/mutations", token, "POST",
+            JSONObject().put("deviceId", deviceId).put("mutations", JSONArray().put(mutation)))
+        val receipt = response.getJSONArray("receipts").getJSONObject(0)
+        if (receipt.getString("mutationId") != mutationId) throw IOException("Invalid book update receipt")
+        return when (receipt.getString("status")) {
+            "accepted" -> {
+                val current = receipt.getJSONObject("current")
+                if (current.getString("entityId") != bookId || current.getString("operation") != "upsert") {
+                    throw IOException("Server did not confirm the book update")
+                }
+                true
+            }
+            "conflict" -> false
+            else -> throw IOException("Server rejected the book update")
+        }
+    }
+
+    fun uploadCover(token: String, bookId: String, file: File) {
+        val boundary = UUID.randomUUID().toString()
+        val head = ("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"cover.jpg\"\r\n" +
+            "Content-Type: image/jpeg\r\n\r\n").toByteArray(UTF_8)
+        uploadPart("/books/${bookId.asUuid()}/cover", "PUT", token, file, boundary, head, setOf(200))
+    }
+
     fun upload(token: String, bookId: String, format: String, file: File): JSONObject {
         require(format in setOf("epub", "pdf"))
         val boundary = UUID.randomUUID().toString()
         val head = ("--$boundary\r\nContent-Disposition: form-data; name=\"bookId\"\r\n\r\n${bookId.asUuid()}\r\n" +
             "--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"book.$format\"\r\n" +
             "Content-Type: application/octet-stream\r\n\r\n").toByteArray(UTF_8)
+        return uploadPart("/uploads?reuseExisting=true", "POST", token, file, boundary, head, setOf(200, 201))
+    }
+
+    private fun uploadPart(
+        path: String, method: String, token: String, file: File, boundary: String, head: ByteArray, accepted: Set<Int>,
+    ): JSONObject {
         val tail = "\r\n--$boundary--\r\n".toByteArray(UTF_8)
         return request(
-            "/uploads?reuseExisting=true", "POST", token, setOf(200, 201),
+            path, method, token, accepted,
             contentType = "multipart/form-data; boundary=$boundary",
             length = head.size + file.length() + tail.size,
             write = { output ->
@@ -208,6 +245,34 @@ internal class LibraryCloudClient(private val origin: String) {
             positions.values.toList(), readerRecords.values.toList())
     }
 
+    fun listShelves(token: String): List<RemoteShelf>? {
+        val shelves = linkedMapOf<String, RemoteShelf>()
+        var after: String? = null
+        while (true) {
+            val cursor = after?.let { "&after=$it" }.orEmpty()
+            val page = try {
+                json("/books/shelves?limit=100$cursor", token)
+            } catch (failure: CloudHttpException) {
+                // Older servers route this path to the Book UUID endpoint.
+                if (after == null && failure.status in setOf(404, 422)) return null
+                throw failure
+            }
+            val items = page.getJSONArray("items")
+            var last = after
+            for (index in 0 until items.length()) {
+                val shelf = items.getJSONObject(index).toRemoteShelf()
+                if (last != null && shelf.id <= last) throw IOException("Invalid server shelf page")
+                shelves[shelf.id] = shelf
+                last = shelf.id
+            }
+            val next = page.optionalString("nextAfter") ?: break
+            if (items.length() == 0 || next.asUuid() != last) throw IOException("Invalid server shelf cursor")
+            after = next
+        }
+
+        return shelves.values.toList()
+    }
+
     private fun pullChanges(token: String, start: Long, accept: (JSONObject) -> Unit): Long {
         var after = start
         var through: Long? = null
@@ -242,6 +307,22 @@ internal class LibraryCloudClient(private val origin: String) {
 
     fun <T> cover(token: String, bookId: String, version: Long, read: (HttpsURLConnection) -> T): T =
         request("/books/${bookId.asUuid()}/cover?v=$version", "GET", token, setOf(200), read = read)
+
+    fun coverMatches(token: String, bookId: String, version: Long, expected: File): Boolean =
+        cover(token, bookId, version) { response ->
+            if (response.contentLengthLong >= 0 && response.contentLengthLong != expected.length()) return@cover false
+            response.inputStream.use { stream ->
+                val bytes = expected.readBytes()
+                var offset = 0
+                val buffer = ByteArray(8192)
+                while (offset < bytes.size) {
+                    val length = stream.read(buffer, 0, minOf(buffer.size, bytes.size - offset))
+                    if (length < 0 || (0 until length).any { buffer[it] != bytes[offset + it] }) return@cover false
+                    offset += length
+                }
+                stream.read() == -1
+            }
+        }
 
     private fun json(path: String, token: String? = null, method: String = "GET", body: JSONObject? = null): JSONObject {
         val bytes = body?.toString()?.toByteArray(UTF_8)
@@ -348,3 +429,6 @@ private fun applyCatalogRecord(
 internal fun String.asUuid(): String = UUID.fromString(this).toString().also { require(it == this) }
 
 private fun JSONObject.optionalString(name: String): String? = if (isNull(name)) null else getString(name)
+
+internal fun JSONObject.toRemoteShelf(): RemoteShelf =
+    RemoteShelf(getString("id").asUuid(), getString("name"))

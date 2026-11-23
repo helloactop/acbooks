@@ -58,7 +58,7 @@ Books Core V1 提供书目创建、列表、详情、部分更新、单本/批�
 }
 ```
 
-- `title` 必填，1–500 字符。
+- `title` 必填，1–500 字符。出版社 `publisher` 和出版日期 `publicationDate` 可空，分别最多 200 和 80 字符。出版日期保留书目原有的精度，例如年份、年月或完整日期。
 - `description`、`authors`、`translators`、`isbn`、`tags`、`shelves`、`copies` 可选；
   `authors`/`translators`/`tags`/`shelves` 各最多 20 项，名称最多 200 字符。
 - `copies` 为实体副本数组（最多 20 个），每项含 `locationId`、`acquiredAt`
@@ -162,20 +162,27 @@ Books Core V1 提供书目创建、列表、详情、部分更新、单本/批�
 
 `GET /api/v1/books/{bookId}` → `200 BookDetail`
 
-`BookDetail` 在列表字段之外包含 `description`、`identifiers`、`copies`、`files`：
+`BookDetail` 在列表字段之外包含 `description`、`series`、`publisher`、`publicationDate`、`identifiers`、`copies`、`files`：
 
+- `shelfRefs` 返回书架的 UUID 和名称，各项为 `{id, name}`。`shelves` 仍返回名称列表。
 - `identifiers`: `{"scheme": "isbn", "value": "9787020002207"}`
 - `copies`: `id`、`locationId`、`locationName`、`acquiredAt`、`note`
 - `files`: `id`、`format`、`fileStatus`、`sizeBytes`
 
 不存在时返回 `404 BOOK_NOT_FOUND`。
 
+#### 书架目录
+
+`GET /api/v1/books/shelves` → `200 BookShelfPage`
+
+按服务器书架 UUID 升序返回 `{items, nextAfter}`，各项含 `id` 和 `name`，包含空书架。每页 `limit` 为 1–100，默认 100。将上一页的 `nextAfter` 传入 `after` 读取后续页，`nextAfter=null` 时结束。
+
 ### 3.5 部分更新
 
 `PATCH /api/v1/books/{bookId}` → `200 BookDetail`
 
 - 未提交的字段保持不变。
-- `description` 或 `isbn` 传 `null` 时清空；其他字段不接受 `null`。
+- `description`、`isbn`、`series`、`publisher` 和 `publicationDate` 传 `null` 时清空。
 - `authors`、`translators`、`tags`、`shelves` 使用数组整体替换，空数组清空。
 - 空对象 `{}` 返回 `422 VALIDATION_ERROR`。
 - 更新不会删除副本、文件、阅读会话、书签、划线或笔记。

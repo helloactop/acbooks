@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.acbooks.core.database.LocalBookCard
+import app.acbooks.library.BookEditSheet
 import app.acbooks.library.BookMenuTarget
 import app.acbooks.library.LibraryCatalog
 import app.acbooks.library.LibraryDeleteDialog
@@ -71,6 +72,7 @@ import top.yukonga.miuix.kmp.glass.glassSearchBarTransition
 import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
 import top.yukonga.miuix.kmp.glass.rememberGlassSearchBarAlpha
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.glass.Back
 import top.yukonga.miuix.kmp.icon.glass.BookOutline
 import top.yukonga.miuix.kmp.icon.glass.DigitalStatistics
 import top.yukonga.miuix.kmp.icon.glass.HomeOutline
@@ -103,8 +105,16 @@ internal fun MainTabs(
     val searchBarAlpha = rememberGlassSearchBarAlpha(searchExpanded)
     val topBarTransition = Modifier.glassSearchBarTransition(searchExpanded) { 1f }
     val displayMode by library.displayMode.collectAsStateWithLifecycle()
+    var shelfId by rememberSaveable { mutableStateOf<String?>(null) }
+    val currentShelf = remember(catalog.shelves, shelfId) { catalog.shelves.firstOrNull { it.shelf.id == shelfId } }
+    LaunchedEffect(catalog.loaded, catalog.failed, currentShelf) {
+        if (catalog.loaded && !catalog.failed && currentShelf == null) shelfId = null
+    }
     val importProgress by library.progress.collectAsStateWithLifecycle()
     val cloud by library.cloudState.collectAsStateWithLifecycle()
+    val editor by library.bookEditor.collectAsStateWithLifecycle()
+    val editorBookId = editor?.bookId
+    val editingBook = remember(catalog.books, editorBookId) { catalog.books.firstOrNull { it.id == editorBookId } }
     val displayAnchor = rememberGlassPopupAnchor()
     val moreAnchor = rememberGlassPopupAnchor()
     var libraryMenu by remember { mutableStateOf<LibraryMenu?>(null) }
@@ -138,10 +148,10 @@ internal fun MainTabs(
     }
 
     BackHandler(
-        enabled = isCurrentDestination && !searchExpanded && libraryMenu == null && importProgress == null &&
+        enabled = isCurrentDestination && !searchExpanded && libraryMenu == null && importProgress == null && editor == null &&
             (pager.settledPage != 0 || pager.targetPage != 0),
     ) {
-        selectTab(0)
+        if (pager.settledPage == 1 && shelfId != null) shelfId = null else selectTab(0)
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -204,13 +214,21 @@ internal fun MainTabs(
                                 )
                             } else {
                                 GlassTopAppBar(
-                                    title = items[page].label.orEmpty(),
+                                    title = if (page == 1 && currentShelf != null) currentShelf.shelf.name
+                                    else items[page].label.orEmpty(),
                                     modifier = Modifier.semantics { heading() },
                                     contentModifier = topBarTransition,
                                     expandable = true,
                                     progressiveBlur = page == 1,
                                     scrollBehavior = scrollBehavior,
                                     backdrop = backdrop,
+                                    navigationIcon = {
+                                        if (page == 1 && currentShelf != null) {
+                                            GlassIconButton(onClick = { shelfId = null }, backdrop = backdrop) {
+                                                Icon(MiuixIcons.Glass.Back, stringResource(R.string.library_back_to_root))
+                                            }
+                                        }
+                                    },
                                     actions = {
                                         if (page == 1) {
                                             LibraryTopBarActions(displayAnchor, moreAnchor) { libraryMenu = it }
@@ -228,10 +246,12 @@ internal fun MainTabs(
                             )
                             1 -> LibraryScreen(
                                 catalog = catalog,
+                                shelfId = currentShelf?.shelf?.id,
                                 mode = displayMode,
                                 scrollBehavior = scrollBehavior,
                                 pagePadding = pagePadding,
                                 coverFile = library::coverFile,
+                                onOpenShelf = { shelfId = it },
                                 onRead = onReadBook,
                                 onDetails = onOpenBook,
                                 onShowMenu = { target ->
@@ -250,11 +270,21 @@ internal fun MainTabs(
                 }
             }
             LibraryImportDialog(
-                progress = importProgress.takeIf { isCurrentDestination },
+                progress = importProgress.takeIf { isCurrentDestination && editor == null },
                 backdrop = navigationBackdrop,
                 onStop = library::cancelImport,
                 onImportMatches = library::importMatches,
                 onDismiss = library::dismissImport,
+            )
+            BookEditSheet(
+                editor = editor,
+                cover = editingBook?.let(library::coverFile),
+                backdrop = navigationBackdrop,
+                library = library,
+                onDismissFinished = {
+                    editor?.savedMessage?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+                    library.finishBookEditorDismissal()
+                },
             )
             LibraryDeleteDialog(
                 book = deleteTarget,
@@ -327,6 +357,10 @@ internal fun MainTabs(
             onDetails = { id ->
                 libraryMenu = null
                 onOpenBook(id)
+            },
+            onEdit = { id ->
+                libraryMenu = null
+                library.openBookEditor(id)
             },
             onDelete = { book ->
                 libraryMenu = null

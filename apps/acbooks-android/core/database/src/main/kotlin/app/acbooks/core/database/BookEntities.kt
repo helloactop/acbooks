@@ -35,6 +35,10 @@ data class LocalBook(
     @ColumnInfo(defaultValue = "0") val createdAt: Long = importedAt,
     @ColumnInfo(defaultValue = "0") val updatedAt: Long = importedAt,
     val preferredFileId: String? = null,
+    val publisher: String? = null,
+    val publicationDate: String? = null,
+    val editedCoverKey: String? = null,
+    @ColumnInfo(defaultValue = "0") val metadataEdited: Boolean = false,
 )
 
 @Entity(tableName = "file_objects", primaryKeys = ["sha256", "format"])
@@ -69,4 +73,5 @@ data class LocalBookCard(
     val cloudBacked: Boolean = false,
     val canDownload: Boolean = false,
     val cloudCoverKey: String? = null,
+    val editedCoverKey: String? = null,
 )

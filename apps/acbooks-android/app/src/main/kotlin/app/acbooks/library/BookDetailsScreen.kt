@@ -185,7 +185,6 @@ private fun BookDetailsContent(
                             item(key = "library") { BookLibraryCard(book, details) }
                         } else {
                             item(key = "statistics") { BookReadingStatisticsCard(details.readingStatistics) }
-                            item(key = "progress") { BookReadingProgressCard(details.readingLocation) }
                         }
                     }
                 }
@@ -233,7 +232,7 @@ private fun BookDetailsSummary(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (progress != null) ReadingProgressBar(progress, showLabel = true)
+            if (progress != null) ReadingProgressBar(progress)
         }
     }
 }

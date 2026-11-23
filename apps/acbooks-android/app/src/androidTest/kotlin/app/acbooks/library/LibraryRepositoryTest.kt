@@ -69,10 +69,12 @@ class LibraryRepositoryTest {
     @Test
     fun importingAndDeletingSharedBooksKeepsTheLastReferenceReadable() = runBlocking {
         val pdf = pdfBytes()
-        val firstSource = addSource(pdf)
+        val firstSource = addSource(pdf, label = "acbooks-room-978-0-306-40615-7")
         val secondSource = addSource(pdf)
-        assertEquals(ImportOutcome.Added, repository.import(firstSource, allowMatchingContent = false))
+        val firstImport = repository.import(firstSource, allowMatchingContent = false)
         val firstBook = repository.books.first().single()
+        assertEquals(ImportOutcome.Added(firstBook.id, "9780306406157"), firstImport)
+        assertEquals("9780306406157", database.library().bookIdentifiers(firstBook.id).single().value)
         val firstFile = requireNotNull(repository.openBook(firstBook.id))
         val cover = requireNotNull(repository.coverFile(firstBook.sha256))
         cover.parentFile!!.mkdirs()
@@ -81,7 +83,7 @@ class LibraryRepositoryTest {
         assertEquals(ImportOutcome.Duplicate, repository.import(firstSource, allowMatchingContent = true))
         assertEquals(ImportOutcome.MatchingContent, repository.import(secondSource, allowMatchingContent = false))
         assertEquals(listOf(firstBook.id), repository.books.first().map { it.id })
-        assertEquals(ImportOutcome.Added, repository.import(secondSource, allowMatchingContent = true))
+        assertTrue(repository.import(secondSource, allowMatchingContent = true) is ImportOutcome.Added)
 
         val remainingBook = repository.books.first().single { it.id != firstBook.id }
         val remainingFile = requireNotNull(repository.openBook(remainingBook.id))
@@ -149,9 +151,9 @@ class LibraryRepositoryTest {
         val pdf = pdfBytes()
         val firstSource = addSource(pdf)
         val secondSource = addSource(pdf)
-        assertEquals(ImportOutcome.Added, repository.import(firstSource, allowMatchingContent = false))
+        assertTrue(repository.import(firstSource, allowMatchingContent = false) is ImportOutcome.Added)
         val firstBook = repository.books.first().single()
-        assertEquals(ImportOutcome.Added, repository.import(secondSource, allowMatchingContent = true))
+        assertTrue(repository.import(secondSource, allowMatchingContent = true) is ImportOutcome.Added)
         val secondBook = repository.books.first().single { it.id != firstBook.id }
         val firstFile = requireNotNull(repository.openBook(firstBook.id))
         val secondFile = requireNotNull(repository.openBook(secondBook.id))
@@ -215,7 +217,7 @@ class LibraryRepositoryTest {
         val account = UUID.randomUUID().toString()
         val profile = dao.saveCurrentServerProfile(account, account, UUID.randomUUID().toString(), "https://example.invalid", 1)
         val source = addSource(pdfBytes())
-        assertEquals(ImportOutcome.Added, repository.import(source, allowMatchingContent = false))
+        assertTrue(repository.import(source, allowMatchingContent = false) is ImportOutcome.Added)
         val book = repository.books.first().single()
         val file = requireNotNull(repository.openBook(book.id))
 
@@ -236,13 +238,13 @@ class LibraryRepositoryTest {
         val pdf = pdfBytes()
         val originalSource = addSource(pdf)
         val replacementSource = addSource(pdf)
-        assertEquals(ImportOutcome.Added, repository.import(originalSource, allowMatchingContent = false))
+        assertTrue(repository.import(originalSource, allowMatchingContent = false) is ImportOutcome.Added)
         val original = repository.books.first().single()
 
         coroutineScope {
             val importing = async { repository.import(replacementSource, allowMatchingContent = true) }
             val deleting = async { repository.deleteLocalBook(original.id) }
-            assertEquals(ImportOutcome.Added, importing.await())
+            assertTrue(importing.await() is ImportOutcome.Added)
             assertTrue(deleting.await())
         }
 
@@ -255,7 +257,7 @@ class LibraryRepositoryTest {
     fun lostTreeGrantAndCacheEvictionKeepBookAndReadableSafOriginal() = runBlocking {
         val pdf = pdfBytes()
         val source = addSource(pdf)
-        assertEquals(ImportOutcome.Added, repository.import(source, allowMatchingContent = false))
+        assertTrue(repository.import(source, allowMatchingContent = false) is ImportOutcome.Added)
         val book = repository.books.first().single()
         val hash = requireNotNull(book.sha256)
         val originalCopy = requireNotNull(repository.openBook(book.id))
@@ -299,9 +301,9 @@ class LibraryRepositoryTest {
         assertEquals(locator, repository.readingPosition(recovered.id))
     }
 
-    private fun addSource(pdf: ByteArray): Uri {
+    private fun addSource(pdf: ByteArray, label: String = "acbooks-room"): Uri {
         val values = ContentValues().apply {
-            put(MediaStore.Downloads.DISPLAY_NAME, "acbooks-room-${UUID.randomUUID()}.pdf")
+            put(MediaStore.Downloads.DISPLAY_NAME, "$label-${UUID.randomUUID()}.pdf")
             put(MediaStore.Downloads.MIME_TYPE, "application/pdf")
             put(MediaStore.Downloads.IS_PENDING, 1)
         }

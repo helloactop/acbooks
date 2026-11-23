@@ -98,6 +98,12 @@ def test_create_book_persists_metadata_and_does_not_merge_isbn(
     assert book["readingStatus"] == "unread"
     assert book["tags"] == ["文学"]
     assert book["shelves"] == ["书房"]
+    [shelf] = book["shelfRefs"]
+    assert shelf["name"] == "书房"
+    UUID(shelf["id"])
+    shelf_page = browser.get(f"{BOOKS}/shelves")
+    assert shelf_page.status_code == 200
+    assert shelf_page.json() == {"items": [shelf], "nextAfter": None}
     assert book["copyCount"] == 0
     assert book["fileCount"] == 0
     assert book["formats"] == []
@@ -111,6 +117,7 @@ def test_create_book_persists_metadata_and_does_not_merge_isbn(
 
     second = create_book(browser, title="同名不同书")
     assert second["id"] != book["id"]
+    assert second["shelfRefs"] == [shelf]
     listing = browser.get(BOOKS)
     assert listing.status_code == 200
     assert listing.json()["total"] == 2

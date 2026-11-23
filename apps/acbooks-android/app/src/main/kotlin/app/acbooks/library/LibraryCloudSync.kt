@@ -5,6 +5,9 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import app.acbooks.core.database.LibraryDao
+import app.acbooks.core.database.PendingBookEdit
+import app.acbooks.core.database.RemoteCatalogBook
+import app.acbooks.core.database.RemoteShelfSnapshot
 import app.acbooks.core.database.PendingCloudUpload
 import app.acbooks.core.database.PendingCloudDownload
 import app.acbooks.core.database.RemoteFileStatus
@@ -29,6 +32,7 @@ import org.json.JSONException
 import org.json.JSONObject
 
 internal class CloudIdentityChanged : IOException("The configured server identity changed")
+internal class CloudSignInRequired : IOException("No active server session")
 internal data class CloudConnection(val origin: String? = null, val username: String? = null, val hasSession: Boolean = false)
 private val cloudSyncLock = Mutex()
 
@@ -52,9 +56,12 @@ internal class LibraryCloudSync(
     suspend fun searchDoubanMetadata(query: String): List<DoubanMetadataCandidate> = serialized {
         val search = query.trim()
         require(search.length in 1..200)
-        val session = verifiedSession() ?: throw IOException("No active server session")
+        val session = verifiedSession() ?: throw CloudSignInRequired()
         session.client.searchDoubanMetadata(session.token, search)
     }
+
+    suspend fun saveBookEdit(bookId: String, initial: BookEditSession, draft: BookEditDraft): Boolean =
+        serialized { library.saveBookEdit(bookId, initial, draft) }
 
     suspend fun login(address: String, username: String, password: String, replaceCurrent: Boolean) = serialized {
         val origin = serverOrigin(address)
@@ -134,20 +141,106 @@ internal class LibraryCloudSync(
             }
         }
         if (changed) pullCatalog(session)
+        val completedEdits = uploadBookEdits(session)
+        if (completedEdits.isNotEmpty()) pullCatalog(session)
+        refreshShelves(session, completedEdits.mapTo(mutableSetOf()) { it.mutationId })
+        for (edit in completedEdits) dao.completeBookEdit(edit.bookId, edit.mutationId)
         uploadReadingPositions(session)
         uploadReaderRecords(session)
         retryDownloads(session)
         library.cacheCloudCovers(dao.cachedRemoteBooks(profile.id), client, token)
         !dao.hasPendingCloudUploads(profile.id) && dao.dirtyReadingFiles(profile.id).isEmpty() &&
-            dao.pendingDownloads(profile.id).isEmpty()
+            dao.pendingDownloads(profile.id).isEmpty() && dao.pendingBookEdits(profile.id).isEmpty()
     }
 
     suspend fun hasRetryableWork(): Boolean {
         val profile = dao.currentServerProfile() ?: return false
-        return dao.pendingDownloads(profile.id).isNotEmpty() || dao.dirtyReadingFiles(profile.id).isNotEmpty() ||
+        return dao.pendingBookEdits(profile.id).isNotEmpty() || dao.pendingDownloads(profile.id).isNotEmpty() ||
+            dao.dirtyReadingFiles(profile.id).isNotEmpty() ||
             dao.pendingCloudUploads(profile.id).any { !it.blocked &&
                 it.lastError !in setOf("REMOTE_FILE_CHANGED", "REMOTE_BOOK_NOT_CONFIRMED", "SOURCE_PERMISSION_REQUIRED")
             }
+    }
+
+    private suspend fun uploadBookEdits(session: CloudSession): List<PendingBookEdit> {
+        val profileId = session.profile.id
+        val completed = mutableListOf<PendingBookEdit>()
+        for (edit in dao.pendingBookEdits(profileId)) {
+            val link = dao.remoteBookLink(profileId, edit.bookId)
+            if (link?.remoteBookId != edit.remoteBookId) continue
+            val remote = dao.remoteCatalogBook(profileId, edit.remoteBookId) ?: continue
+            try {
+                if (pushBookEdit(session, edit, remote)) completed.add(edit)
+            } catch (failure: CloudHttpException) {
+                if (failure.status in setOf(401, 403, 429) || failure.status >= 500) throw failure
+            } catch (_: IOException) {
+                // Preserve the pending patch for a retry.
+            }
+        }
+        return completed
+    }
+
+    private suspend fun refreshShelves(session: CloudSession, completed: Set<String>) {
+        val (profile, client, token) = session
+        val directory = client.listShelves(token) ?: return
+        val shelves = directory.associateBy { it.id }.toMutableMap()
+        val shelvesByName = directory.groupBy { it.name }
+        val memberships = mutableMapOf<String, Set<String>>()
+        for (book in dao.cachedRemoteBooks(profile.id)) {
+            val bookId = book.remoteBookId
+            val details = book.detailsJson?.let(::JSONObject) ?: continue
+            val refs = details.optJSONArray("shelfRefs")
+            if (refs != null) {
+                memberships[bookId] = (0 until refs.length()).mapTo(mutableSetOf()) { index ->
+                    val shelf = refs.getJSONObject(index).toRemoteShelf()
+                    shelves.putIfAbsent(shelf.id, shelf)
+                    shelf.id
+                }
+            } else {
+                val names = details.optJSONArray("shelves") ?: continue
+                val ids = (0 until names.length()).mapNotNull { shelvesByName[names.getString(it)]?.singleOrNull()?.id }
+                if (ids.size == names.length()) memberships[bookId] = ids.toSet()
+            }
+        }
+        val pending = dao.pendingBookEdits(profile.id)
+            .filter { it.mutationId !in completed && JSONObject(it.patchJson).has("shelves") }
+            .mapTo(mutableSetOf()) { it.bookId }
+        val snapshot = RemoteShelfSnapshot(shelves.values.sortedBy { it.id }, memberships)
+        dao.replaceRemoteShelves(profile.id, snapshot, pending)
+    }
+
+    private suspend fun pushBookEdit(session: CloudSession, edit: PendingBookEdit, remote: RemoteCatalogBook): Boolean {
+        val revision = dao.cloudCatalogVersion(edit.profileId, "book", edit.remoteBookId)
+            ?.takeUnless { it.deleted }?.revision ?: return false
+        val current = remote.detailsJson?.let(::JSONObject) ?: return false
+        val baseline = edit.baselineJson?.let(::JSONObject)
+        val desired = JSONObject(edit.patchJson)
+        val remaining = JSONObject()
+        for (key in desired.fieldNames()) {
+            if (desired.bookFieldMatches(current, key)) continue
+            if (baseline?.has(key) == true && !baseline.bookFieldMatches(current, key)) return false
+            remaining.put(key, desired.get(key))
+        }
+
+        val (profile, client, token) = session
+        val cover = edit.coverKey?.let { key ->
+            library.editedCoverFile(key)?.takeIf { it.isFile } ?: throw IOException("The edited book cover is unavailable")
+        }
+        val coverVersion = remote.coverUpdatedAt
+        val coverAlreadyUploaded = if (cover != null && baseline != null && coverVersion != edit.baseCoverVersion) {
+            if (coverVersion == null || !client.coverMatches(token, edit.remoteBookId, coverVersion, cover)) return false
+            true
+        } else false
+        if (remaining.length() > 0 && !client.updateBook(
+                token, checkNotNull(profile.deviceId), edit.remoteBookId, revision, edit.mutationId, remaining,
+            )
+        ) return false
+
+        if (cover != null) {
+            if (!coverAlreadyUploaded) client.uploadCover(token, edit.remoteBookId, cover)
+            dao.queueBookEdit(edit.copy(coverKey = null))
+        }
+        return true
     }
 
     suspend fun refreshReadingPosition(fileId: String) = serialized {
@@ -246,7 +339,11 @@ internal class LibraryCloudSync(
                 throw CloudMutationRejected("REMOTE_BOOK_ID_IN_USE")
             }
             client.createBook(token, checkNotNull(profile.deviceId), upload.bookId, checkNotNull(upload.payload))
-            dao.acknowledgeCloudUpload(upload, upload.bookId)
+            val cover = dao.book(upload.bookId)?.editedCoverKey?.let { key ->
+                PendingBookEdit(upload.bookId, profile.id, upload.bookId, UUID.randomUUID().toString(),
+                    "{}", null, key, null)
+            }
+            dao.acknowledgeCloudUpload(upload, upload.bookId, cover)
             createdBooks.add(upload.bookId)
             return true
         }

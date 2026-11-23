@@ -31,7 +31,7 @@ class RemoteCatalogTest {
             dao.replaceRemoteCatalog(profile.id, listOf(book), listOf(file))
             val card = dao.observeBooks().first().single()
             assertEquals(book.remoteBookId, card.id)
-            assertEquals("Description", dao.observeCloudDescription(card.id).first())
+            assertEquals("Description", dao.observeBookCloudMetadata(card.id).first()?.description)
             assertTrue(card.cloudBacked && card.canDownload)
             assertFalse(card.hasLocalCopy)
             assertNull(dao.firstBookFile(card.id))
@@ -53,6 +53,60 @@ class RemoteCatalogTest {
             assertTrue(dao.observeBooks().first().isEmpty())
             assertNull(dao.remoteCatalogBook(profile.id, book.remoteBookId))
             assertNull(dao.readingPosition(restored.id))
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun remoteShelvesUseServerIdsAndPreserveOfflineAssignments() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(context, LibraryDatabase::class.java).configureLibrary().build()
+        try {
+            val dao = database.library()
+            val account = UUID.randomUUID().toString()
+            val profile = dao.saveCurrentServerProfile(
+                account, account, UUID.randomUUID().toString(), "https://example.invalid", 1,
+            )
+            val cloudBook = RemoteCatalogBook(
+                profile.id, UUID.randomUUID().toString(), "Cloud book", null, null, true, 1, 1,
+            )
+            val localBook = LocalBook(UUID.randomUUID().toString(), "Local book", null, 1)
+            val oldShelf = LocalShelf(UUID.randomUUID().toString(), "Fiction", "fiction")
+            val fiction = RemoteShelf(UUID.randomUUID().toString(), "Fiction")
+            val history = RemoteShelf(UUID.randomUUID().toString(), "History")
+            val empty = RemoteShelf(UUID.randomUUID().toString(), "Empty")
+            dao.addBook(localBook)
+            dao.addShelf(oldShelf)
+            dao.addMembership(LocalShelfBook(oldShelf.id, localBook.id))
+            val remote = RemoteShelfSnapshot(
+                listOf(fiction, history, empty),
+                mapOf(cloudBook.remoteBookId to setOf(fiction.id, history.id)),
+            )
+            dao.replaceRemoteCatalog(profile.id, listOf(cloudBook), emptyList())
+            dao.replaceRemoteShelves(profile.id, remote)
+
+            val folders = dao.observeLibraryShelves().first().associateBy { it.shelf.serverShelfId }
+            assertEquals(setOf(fiction.id, history.id, empty.id), folders.keys)
+            assertEquals(setOf(localBook.id, cloudBook.remoteBookId), folders.getValue(fiction.id).bookIds.toSet())
+            assertEquals(listOf(cloudBook.remoteBookId), folders.getValue(history.id).bookIds)
+            assertEquals(emptyList<String>(), folders.getValue(empty.id).bookIds)
+
+            dao.removeMembership(serverShelfKey(profile.id, fiction.id), cloudBook.remoteBookId)
+            dao.replaceRemoteShelves(profile.id, remote, preserveShelfEditsFor = setOf(cloudBook.remoteBookId))
+            assertEquals(listOf(serverShelfKey(profile.id, history.id)), dao.shelfIdsForBook(cloudBook.remoteBookId))
+
+            val renamed = history.copy(name = "World history")
+            val updated = RemoteShelfSnapshot(listOf(renamed), mapOf(cloudBook.remoteBookId to emptySet()))
+            dao.replaceRemoteShelves(profile.id, updated)
+            val refreshed = dao.observeLibraryShelves().first().associateBy { it.shelf.id }
+            val fictionKey = serverShelfKey(profile.id, fiction.id)
+            val historyKey = serverShelfKey(profile.id, history.id)
+            assertEquals(setOf(fictionKey, historyKey), refreshed.keys)
+            assertEquals(renamed.name, refreshed.getValue(historyKey).shelf.name)
+            assertEquals(listOf(localBook.id), refreshed.getValue(fictionKey).bookIds)
+            assertNull(refreshed.getValue(fictionKey).shelf.serverNameKey)
+            assertTrue(dao.shelfIdsForBook(cloudBook.remoteBookId).isEmpty())
         } finally {
             database.close()
         }

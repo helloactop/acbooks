@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
+import app.acbooks.core.database.BookEditRelations
 import app.acbooks.core.database.LibraryDao
 import app.acbooks.core.database.BookImportCommit
 import app.acbooks.core.database.CloudCatalogBatch
@@ -19,6 +20,7 @@ import app.acbooks.core.database.LocalBookRemoval
 import app.acbooks.core.database.LocalReadingSession
 import app.acbooks.core.database.LocalFileObject
 import app.acbooks.core.database.LocalFileSource
+import app.acbooks.core.database.PendingBookEdit
 import app.acbooks.core.database.RemoteBookLink
 import app.acbooks.core.database.RemoteCatalogBook
 import app.acbooks.core.database.RemoteCatalogFile
@@ -26,26 +28,37 @@ import app.acbooks.core.database.coverCacheKey
 import app.acbooks.core.database.managedObjectPath
 import app.acbooks.core.database.summarizeReadingSessions
 import app.acbooks.R
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.net.URI
 import java.security.MessageDigest
 import java.time.ZoneId
 import java.util.Locale
 import java.util.UUID
+import javax.net.ssl.HttpsURLConnection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
-internal enum class ImportOutcome { Added, Duplicate, MatchingContent, Unsupported, Failed }
+internal sealed interface ImportOutcome {
+    data class Added(val bookId: String, val isbn: String?) : ImportOutcome
+    data object Duplicate : ImportOutcome
+    data object MatchingContent : ImportOutcome
+    data object Unsupported : ImportOutcome
+    data object Failed : ImportOutcome
+}
 
 internal data class ReadableBookFile(val id: String, val format: String, val file: File)
 
@@ -54,6 +67,7 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
     private val filesRoot = context.filesDir
     private val objects = File(filesRoot, "library/objects")
     private val covers = File(context.filesDir, "library/covers")
+    private val coverDrafts = File(context.cacheDir, "book-cover-drafts")
     private val cloudCovers = File(context.cacheDir, "cloud-covers")
     private val untitled = context.getString(R.string.library_untitled)
     val books = dao.observeBooks()
@@ -62,7 +76,160 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
 
     fun coverFile(book: LocalBookCard): File? {
         val cloud = book.cloudCoverKey?.takeIf(cloudCoverName::matches)?.let { File(cloudCovers, it) }
-        return cloud?.takeIf(File::isFile) ?: coverFile(book.sha256)
+        return editedCoverFile(book.editedCoverKey)?.takeIf(File::isFile)
+            ?: cloud?.takeIf(File::isFile) ?: coverFile(book.sha256)
+    }
+
+    fun editedCoverFile(key: String?): File? =
+        key?.takeIf(editedCoverName::matches)?.let { File(covers, "edit-$it.jpg") }
+
+    suspend fun loadBookEdit(bookId: String): BookEditSession = withContext(Dispatchers.IO) {
+        val book = checkNotNull(dao.book(bookId))
+        val embedded = if (book.metadataEdited) null else {
+            readBookDetailsFile(openBook(bookId)?.takeIf { it.format == "epub" })?.metadata
+        }
+        val remote = dao.observeBookCloudMetadata(bookId).first()
+        val pending = dao.pendingBookEdit(bookId)
+        val patchKeys = pending?.let { JSONObject(it.patchJson).fieldNames() }.orEmpty()
+        val draft = bookDraft(book, embedded, remote, patchKeys)
+        val baseline = remote?.detailsJson?.let { JSONObject(it).editableBookValues().toString() }
+        BookEditSession(draft, baseline, remote?.coverUpdatedAt, patchKeys, pending?.coverKey != null)
+    }
+
+    private suspend fun bookDraft(
+        book: LocalBook,
+        embedded: BookBibliography?,
+        remote: RemoteCatalogBook?,
+        localKeys: Set<String>,
+    ): BookEditDraft {
+        val draft = readLocalBookEdit(book, embedded)
+        return remote?.detailsJson?.let {
+            draft.withCloudMetadata(JSONObject(it), localKeys, useEmbeddedFallback = !book.metadataEdited)
+        } ?: draft.copy(
+            title = remote?.title?.takeUnless { "title" in localKeys } ?: draft.title,
+            authors = remote?.author?.takeUnless { "authors" in localKeys } ?: draft.authors,
+            description = remote?.description?.takeUnless { "description" in localKeys } ?: draft.description,
+        )
+    }
+
+    suspend fun readLocalBookEdit(book: LocalBook, embedded: BookBibliography? = null): BookEditDraft {
+        val people = dao.bookContributors(book.id)
+        val relations = BookEditRelations(
+            authors = people.filter { it.role == "author" }.map { it.name },
+            translators = people.filter { it.role == "translator" }.map { it.name },
+            isbn = dao.bookIdentifiers(book.id).firstOrNull { it.scheme == "isbn" }?.value,
+            tags = dao.bookTags(book.id).map { it.name },
+            shelves = dao.bookShelves(book.id).map { it.name },
+        )
+        return localBookDraft(book, relations, embedded)
+    }
+
+    /** Writes the edited book and its outbox entry in one Room transaction. */
+    suspend fun saveBookEdit(bookId: String, initial: BookEditSession, draft: BookEditDraft): Boolean =
+        withContext(Dispatchers.IO) {
+            libraryFilesLock.withLock {
+                val book = checkNotNull(dao.book(bookId))
+                val profile = dao.currentServerProfile()
+                val link = profile?.let { dao.remoteBookLink(it.id, bookId) }
+                val previous = dao.pendingBookEdit(bookId)
+                val newCoverKey = draft.cover?.let { uuid() }
+                val savedCoverKey = newCoverKey ?: book.editedCoverKey
+                val target = editedCoverFile(newCoverKey)
+                val oldValues = initial.draft.values()
+                val newValues = draft.values()
+                val cloudValues = initial.cloudMetadata?.let(::JSONObject)
+                val patch = JSONObject()
+                for (key in newValues.fieldNames()) {
+                    val filledFromFile = cloudValues?.has(key) == true && cloudValues.isNull(key) && !newValues.isNull(key)
+                    if (key in initial.retryKeys || filledFromFile || !newValues.bookFieldMatches(oldValues, key)) {
+                        patch.put(key, newValues.get(key))
+                    }
+                }
+                val coverToSync = newCoverKey ?: previous?.coverKey
+                val remoteId = link?.remoteBookId ?: profile?.let {
+                    bookId.takeIf { dao.hasQueuedCloudBook(profile.id, bookId) }
+                }
+                val pending = if (profile != null && remoteId != null && (patch.length() > 0 || coverToSync != null)) {
+                    PendingBookEdit(
+                        bookId, profile.id, remoteId, uuid(), patch.toString(),
+                        // Only compare a new edit against what the editor displayed.
+                        initial.cloudMetadata,
+                        coverToSync,
+                        initial.cloudCoverVersion,
+                    )
+                } else null
+                val relations = draft.relations()
+                withContext(NonCancellable) {
+                    try {
+                        if (target != null) {
+                            val staged = checkNotNull(draft.cover)
+                            check(staged.parentFile == coverDrafts && staged.isFile)
+                            if (!covers.isDirectory && !covers.mkdirs()) throw IOException("Could not create the cover directory")
+                            staged.copyTo(target)
+                        }
+                        dao.writeBookEdit(
+                            bookId,
+                            book.copy(
+                                title = draft.title.trim(),
+                                author = relations.authors.joinToString(", ").ifEmpty { null },
+                                description = draft.description.trim().ifEmpty { null },
+                                series = draft.series.trim().ifEmpty { null },
+                                publisher = draft.publisher.trim().ifEmpty { null },
+                                publicationDate = draft.publicationDate.trim().ifEmpty { null },
+                                readingStatus = draft.readingStatus,
+                                editedCoverKey = savedCoverKey,
+                                updatedAt = System.currentTimeMillis(),
+                            ),
+                            relations,
+                            pending,
+                        )
+                    } catch (failure: Exception) {
+                        target?.delete()
+                        throw failure
+                    }
+                    val oldCoverKey = book.editedCoverKey
+                    if (newCoverKey != null && oldCoverKey != null && !dao.hasPendingEditedCover(oldCoverKey)) {
+                        editedCoverFile(oldCoverKey)?.delete()
+                    }
+                }
+                pending != null
+            }
+        }
+
+    suspend fun stageBookCover(uri: Uri): File = withContext(Dispatchers.IO) {
+        require(uri.scheme == ContentResolver.SCHEME_CONTENT)
+        val bytes = resolver.openInputStream(uri)?.use(::readCoverBytes) ?: throw IOException("Cannot read cover")
+        stageBookCover(bytes)
+    }
+
+    suspend fun stageDoubanCover(url: String): File = withContext(Dispatchers.IO) {
+        require(doubanCoverUrl.matches(url))
+        val connection = URI(url).toURL().openConnection() as HttpsURLConnection
+        try {
+            connection.instanceFollowRedirects = false
+            connection.connectTimeout = 5_000
+            connection.readTimeout = 8_000
+            connection.setRequestProperty("Referer", "https://book.douban.com/")
+            connection.setRequestProperty("User-Agent", "acbooks")
+            if (connection.responseCode != 200 || connection.contentType?.startsWith("image/") != true) {
+                throw IOException("Douban did not return a cover image")
+            }
+            stageBookCover(connection.inputStream.use(::readCoverBytes))
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun stageBookCover(bytes: ByteArray): File {
+        if (!coverDrafts.isDirectory && !coverDrafts.mkdirs()) throw IOException("Could not create cover staging directory")
+        val file = File.createTempFile("book-cover-", ".jpg", coverDrafts)
+        try {
+            if (!encodeCover(bytes, file)) throw IOException("Invalid cover image")
+            return file
+        } catch (failure: Exception) {
+            file.delete()
+            throw failure
+        }
     }
 
     fun cacheCloudCovers(books: List<RemoteCatalogBook>, client: LibraryCloudClient, token: String) {
@@ -329,23 +496,50 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
             shelves = shelves,
             readingLocation = readBookLocation(position, detailsFile?.pdfPageCount),
             readingStatistics = statistics?.let {
-                BookReadingStatistics(it.activeSeconds.toLong(), it.sessionCount, it.readingDays, it.lastReadAt)
+                BookReadingStatistics(it.activeSeconds.toLong(), it.readingDays, it.lastReadAt)
             },
         )
-    }.combine(dao.observeCloudBookDetails(bookId)) { details, payload -> details.withCloudDetails(payload) }
+    }.combine(observeEditedBook(bookId)) { details, (book, remote, pending) ->
+        if (book == null) return@combine details
+        val embedded = details.metadata
+        val localKeys = pending?.let { JSONObject(it.patchJson).fieldNames() }.orEmpty()
+        val draft = bookDraft(book, embedded, remote, localKeys)
+        val relations = draft.relations()
+        details.copy(
+            metadata = (embedded ?: BookBibliography()).copy(
+                description = draft.description.ifBlank { null },
+                translators = relations.translators,
+                isbn = draft.isbn.ifBlank { null },
+                publisher = draft.publisher.ifBlank { null },
+                publicationDate = draft.publicationDate.ifBlank { null },
+                series = draft.series.ifBlank { null },
+            ),
+            shelves = relations.shelves,
+            tags = relations.tags,
+            readingStatus = when (draft.readingStatus) {
+                "reading" -> BookReadingStatus.Reading
+                "done" -> BookReadingStatus.Finished
+                else -> BookReadingStatus.Unread
+            },
+        )
+    }
 
     suspend fun saveReadingSession(session: LocalReadingSession) = dao.insertReadingSession(session)
 
     suspend fun bookUploadPayload(book: LocalBook): String {
-        val bibliography = readBookDetailsFile(openBook(book.id)?.takeIf { it.format == "epub" })?.metadata
-        val contributors = dao.observeBookContributors(book.id).first()
-        return bookCreatePayload(book, bibliography, authors = contributors.filter { it.role == "author" }.map { it.name }
-            .ifEmpty { listOfNotNull(book.author) },
-            translators = contributors.filter { it.role == "translator" }.map { it.name }
-                .ifEmpty { bibliography?.translators.orEmpty() },
-            isbn = dao.bookIdentifiers(book.id).firstOrNull { it.scheme == "isbn" }?.value ?: bibliography?.isbn,
-            tags = dao.observeBookTags(book.id).first().map { it.name }, shelves = dao.observeBookShelves(book.id).first())
+        val bibliography = if (book.metadataEdited) null else {
+            readBookDetailsFile(openBook(book.id)?.takeIf { it.format == "epub" })?.metadata
+        }
+        val relations = readLocalBookEdit(book, bibliography).relations()
+        return bookCreatePayload(
+            book, bibliography, relations.authors, relations.translators, relations.isbn,
+            relations.tags, relations.shelves,
+        )
     }
+
+    private fun observeEditedBook(bookId: String) = combine(
+        dao.observeBook(bookId), dao.observeBookCloudMetadata(bookId), dao.observePendingBookEdit(bookId),
+    ) { book, remote, pending -> Triple(book, remote, pending) }
 
     suspend fun saveReadingPosition(fileId: String, locator: String, percent: Double? = null) =
         dao.recordReadingPosition(fileId, locator, percent, System.currentTimeMillis())
@@ -410,6 +604,7 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                 if (path.exists() && !path.delete()) Log.w("LibraryDelete", "Could not remove cached book object")
             }
         }
+        editedCoverFile(removal.editedCoverKey)?.delete()
         for (hash in removal.unreferencedCoverHashes) {
             if (contentHash.matches(hash)) {
                 val path = File(covers, "$hash.jpg")
@@ -482,9 +677,13 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
                     val bibliography = if (format == "epub") {
                         readBookDetailsFile(ReadableBookFile(file.id, format, objectFile))?.metadata
                     } else null
-                    when (dao.importBook(book, file, LocalFileObject(sha256, format, size), allowMatchingContent,
-                        book.importedAt, bookCreatePayload(book, bibliography))) {
-                        BookImportCommit.Added -> ImportOutcome.Added
+                    val commit = dao.importBook(
+                        book, file, LocalFileObject(sha256, format, size), allowMatchingContent, book.importedAt,
+                        bookUploadPayload = bookCreatePayload(book, bibliography, isbn = metadata.isbn ?: bibliography?.isbn),
+                        isbn = metadata.isbn,
+                    )
+                    when (commit) {
+                        BookImportCommit.Added -> ImportOutcome.Added(book.id, metadata.isbn)
                         BookImportCommit.Duplicate -> ImportOutcome.Duplicate
                         BookImportCommit.MatchingContent -> ImportOutcome.MatchingContent
                     }
@@ -508,25 +707,30 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
         if (bytes == null) return
         val target = coverFile(sha256) ?: return
         if (target.isFile || (!covers.isDirectory && !covers.mkdirs())) return
-        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-        if (options.outWidth !in 1..16384 || options.outHeight !in 1..16384) return
-        options.inSampleSize = 1
-        while (maxOf(options.outWidth, options.outHeight) / options.inSampleSize > 640) {
-            options.inSampleSize *= 2
-        }
-        options.inJustDecodeBounds = false
-        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return
         try {
             val pending = File.createTempFile("cover-", ".part", covers)
             try {
-                val encoded = pending.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 84, it) }
-                if (encoded) pending.renameTo(target)
+                if (encodeCover(bytes, pending)) pending.renameTo(target)
             } finally {
                 pending.delete()
             }
         } catch (_: IOException) {
             Log.w("LibraryImport", "Could not cache the book cover")
+        }
+    }
+
+    private fun encodeCover(bytes: ByteArray, file: File): Boolean {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        if (options.outWidth !in 1..16384 || options.outHeight !in 1..16384) return false
+        options.inSampleSize = 1
+        while (maxOf(options.outWidth, options.outHeight) / options.inSampleSize > 640) {
+            options.inSampleSize *= 2
+        }
+        options.inJustDecodeBounds = false
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return false
+        return try {
+            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 84, it) }
         } finally {
             bitmap.recycle()
         }
@@ -536,8 +740,20 @@ internal class LibraryRepository(context: Context, private val dao: LibraryDao) 
 }
 
 private val contentHash = Regex("[0-9a-f]{64}")
+private val editedCoverName = Regex("[0-9a-f-]{36}")
 private val cloudCoverName = Regex("[0-9a-f-]{73}-[0-9]{1,16}")
 private const val MaxCloudCoverBytes = 5 * 1024 * 1024
+
+private fun readCoverBytes(input: InputStream): ByteArray {
+    val output = ByteArrayOutputStream()
+    val buffer = ByteArray(8192)
+    while (true) {
+        val count = input.read(buffer)
+        if (count < 0) return output.toByteArray()
+        if (output.size() + count > MaxCloudCoverBytes) throw IOException("Book cover is too large")
+        output.write(buffer, 0, count)
+    }
+}
 
 private fun matchesContent(file: File, sha256: String): Boolean {
     val digest = MessageDigest.getInstance("SHA-256")

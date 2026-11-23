@@ -18,9 +18,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         RemoteBookLink::class, RemoteFileLink::class,
         CloudSyncState::class, CloudCatalogVersion::class, PendingCloudUpload::class,
         CloudReadingPosition::class, PendingReadingPosition::class,
-        CloudReaderRecord::class, PendingCloudDownload::class,
+        CloudReaderRecord::class, PendingCloudDownload::class, PendingBookEdit::class,
     ],
-    version = 10,
+    version = 11,
 )
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun library(): LibraryDao

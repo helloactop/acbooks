@@ -37,6 +37,7 @@ import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.BookOutline
 import top.yukonga.miuix.kmp.icon.glass.Delete
+import top.yukonga.miuix.kmp.icon.glass.Edit
 import top.yukonga.miuix.kmp.icon.glass.Info
 import top.yukonga.miuix.kmp.icon.glass.More
 import top.yukonga.miuix.kmp.icon.glass.Tune
@@ -94,6 +95,7 @@ internal fun BoxScope.LibraryMenus(
     onSync: () -> Unit,
     onRead: (String) -> Unit,
     onDetails: (String) -> Unit,
+    onEdit: (String) -> Unit,
     onDelete: (LocalBookCard) -> Unit,
 ) {
     GlassIconDropdownMenu(
@@ -154,6 +156,7 @@ internal fun BoxScope.LibraryMenus(
         onDismiss = { onDismiss(LibraryMenu.Book) },
         onRead = onRead,
         onDetails = onDetails,
+        onEdit = onEdit,
         onDelete = onDelete,
     )
 }
@@ -166,6 +169,7 @@ private fun BoxScope.BookContextMenu(
     onDismiss: () -> Unit,
     onRead: (String) -> Unit,
     onDetails: (String) -> Unit,
+    onEdit: (String) -> Unit,
     onDelete: (LocalBookCard) -> Unit,
 ) {
     val anchor = rememberGlassPopupAnchor()
@@ -210,6 +214,11 @@ private fun BoxScope.BookContextMenu(
                 text = stringResource(R.string.library_book_details),
                 icon = MiuixIcons.Glass.Info,
                 onClick = { onDetails(book.id) },
+            )
+            GlassPopupItem(
+                text = stringResource(R.string.book_edit_title),
+                icon = MiuixIcons.Glass.Edit,
+                onClick = { onEdit(book.id) },
             )
             GlassPopupItem(
                 text = stringResource(R.string.library_delete_book),

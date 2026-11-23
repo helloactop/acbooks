@@ -11,8 +11,6 @@ class Candidate(BookCreate):
     cover_id: Annotated[int, Field(gt=0, le=2147483647)] | None = None
     douban_id: Annotated[str, Field(pattern=r"^[0-9]{1,20}$")] | None = None
     douban_cover_url: Annotated[str, Field(max_length=250)] | None = None
-    publisher: Annotated[str, Field(max_length=200)] | None = None
-    publication_date: Annotated[str, Field(max_length=80)] | None = None
     rating: Annotated[float, Field(gt=0, le=10)] | None = None
 
 

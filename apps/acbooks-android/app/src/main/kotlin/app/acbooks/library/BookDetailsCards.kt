@@ -41,15 +41,10 @@ import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.BookOutline
-import top.yukonga.miuix.kmp.icon.glass.ClockOutline
-import top.yukonga.miuix.kmp.icon.glass.Date
 import top.yukonga.miuix.kmp.icon.glass.DigitalStatistics
 import top.yukonga.miuix.kmp.icon.glass.ExpandLess
 import top.yukonga.miuix.kmp.icon.glass.ExpandMore
-import top.yukonga.miuix.kmp.icon.glass.FrequentlyUsed
 import top.yukonga.miuix.kmp.icon.glass.Info
-import top.yukonga.miuix.kmp.icon.glass.Read
-import top.yukonga.miuix.kmp.icon.glass.TimeLapse
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -167,86 +162,36 @@ internal fun BookReadingStatisticsCard(statistics: BookReadingStatistics?) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ReadingMetric(
-                        MiuixIcons.Glass.ClockOutline,
                         stringResource(R.string.book_details_duration),
                         stringResource(R.string.book_details_hours_minutes, numbers.format(minutes / 60), numbers.format(minutes % 60)),
                         Modifier.weight(1f),
                     )
                     ReadingMetric(
-                        MiuixIcons.Glass.Read,
-                        stringResource(R.string.book_details_session_count),
-                        numbers.format(statistics.sessionCount),
-                        Modifier.weight(1f),
-                    )
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ReadingMetric(
-                        MiuixIcons.Glass.Date,
                         stringResource(R.string.book_details_day_count),
                         numbers.format(statistics.readingDays),
                         Modifier.weight(1f),
                     )
-                    ReadingMetric(
-                        MiuixIcons.Glass.FrequentlyUsed,
-                        stringResource(R.string.book_details_last_read),
-                        bookDate(statistics.lastReadAt),
-                        Modifier.weight(1f),
-                    )
                 }
+                ReadingMetric(stringResource(R.string.book_details_last_read), bookDate(statistics.lastReadAt))
             }
         }
     }
 }
 
 @Composable
-internal fun BookReadingProgressCard(location: BookReadingLocation?) {
-    val position = when (location) {
-        is BookReadingLocation.Epub -> {
-            val locator = location.locator
-            locator.title?.takeIf(String::isNotBlank)
-                ?: locator.locations.position?.let { stringResource(R.string.book_details_epub_position, it) }
-                ?: locator.href.toString()
-        }
-        is BookReadingLocation.Pdf -> {
-            val count = location.pageCount
-            if (count != null && location.page in 1..count) {
-                stringResource(R.string.reader_page, location.page, count)
-            } else {
-                stringResource(R.string.book_details_pdf_page, location.page)
-            }
-        }
-        null -> null
-    }
-    DetailsCard(stringResource(R.string.book_details_progress), MiuixIcons.Glass.TimeLapse) {
-        val fraction = location?.fraction
-        if (fraction == null) {
-            Text(stringResource(R.string.book_details_no_progress), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-        } else {
-            ReadingProgressBar(fraction)
-        }
-        if (!position.isNullOrBlank()) {
-            InformationRow(stringResource(R.string.book_details_last_position), position)
-        }
-    }
-}
-
-@Composable
-internal fun ReadingProgressBar(fraction: Float, showLabel: Boolean = false) {
+internal fun ReadingProgressBar(fraction: Float) {
     val colors = MiuixTheme.colorScheme
     val percent = NumberFormat.getPercentInstance(LocalConfiguration.current.locales[0]).format(fraction)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (showLabel) {
-                Text(
-                    stringResource(R.string.book_details_progress),
-                    modifier = Modifier.weight(1f),
-                    color = colors.onSurfaceVariantSummary,
-                    style = MiuixTheme.textStyles.footnote1,
-                )
-            }
+            Text(
+                stringResource(R.string.book_details_progress),
+                modifier = Modifier.weight(1f),
+                color = colors.onSurfaceVariantSummary,
+                style = MiuixTheme.textStyles.footnote1,
+            )
             Text(
                 percent,
-                modifier = if (showLabel) Modifier else Modifier.fillMaxWidth(),
                 color = colors.onSurface,
                 style = MiuixTheme.textStyles.footnote1,
                 textAlign = TextAlign.End,
@@ -306,10 +251,9 @@ private fun InformationRow(label: String, value: @Composable () -> Unit) {
 }
 
 @Composable
-private fun ReadingMetric(icon: ImageVector, label: String, value: String, modifier: Modifier = Modifier) {
+private fun ReadingMetric(label: String, value: String, modifier: Modifier = Modifier) {
     val colors = MiuixTheme.colorScheme
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = colors.onSurface)
         Text(value, color = colors.onSurface, style = MiuixTheme.textStyles.title3, fontWeight = FontWeight.SemiBold)
         Text(label, color = colors.onSurfaceVariantSummary, style = MiuixTheme.textStyles.footnote1)
     }

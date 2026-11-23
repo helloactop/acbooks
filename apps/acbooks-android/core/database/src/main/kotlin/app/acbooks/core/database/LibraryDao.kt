@@ -16,11 +16,12 @@ enum class BookImportCommit { Added, Duplicate, MatchingContent }
 data class LocalBookRemoval(
     val unreferencedObjects: List<LocalFileObject>,
     val unreferencedCoverHashes: List<String>,
+    val editedCoverKey: String? = null,
 )
 
 @Dao
 abstract class LibraryDao :
-    ReadingSyncDao(), ShelfDao, ReadingSessionDao, ReadingMarkDao, CatalogMetadataDao,
+    ReadingSyncDao(), BookEditDao, ReadingSessionDao, ReadingMarkDao,
     FileSourceDao, FolderDao, CloudSyncDao, CloudReaderDao, CloudDownloadDao {
     @Upsert
     protected abstract suspend fun upsertServerProfile(profile: ServerProfile)
@@ -63,14 +64,17 @@ abstract class LibraryDao :
     }
 
     @Query("""
-        SELECT b.id, COALESCE(c.title, b.title) AS title, COALESCE(c.author, (
+        SELECT b.id,
+        CASE WHEN e.bookId IS NOT NULL THEN b.title ELSE COALESCE(c.title, b.title) END AS title,
+        CASE WHEN e.bookId IS NOT NULL THEN b.author WHEN c.detailsJson IS NOT NULL THEN c.author
+        ELSE COALESCE(c.author, (
             SELECT group_concat(name, ', ') FROM (
                 SELECT c.name FROM book_contributors bc
                 JOIN contributors c ON c.id = bc.contributorId
                 WHERE bc.bookId = b.id AND bc.role = 'author'
                 ORDER BY c.name, c.id
             )
-        ), b.author) AS author, b.importedAt,
+        ), b.author) END AS author, b.importedAt,
         COALESCE(f.format, (
             SELECT rf.format FROM remote_catalog_files rf
             WHERE rf.profileId = c.profileId AND rf.remoteBookId = c.remoteBookId
@@ -86,11 +90,13 @@ abstract class LibraryDao :
             SELECT 1 FROM remote_catalog_files rf WHERE rf.profileId = c.profileId AND rf.remoteBookId = c.remoteBookId
             AND rf.fileStatus = 'present' AND rf.format IN ('epub', 'pdf')
         ) AS canDownload,
-        (c.profileId || '-' || c.remoteBookId || '-' || c.coverUpdatedAt) AS cloudCoverKey
+        (c.profileId || '-' || c.remoteBookId || '-' || c.coverUpdatedAt) AS cloudCoverKey,
+        CASE WHEN c.remoteBookId IS NULL OR e.coverKey IS NOT NULL THEN b.editedCoverKey END AS editedCoverKey
         FROM books b
         LEFT JOIN server_profiles p ON p.currentSlot = 1
         LEFT JOIN remote_book_links l ON l.profileId = p.id AND l.localBookId = b.id
         LEFT JOIN remote_catalog c ON c.profileId = l.profileId AND c.remoteBookId = l.remoteBookId AND c.available = 1
+        LEFT JOIN pending_book_edits e ON e.bookId = b.id AND e.profileId = p.id
         LEFT JOIN book_files f ON f.id = COALESCE(b.preferredFileId, (
             SELECT id FROM book_files WHERE bookId = b.id ORDER BY id LIMIT 1
         ))
@@ -150,10 +156,11 @@ abstract class LibraryDao :
 
     @Transaction
     open suspend fun removeLocalBook(bookId: String): LocalBookRemoval? {
+        val editedCoverKey = book(bookId)?.editedCoverKey
         val files = allBookFiles(bookId)
         if (deleteBookRow(bookId) == 0) return null
 
-        return releaseUnreferencedFiles(files)
+        return releaseUnreferencedFiles(files).copy(editedCoverKey = editedCoverKey)
     }
 
     private suspend fun releaseUnreferencedFiles(files: List<LocalBookFile>): LocalBookRemoval {
@@ -188,6 +195,8 @@ abstract class LibraryDao :
         profileId: String,
         books: List<RemoteCatalogBook>,
         files: List<RemoteCatalogFile>,
+        shelfSnapshot: RemoteShelfSnapshot? = null,
+        preserveShelfEditsFor: Set<String> = emptySet(),
     ) {
         check(currentServerProfile()?.id == profileId)
         require(books.all { it.profileId == profileId } && files.all { it.profileId == profileId })
@@ -290,10 +299,61 @@ abstract class LibraryDao :
     }
 
     @Transaction
-    open suspend fun acknowledgeCloudUpload(upload: PendingCloudUpload, remoteId: String) {
+    open suspend fun replaceRemoteShelves(
+        profileId: String,
+        snapshot: RemoteShelfSnapshot,
+        preserveShelfEditsFor: Set<String> = emptySet(),
+    ) {
+        check(currentServerProfile()?.id == profileId)
+        val existing = allShelves()
+        val localByName = existing.filter { it.serverProfileId == null }
+            .groupBy { it.name.shelfNameKey() }.toMutableMap()
+        val remoteIds = snapshot.shelves.mapTo(mutableSetOf()) { it.id }
+        for (remote in snapshot.shelves) {
+            val key = remote.name.shelfNameKey()
+            val localId = serverShelfKey(profileId, remote.id)
+            // Scope shelf IDs to their server so switching servers retains both caches.
+            upsertShelf(LocalShelf(localId, remote.name, "\u0000$localId", key, profileId, remote.id))
+            for (local in localByName.remove(key).orEmpty()) {
+                copyShelfMemberships(local.id, localId)
+                deleteShelf(local.id)
+            }
+        }
+
+        val linksByRemoteBook = remoteBookLinks(profileId).groupBy { it.remoteBookId }
+        for ((remoteBookId, shelfIds) in snapshot.shelfIdsByRemoteBook) {
+            check(remoteIds.containsAll(shelfIds))
+            val desired = shelfIds.mapTo(mutableSetOf()) { serverShelfKey(profileId, it) }
+            for (link in linksByRemoteBook[remoteBookId].orEmpty()) {
+                if (link.localBookId !in preserveShelfEditsFor) replaceBookShelves(link.localBookId, desired)
+            }
+        }
+
+        for (old in existing) {
+            if (old.serverProfileId != profileId || old.serverShelfId in remoteIds) continue
+            val key = checkNotNull(old.serverNameKey)
+            if (hasShelfMembers(old.id)) {
+                // Retain assignments for local-only books and unsynced edits.
+                val replacement = shelfByNameKey(key, excludingId = old.id)
+                if (replacement == null) {
+                    upsertShelf(old.copy(nameKey = key, serverNameKey = null, serverProfileId = null, serverShelfId = null))
+                    continue
+                }
+                copyShelfMemberships(old.id, replacement.id)
+            }
+            deleteShelf(old.id)
+        }
+    }
+
+    @Transaction
+    open suspend fun acknowledgeCloudUpload(
+        upload: PendingCloudUpload, remoteId: String, cover: PendingBookEdit? = null,
+    ) {
         if (removeCloudUpload(upload.profileId, upload.id) == 0) return
-        if (upload.fileId == null) linkRemoteBook(RemoteBookLink(upload.profileId, upload.bookId, remoteId))
-        else {
+        if (upload.fileId == null) {
+            linkRemoteBook(RemoteBookLink(upload.profileId, upload.bookId, remoteId))
+            if (cover != null && pendingBookEdit(upload.bookId) == null) queueBookEdit(cover)
+        } else {
             val previous = remoteFileLink(upload.profileId, upload.fileId)
             if (previous != null && previous.remoteFileId != remoteId) requeueReadingPosition(upload.fileId)
             linkRemoteFile(RemoteFileLink(upload.profileId, upload.fileId, remoteId))
@@ -380,6 +440,7 @@ abstract class LibraryDao :
         allowMatchingContent: Boolean,
         verifiedAt: Long? = null,
         bookUploadPayload: String? = null,
+        isbn: String? = null,
     ): BookImportCommit {
         if (hasImported(file.sourceUri, file.sha256, file.format)) {
             if (verifiedAt != null) {
@@ -396,6 +457,7 @@ abstract class LibraryDao :
             insertContributor(contributor)
             insertBookContributor(LocalBookContributor(book.id, contributor.id, "author"))
         }
+        isbn?.let { insertBookIdentifier(LocalBookIdentifier(UUID.randomUUID().toString(), book.id, "isbn", it)) }
         addFile(file)
         recordImportedSources(file.sha256, file.format, file.sourceUri, verifiedAt)
         if (bookUploadPayload != null) currentServerProfile()?.let { profile ->
@@ -467,3 +529,5 @@ abstract class LibraryDao :
         return setDocumentImportedFile(folderId, documentId, fileId) == 1
     }
 }
+
+internal fun serverShelfKey(profileId: String, shelfId: String) = "$profileId:$shelfId"
