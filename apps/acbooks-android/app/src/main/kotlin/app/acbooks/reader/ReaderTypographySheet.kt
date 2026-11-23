@@ -170,7 +170,7 @@ internal fun ReaderTypographySheet(
                         steps = 24,
                         format = { "${(it * 100).roundToInt()}%" },
                         onPreview = { draft = current.copy(fontSize = it) },
-                        onCommit = { draft?.let(onSave) },
+                        onCommit = { draft?.let { save(it) } },
                     )
 
                     TypographySection(R.string.reader_typography_paragraph)
@@ -200,7 +200,7 @@ internal fun ReaderTypographySheet(
                         onPreview = {
                             draft = current.copy(lineHeight = it, publisherStyles = false)
                         },
-                        onCommit = { draft?.let(onSave) },
+                        onCommit = { draft?.let { save(it) } },
                     )
 
                     TypographySection(R.string.reader_typography_page)
@@ -212,7 +212,7 @@ internal fun ReaderTypographySheet(
                         steps = 14,
                         format = { "${((it * 10).roundToInt() / 10.0)}×" },
                         onPreview = { draft = current.copy(pageMargins = it) },
-                        onCommit = { draft?.let(onSave) },
+                        onCommit = { draft?.let { save(it) } },
                     )
 
                     TypographySection(R.string.reader_typography_appearance)
