@@ -230,4 +230,9 @@
     <string name="about_license">Software license</string>
     <string name="about_feedback">Report an issue</string>
     <string name="about_link_failed">No browser found to open this link</string>
+    <string name="home_recently_read">Recently read</string>
+    <string name="home_percent">%1$d%%</string>
+    <string name="home_cloud_only">Cloud only</string>
+    <string name="home_downloaded">Downloaded</string>
+    <string name="home_local_book">On this device</string>
 </resources>
