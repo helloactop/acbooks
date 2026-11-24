@@ -26,9 +26,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import org.readium.r2.navigator.HyperlinkNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
+import org.readium.r2.navigator.epub.EpubSettings
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.navigator.preferences.Theme
@@ -38,6 +41,7 @@ import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.isRestricted
+import org.readium.r2.shared.util.AbsoluteUrl
 import org.readium.r2.shared.util.Try
 import org.readium.r2.shared.util.asset.Asset
 import org.readium.r2.shared.util.asset.AssetRetriever
@@ -57,6 +61,21 @@ internal class EpubDocumentFragment : Fragment() {
     private var activeNavigator: EpubNavigatorFragment? = null
     private var chapters: List<ReaderChapter>? = null
     private var currentHref: String? = null
+    private val jumpHistory = ReaderJumpHistory<ReaderReturnPoint>()
+    private var capturingReturnPoint = false
+
+    private data class ReaderReturnPoint(
+        val position: Locator,
+        val visibleAnchor: Locator?,
+        val settings: EpubSettings,
+    )
+
+    internal var onReturnAvailabilityChanged: ((Boolean) -> Unit)? = null
+        set(callback) {
+            if (field === callback) return
+            field = callback
+            callback?.invoke(jumpHistory.canReturn)
+        }
 
     // Readium's content tap callbacks preserve page-turn and selection gestures.
     internal var onCenterTap: (() -> Unit)? = null
@@ -77,6 +96,72 @@ internal class EpubDocumentFragment : Fragment() {
 
     internal fun goToChapter(link: Link): Boolean =
         activeNavigator?.go(link, animated = false) ?: false
+
+    /**
+     * Only hyperlink activation creates history. Readium also calls its
+     * onJumpToLocator listener for initial loading, TOC navigation and reflow;
+     * using that callback would incorrectly record those operations.
+     */
+    private fun followBookLink(link: Link): Boolean {
+        val navigator = activeNavigator ?: return true
+        val opened = publication ?: return true
+        val target = link.url().removeFragment()
+        // Do not promise a return point for resources outside the readable spine.
+        if (opened.readingOrder.none { it.url().removeFragment() == target }) return true
+        if (capturingReturnPoint) return false
+        capturingReturnPoint = true
+        val position = navigator.currentLocator.value
+        val settings = navigator.settings.value
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val anchor = try {
+                    withTimeoutOrNull(350L) { navigator.firstVisibleElementLocator() }
+                } catch (failure: Exception) {
+                    if (failure is CancellationException) throw failure
+                    Log.w("Reader", "Could not capture visible EPUB anchor", failure)
+                    null
+                }
+                if (activeNavigator !== navigator) return@launch
+                val current = navigator.currentLocator.value
+                // If the reader moved during the asynchronous capture, do not
+                // attach an anchor from the wrong page to the saved position.
+                val visible = anchor?.takeIf {
+                    current == position && it.href.removeFragment() == position.href.removeFragment() &&
+                        (it.locations["cssSelector"] as? String)?.let { selector ->
+                            selector.isNotBlank() && selector != "body" && selector != "html"
+                        } == true
+                }?.copyWithLocations(
+                    progression = position.locations.progression,
+                    position = position.locations.position,
+                    totalProgression = position.locations.totalProgression,
+                )
+                val returnPoint = ReaderReturnPoint(position, visible, settings)
+                // go() reports whether Readium accepted the navigation.
+                if (navigator.go(link, animated = false)) {
+                    jumpHistory.record(returnPoint)
+                    onReturnAvailabilityChanged?.invoke(jumpHistory.canReturn)
+                }
+            } finally {
+                capturingReturnPoint = false
+            }
+        }
+        // We perform the navigation ourselves after capturing the source.
+        return false
+    }
+
+    internal fun returnToPreviousLocation(): Boolean {
+        val navigator = activeNavigator ?: return false
+        if (capturingReturnPoint) return false
+        val returned = jumpHistory.returnToPrevious { point ->
+            // The page progression is most accurate with unchanged layout.
+            // After a typography change prefer the saved text/DOM anchor.
+            val target = if (navigator.settings.value == point.settings) point.position
+                else point.visibleAnchor ?: point.position
+            navigator.go(target, animated = false)
+        }
+        onReturnAvailabilityChanged?.invoke(jumpHistory.canReturn)
+        return returned
+    }
 
     private val theme: Theme
         get() = if (requireArguments().getBoolean(DARK)) Theme.DARK else Theme.LIGHT
@@ -143,6 +228,15 @@ internal class EpubDocumentFragment : Fragment() {
                 val factory = EpubNavigatorFactory(opened).createFragmentFactory(
                     initialLocator = locator,
                     initialPreferences = initialPreferences,
+                    listener = object : EpubNavigatorFragment.Listener {
+                        override fun shouldFollowInternalLink(
+                            link: Link,
+                            context: HyperlinkNavigator.LinkContext?,
+                        ): Boolean = followBookLink(link)
+
+                        // Keep the reader's existing offline external-link behavior.
+                        override fun onExternalLinkActivated(url: AbsoluteUrl) = Unit
+                    },
                     configuration = EpubNavigatorFragment.Configuration(
                         servedAssets = listOf(DeepEpubTypography.ASSET_PATH),
                     ),
@@ -221,6 +315,10 @@ internal class EpubDocumentFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         activeNavigator = null
+        jumpHistory.clear()
+        capturingReturnPoint = false
+        onReturnAvailabilityChanged?.invoke(false)
+        onReturnAvailabilityChanged = null
         chapters = null
         currentHref = null
         onContentsChanged?.invoke(null)

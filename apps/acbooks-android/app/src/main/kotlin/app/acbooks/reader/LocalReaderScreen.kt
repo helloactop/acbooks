@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.fragment.compose.AndroidFragment
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -51,8 +53,10 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.glass.GlassFloatingToolbar
 import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.glass.Back
 import top.yukonga.miuix.kmp.icon.glass.Menu
 import top.yukonga.miuix.kmp.icon.glass.SettingsOutline
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -84,6 +88,7 @@ internal fun LocalReaderScreen(
     }
     var chapters by remember(bookId) { mutableStateOf<List<ReaderChapter>?>(null) }
     var currentHref by remember(bookId) { mutableStateOf<String?>(null) }
+    var canReturnToPreviousLocation by remember(bookId) { mutableStateOf(false) }
     var epubFragment by remember(bookId) { mutableStateOf<EpubDocumentFragment?>(null) }
     // Stable callbacks prevent navigator updates from repeatedly re-registering listeners.
     val contentsObserver: (List<ReaderChapter>?) -> Unit = remember(bookId) {
@@ -91,6 +96,9 @@ internal fun LocalReaderScreen(
     }
     val hrefObserver: (String?) -> Unit = remember(bookId) {
         { value -> currentHref = value }
+    }
+    val returnAvailabilityObserver: (Boolean) -> Unit = remember(bookId) {
+        { value -> canReturnToPreviousLocation = value }
     }
     val centerTapHandler: () -> Unit = remember(bookId) {
         { if (!showContents && !showTypography) toolbarVisible = !toolbarVisible }
@@ -130,6 +138,7 @@ internal fun LocalReaderScreen(
                                 fragment.onContentsChanged = contentsObserver
                                 fragment.onCurrentHrefChanged = hrefObserver
                                 fragment.onCenterTap = centerTapHandler
+                                fragment.onReturnAvailabilityChanged = returnAvailabilityObserver
                             },
                         )
                     } else {
@@ -167,6 +176,30 @@ internal fun LocalReaderScreen(
                             MiuixIcons.Glass.SettingsOutline,
                             stringResource(R.string.reader_typography_title),
                         )
+                    }
+                }
+                // Independent overlay: it neither reads nor changes toolbarVisible.
+                // Use miuix's native floating glass surface; the single action is
+                // not part of the menu/settings toolbar.
+                if (canReturnToPreviousLocation && !showContents && !showTypography) {
+                    GlassFloatingToolbar(
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                            .padding(bottom = 8.dp),
+                        backdrop = backdrop,
+                    ) {
+                        Row(
+                            modifier = Modifier.clickable(role = Role.Button) {
+                                epubFragment?.returnToPreviousLocation()
+                            }.padding(horizontal = 14.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(MiuixIcons.Glass.Back, contentDescription = null)
+                            Text(
+                                stringResource(R.string.reader_return_to_previous),
+                                style = MiuixTheme.textStyles.body2,
+                            )
+                        }
                     }
                 }
                 ReaderContentsSheet(
