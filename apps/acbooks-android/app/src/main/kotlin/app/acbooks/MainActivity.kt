@@ -169,6 +169,7 @@ internal fun AcbooksNavigation(library: LibraryViewModel) {
             },
         )
     }
+    val readerBackground = MiuixTheme.colorScheme.background
     NavDisplay(
         navController = navController,
         transition = NavTransitions.MiuixDefault,
@@ -278,7 +279,7 @@ internal fun AcbooksNavigation(library: LibraryViewModel) {
             )
         }
         entry<AcbooksRoute.Reader>(
-            transition = NavTransitions.expansion(containerColor = MiuixTheme.colorScheme.background),
+            transition = NavTransitions.expansion(containerColor = readerBackground),
         ) { route ->
             LocalReaderScreen(model = library, bookId = route.bookId)
         }
