@@ -17,6 +17,7 @@ appcompat = "1.7.1"
 fragment = "1.9.1"
 lifecycle = "2.11.0"
 readium = "3.4.0"
+jsoup = "1.23.2"
 desugar = "2.1.5"
 coil = "3.6.3"
 
@@ -42,6 +43,7 @@ junit = { module = "junit:junit", version.ref = "junit" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 readium-navigator = { module = "org.readium.kotlin-toolkit:readium-navigator", version.ref = "readium" }
 readium-streamer = { module = "org.readium.kotlin-toolkit:readium-streamer", version.ref = "readium" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 desugar-jdk = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 
