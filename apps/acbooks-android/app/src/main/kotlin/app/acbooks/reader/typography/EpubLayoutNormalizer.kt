@@ -14,6 +14,10 @@ import org.jsoup.parser.Parser
 internal object EpubLayoutNormalizer {
     private const val LEADING = "data-acbooks-leading"
     private const val PROTECTED = "data-acbooks-preserve"
+    private const val SPACER = "data-acbooks-spacer"
+    private const val IMAGE_BLOCK = "data-acbooks-image-block"
+    private const val IMAGE = "data-acbooks-image"
+    private val imageWrappers = setOf("div", "p", "section", "article", "main", "a", "span")
     private val wrapperTags = setOf("div", "section", "article", "header", "main")
     private val specialTags = setOf("nav", "aside", "blockquote", "pre", "figure", "figcaption", "table", "svg", "math", "footer")
     private val specialTypes = setOf("cover", "titlepage", "toc", "footnote", "endnote",
@@ -48,19 +52,39 @@ internal object EpubLayoutNormalizer {
         if (isSpecial(body) || isSpecial(document.selectFirst("html"))) {
             mark(body, PROTECTED)
         } else {
-            var current = firstMeaningfulChild(body)
+            val spacers = mutableListOf<Element>()
+            var current = firstMeaningfulChild(body, spacers)
             val wrappers = mutableListOf<Element>()
             while (current != null && current.normalName() in wrapperTags &&
                 !isSpecial(current) && !isHeading(current) && wrappers.size < 12
             ) {
                 wrappers.add(current)
-                current = firstMeaningfulChild(current)
+                current = firstMeaningfulChild(current, spacers)
             }
             if (current != null && isHeading(current) && !isSpecial(current) &&
                 current.text().isNotBlank() && current.selectFirst("img,svg,math,video,audio,object,iframe,table") == null
             ) {
+                spacers.forEach { mark(it, SPACER) }
                 wrappers.forEach { mark(it, LEADING) }
                 mark(current, LEADING)
+            }
+        }
+        // Only center image-only blocks, including nested wrappers.
+        // Mixed prose, inline icons and protected content stay authored.
+        for (image in body.select("img")) {
+            if (isSpecial(image) || image.parents().any { isSpecial(it) } ||
+                isSpecial(document.selectFirst("html"))) continue
+            val blocks = mutableListOf<Element>()
+            var parent = image.parent()
+            while (parent != null && parent.normalName() in imageWrappers &&
+                !isSpecial(parent) && isImageOnly(parent)
+            ) {
+                if (parent.normalName() != "a" && parent.normalName() != "span") blocks.add(parent)
+                parent = parent.parent()
+            }
+            if (blocks.isNotEmpty() || (parent == body && isImageOnly(body))) {
+                mark(image, IMAGE)
+                blocks.forEach { mark(it, IMAGE_BLOCK) }
             }
         }
         if (edits.isEmpty()) return html
@@ -84,7 +108,13 @@ internal object EpubLayoutNormalizer {
             element.classNames().any { it.lowercase(Locale.ROOT) in specialClasses }
     }
 
-    private fun firstMeaningfulChild(parent: Element): Element? {
+    private fun isImageOnly(element: Element): Boolean =
+        element.text().isBlank() && element.select("img").size == 1 &&
+            element.getAllElements().all {
+                it == element || (!isSpecial(it) && (it.normalName() in imageWrappers || it.normalName() == "img"))
+            }
+
+    private fun firstMeaningfulChild(parent: Element, spacers: MutableList<Element>): Element? {
         for (node in parent.childNodes()) {
             when (node) {
                 is TextNode -> if (node.wholeText.isNotBlank()) return null
@@ -98,6 +128,15 @@ internal object EpubLayoutNormalizer {
                     if (node.normalName() == "a" && node.text().isBlank() && node.children().isEmpty() &&
                         (node.hasAttr("id") || node.hasAttr("name"))
                     ) continue
+                    // Calibre/Sigil can emit empty named section anchors as
+                    // block elements with paragraph margins. Collapse them only
+                    // if a real heading follows; keep the ID and original node.
+                    if (node.normalName() in setOf("div", "p") && node.id().isNotEmpty() &&
+                        node.children().isEmpty() && node.text().isBlank() && !isSpecial(node)
+                    ) {
+                        spacers.add(node)
+                        continue
+                    }
                     return node
                 }
             }

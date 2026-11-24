@@ -93,4 +93,48 @@
     padding-block-start: 0 !important;
   }
 
+  /* A title may contain a block-level span with its own centered publisher
+   * style, font size and color. Inherit heading typography on text wrappers. */
+  :root[style*="readium-advanced-on"] body :is(h1, h2, h3, h4, h5, h6, [data-acbooks-heading]):not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) :is(span, b, strong, i, em, a):not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    text-align: inherit !important;
+    text-indent: 0 !important;
+    font-size: inherit !important;
+    font-family: inherit !important;
+    line-height: inherit !important;
+    color: inherit !important;
+  }
+
+  /* Keep chapter anchor IDs in place; remove only the whitespace they create. */
+  :root[style*="readium-advanced-on"] body [data-acbooks-spacer="true"]:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    margin-block: 0 !important;
+    padding-block: 0 !important;
+    min-block-size: 0 !important;
+    block-size: 0 !important;
+    line-height: 0 !important;
+  }
+
+  /* An image-only paragraph is not prose: do not apply paragraph indentation.
+   * The intrinsic aspect ratio is retained; never enlarge small illustrations. */
+  :root[style*="readium-advanced-on"] body [data-acbooks-image-block="true"]:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    text-align: center !important;
+    text-indent: 0 !important;
+    margin-inline: 0 !important;
+    padding-inline: 0 !important;
+    inline-size: auto !important;
+    max-inline-size: 100% !important;
+    box-sizing: border-box !important;
+  }
+  :root[style*="readium-advanced-on"] body img[data-acbooks-image="true"]:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    display: block !important;
+    float: none !important;
+    margin-inline: auto !important;
+    padding-inline: 0 !important;
+    inline-size: auto !important;
+    max-inline-size: 100% !important;
+    block-size: auto !important;
+    max-height: 100vh !important;
+    object-fit: contain !important;
+    break-inside: avoid;
+  }
+
 }

@@ -54,4 +54,35 @@ class EpubLayoutNormalizerTest {
         assertTrue(result.contains("""<p data-acbooks-leading="true" data-acbooks-heading="chapter" id="title">认识世界"""))
         assertEquals(3, Regex("data-acbooks-leading=").findAll(result).count())
     }
+
+    @Test
+    fun emptyNamedAnchorBeforeNestedChapterDoesNotBlockLeadingDetection() {
+        val input = html("""<div class="anchor" id="section.xhtml">
+            </div><div class="wrapper"><h3><span class="center" id="chapter"><b>第</b><b>一</b><b>章</b></span></h3></div><div><p>Example body.</p></div>""")
+        val result = DeepEpubTypography.injectStylesheet(
+            input.toByteArray(), listOf(EpubHeadingHint("第一章", null, 0)),
+        ).decodeToString()
+        assertTrue(result.contains("""<div data-acbooks-spacer="true" class="anchor" id="section.xhtml">"""))
+        assertTrue(result.contains("""<div data-acbooks-leading="true" class="wrapper">"""))
+        assertTrue(result.contains("""<h3 data-acbooks-leading="true" data-acbooks-heading="chapter">"""))
+        assertTrue(result.contains("""<span class="center" id="chapter"><b>第</b><b>一</b><b>章</b></span>"""))
+    }
+
+    @Test
+    fun marksNestedImageOnlyBlocksWithoutMarkingMixedProseOrProtectedImages() {
+        val input = html("""<div class="indent"><div class="inner"><img src="picture.jpg"/></div></div><p>Text <img src="icon.jpg"/> more text</p><figure><img src="protected.jpg"/></figure>""")
+        val result = EpubLayoutNormalizer.normalize(input)
+        assertEquals(2, Regex("data-acbooks-image-block=").findAll(result).count())
+        assertTrue(result.contains("""<img data-acbooks-image="true" src="picture.jpg"/>"""))
+        assertTrue(result.contains("""<p>Text <img src="icon.jpg"/> more text</p>"""))
+        assertTrue(result.contains("""<img src="protected.jpg"/>"""))
+        assertEquals(input, result.replace(Regex(""" data-acbooks-(?:image-block|image|preserve)="true""""), ""))
+        assertEquals(result, EpubLayoutNormalizer.normalize(result))
+    }
+
+    @Test
+    fun emptyAnchorWithoutFollowingTitleIsNotCollapsed() {
+        val input = html("""<div id="blank"></div><p>Ordinary prose.</p>""")
+        assertFalse(EpubLayoutNormalizer.normalize(input).contains("data-acbooks-spacer"))
+    }
 }
