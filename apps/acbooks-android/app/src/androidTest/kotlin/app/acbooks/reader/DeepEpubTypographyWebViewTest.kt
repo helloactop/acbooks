@@ -31,7 +31,7 @@ class DeepEpubTypographyWebViewTest {
                 null,
                 """<!DOCTYPE html><html dir="ltr" style="--USER__advancedSettings: readium-advanced-on">
                    <head><style>html { font-size: 20px; } h1 { text-align: center; margin-top: 80px; font-size: 20px; }</style>
-                   <style>$css</style></head><body><section><h1 id="title">Chapter</h1><p>Text</p></section></body></html>""",
+                   <style>$css</style></head><body><section><h1 id="title">Chapter</h1><p id="number" data-acbooks-heading="number">第二章</p><p id="semantic" data-acbooks-heading="chapter" style="text-align:center;font-size:20px">Semantic title</p><p>Text</p></section></body></html>""",
                 "text/html", "UTF-8", null,
             )
         }
@@ -42,8 +42,16 @@ class DeepEpubTypographyWebViewTest {
                 evaluate(webView, """(() => { const s = getComputedStyle(document.getElementById('title')); return [s.textAlign,s.marginTop,s.fontSize].join('|'); })()"""),
             )
             assertEquals(
+                "\"start|33px|17px\"",
+                evaluate(webView, """(() => { const s = getComputedStyle(document.getElementById('semantic')); const n = getComputedStyle(document.getElementById('number')); return [s.textAlign,s.fontSize,n.fontSize].join('|'); })()"""),
+            )
+            assertEquals(
                 "\"center|80px|20px\"",
                 evaluate(webView, """(() => { document.documentElement.style.removeProperty('--USER__advancedSettings'); const s = getComputedStyle(document.getElementById('title')); return [s.textAlign,s.marginTop,s.fontSize].join('|'); })()"""),
+            )
+            assertEquals(
+                "\"center|20px\"",
+                evaluate(webView, """(() => { const s = getComputedStyle(document.getElementById('semantic')); return [s.textAlign,s.fontSize].join('|'); })()"""),
             )
         } finally {
             instrumentation.runOnMainSync { webView.destroy() }
