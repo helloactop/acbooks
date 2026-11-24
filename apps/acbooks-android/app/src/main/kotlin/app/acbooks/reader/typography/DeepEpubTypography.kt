@@ -110,6 +110,11 @@ internal object DeepEpubTypography {
             // A malformed document should still be readable with basic CSS.
             injected
         }
-        return annotated.toByteArray(Charsets.UTF_8)
+        val normalized = try {
+            EpubLayoutNormalizer.normalize(annotated)
+        } catch (_: Exception) {
+            annotated
+        }
+        return normalized.toByteArray(Charsets.UTF_8)
     }
 }
