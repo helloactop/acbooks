@@ -22,6 +22,7 @@ import app.acbooks.R
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.Backdrop
+import top.yukonga.miuix.kmp.glass.GlassCard
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButton
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
@@ -59,18 +60,20 @@ internal fun BookShelvesDialog(
             if (catalog.shelves.isEmpty()) {
                 Text(stringResource(R.string.library_shelf_picker_empty))
             } else {
-                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 240.dp)) {
-                    items(catalog.shelves, key = { it.shelf.id }) { shelf ->
-                        val id = shelf.shelf.id
-                        CheckboxPreference(
-                            title = shelf.shelf.name,
-                            checked = id in selected,
-                            onCheckedChange = { checked ->
-                                selection = ArrayList(if (checked) selected + id else selected - id)
-                                error = null
-                            },
-                            enabled = !saving && (id in selected || selected.size < 20),
-                        )
+                GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 240.dp)) {
+                        items(catalog.shelves, key = { it.shelf.id }) { shelf ->
+                            val id = shelf.shelf.id
+                            CheckboxPreference(
+                                title = shelf.shelf.name,
+                                checked = id in selected,
+                                onCheckedChange = { checked ->
+                                    selection = ArrayList(if (checked) selected + id else selected - id)
+                                    error = null
+                                },
+                                enabled = !saving && (id in selected || selected.size < 20),
+                            )
+                        }
                     }
                 }
                 if (selected.size >= 20) Text(stringResource(R.string.library_shelf_limit))
