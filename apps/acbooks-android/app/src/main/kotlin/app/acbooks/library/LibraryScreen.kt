@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.acbooks.AcbooksRoute
 import app.acbooks.R
 import app.acbooks.core.database.LocalBookCard
 import app.acbooks.core.database.LocalShelf
@@ -65,6 +66,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.BookOutline
 import top.yukonga.miuix.kmp.icon.glass.Cloud
+import top.yukonga.miuix.kmp.nav.transition.navTransitionSource
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 internal val BookCoverCorner = 10.dp
@@ -152,6 +154,13 @@ internal fun BookGridItem(
             title = book.title,
             cloudOnly = book.cloudBacked && !book.hasLocalCopy,
             modifier = Modifier.fillMaxWidth()
+                .navTransitionSource(
+                    route = AcbooksRoute.Reader(book.id),
+                    cornerRadius = BookCoverCorner,
+                    containerColor = MiuixTheme.colorScheme.surfaceContainer,
+                    shape = RoundedCornerShape(BookCoverCorner),
+                    sourceKey = "library:cover:${book.id}",
+                )
                 .onGloballyPositioned { coverCoordinates[0] = it }
                 // Record the touch location without consuming pointer events. CombinedClickable
                 // still handles taps, long presses, haptics and accessibility semantics.
