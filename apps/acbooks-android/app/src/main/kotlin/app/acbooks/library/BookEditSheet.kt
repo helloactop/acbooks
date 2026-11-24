@@ -43,6 +43,7 @@ import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.glass.GlassBottomSheet
+import top.yukonga.miuix.kmp.glass.GlassCard
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButton
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
@@ -250,63 +251,103 @@ private fun BookEditForm(
     onUndoCover: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            BookCover(
-                draft.cover ?: cover,
-                Modifier.width(72.dp).clickable(
-                    enabled = enabled,
-                    role = Role.Button,
-                    onClickLabel = stringResource(R.string.book_edit_choose_cover),
-                    onClick = onSelectCover,
-                ),
-                title = draft.title,
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    stringResource(R.string.book_edit_choose_cover),
-                    modifier = Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onSelectCover)
-                        .padding(vertical = 8.dp),
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
-                if (draft.cover != null) {
-                    Text(
-                        stringResource(R.string.book_edit_undo_cover),
-                        modifier = Modifier.heightIn(min = 44.dp).clickable(
+        GlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            insideMargin = PaddingValues(12.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    BookCover(
+                        draft.cover ?: cover,
+                        Modifier.width(72.dp).clickable(
                             enabled = enabled,
                             role = Role.Button,
-                            onClick = onUndoCover,
-                        ).padding(vertical = 8.dp),
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            onClickLabel = stringResource(R.string.book_edit_choose_cover),
+                            onClick = onSelectCover,
+                        ),
+                        title = draft.title,
                     )
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            stringResource(R.string.book_edit_choose_cover),
+                            modifier = Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onSelectCover)
+                                .padding(vertical = 8.dp),
+                            style = MiuixTheme.textStyles.body2,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                        if (draft.cover != null) {
+                            Text(
+                                stringResource(R.string.book_edit_undo_cover),
+                                modifier = Modifier.heightIn(min = 44.dp).clickable(
+                                    enabled = enabled,
+                                    role = Role.Button,
+                                    onClick = onUndoCover,
+                                ).padding(vertical = 8.dp),
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                        }
+                    }
                 }
             }
         }
-        EditField(R.string.book_details_book_name, draft.title, enabled) { onChange(draft.copy(title = it)) }
-        Text(stringResource(R.string.book_edit_names_hint), style = MiuixTheme.textStyles.footnote1)
-        EditField(R.string.book_details_author, draft.authors, enabled, multiline = true) { onChange(draft.copy(authors = it)) }
-        EditField(R.string.book_details_translator, draft.translators, enabled, multiline = true) { onChange(draft.copy(translators = it)) }
-        EditField(R.string.book_details_isbn, draft.isbn, enabled) { onChange(draft.copy(isbn = it)) }
-        EditField(R.string.book_details_publisher, draft.publisher, enabled) { onChange(draft.copy(publisher = it)) }
-        EditField(R.string.book_details_publish_date, draft.publicationDate, enabled) { onChange(draft.copy(publicationDate = it)) }
-        EditField(R.string.book_details_description, draft.description, enabled, multiline = true, minLines = 3) {
-            onChange(draft.copy(description = it))
-        }
-        EditField(R.string.book_edit_series, draft.series, enabled) { onChange(draft.copy(series = it)) }
-        EditField(R.string.book_details_tags, draft.tags, enabled, multiline = true) { onChange(draft.copy(tags = it)) }
-        Text(stringResource(R.string.book_details_status), modifier = Modifier.semantics { heading() })
-        GlassSegmentedTabRow(
-            tabs = listOf(
-                stringResource(R.string.book_details_status_unread),
-                stringResource(R.string.book_details_status_reading),
-                stringResource(R.string.book_details_status_finished),
-            ),
-            selectedIndex = readingStatuses.indexOf(draft.readingStatus).coerceAtLeast(0),
-            onSelect = { if (enabled) onChange(draft.copy(readingStatus = readingStatuses[it])) },
-            backdrop = backdrop,
+
+        GlassCard(
             modifier = Modifier.fillMaxWidth(),
-        )
+            insideMargin = PaddingValues(12.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                EditField(R.string.book_details_book_name, draft.title, enabled) { onChange(draft.copy(title = it)) }
+                Text(stringResource(R.string.book_edit_names_hint), style = MiuixTheme.textStyles.footnote1)
+                EditField(R.string.book_details_author, draft.authors, enabled, multiline = true) { onChange(draft.copy(authors = it)) }
+                EditField(R.string.book_details_translator, draft.translators, enabled, multiline = true) { onChange(draft.copy(translators = it)) }
+            }
+        }
+
+        GlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            insideMargin = PaddingValues(12.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                EditField(R.string.book_details_isbn, draft.isbn, enabled) { onChange(draft.copy(isbn = it)) }
+                EditField(R.string.book_details_publisher, draft.publisher, enabled) { onChange(draft.copy(publisher = it)) }
+                EditField(R.string.book_details_publish_date, draft.publicationDate, enabled) { onChange(draft.copy(publicationDate = it)) }
+            }
+        }
+
+        GlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            insideMargin = PaddingValues(12.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                EditField(R.string.book_details_description, draft.description, enabled, multiline = true, minLines = 3) {
+                    onChange(draft.copy(description = it))
+                }
+                EditField(R.string.book_edit_series, draft.series, enabled) { onChange(draft.copy(series = it)) }
+                EditField(R.string.book_details_tags, draft.tags, enabled, multiline = true) { onChange(draft.copy(tags = it)) }
+            }
+        }
+
+        GlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            insideMargin = PaddingValues(12.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.book_details_status), modifier = Modifier.semantics { heading() })
+                GlassSegmentedTabRow(
+                    tabs = listOf(
+                        stringResource(R.string.book_details_status_unread),
+                        stringResource(R.string.book_details_status_reading),
+                        stringResource(R.string.book_details_status_finished),
+                    ),
+                    selectedIndex = readingStatuses.indexOf(draft.readingStatus).coerceAtLeast(0),
+                    onSelect = { if (enabled) onChange(draft.copy(readingStatus = readingStatuses[it])) },
+                    backdrop = backdrop,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
     }
 }
 
