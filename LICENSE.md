@@ -49,6 +49,7 @@ acbooks 源码采用 [GPL-3.0-only](LICENSE)。以下为 Android 工程当前直
 | [KSP](https://github.com/google/ksp/blob/2.3.14/LICENSE) | 2.3.14 | Apache-2.0 |
 | [Coil](https://github.com/coil-kt/coil/blob/3.6.3/LICENSE.txt) | 3.6.3 | Apache-2.0 |
 | [Readium Kotlin Toolkit](https://github.com/readium/kotlin-toolkit/blob/3.4.0/LICENSE) | 3.4.0 | BSD-3-Clause |
+| [jsoup](https://github.com/jhy/jsoup/blob/jsoup-1.23.2/LICENSE) | 1.23.2 | MIT |
 | [Desugar JDK Libs](https://github.com/google/desugar_jdk_libs/blob/master/LICENSE) | 2.1.5 | GPL-2.0 with Classpath Exception |
 | [Miuix](https://github.com/compose-miuix-ui/miuix/tree/v0.9.5-beta03) | 0.9.5-beta03（`miuix-ui-android`、`miuix-glass-android`、`miuix-glass-icons-android`、`miuix-nav-android`、`miuix-preference-android`） | [Apache-2.0](https://github.com/compose-miuix-ui/miuix/blob/v0.9.5-beta03/LICENSE) |
 
