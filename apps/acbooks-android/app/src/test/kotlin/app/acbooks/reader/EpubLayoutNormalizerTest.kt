@@ -115,4 +115,27 @@ class EpubLayoutNormalizerTest {
         assertTrue(result.contains("""<img src="c.jpg"/>"""))
         assertTrue(result.contains("""<img src="d.jpg"/>"""))
     }
+
+    @Test
+    fun marksPlainNestedQuotesWithoutChangingContentOrNavigationAnchors() {
+        val input = html("""<p>Intro</p><blockquote class="outer"><blockquote class="inner" id="citation">Example <a href="#source">source</a>.</blockquote></blockquote><blockquote>Next quotation.</blockquote><p>Body</p>""")
+        val result = EpubLayoutNormalizer.normalize(input)
+        assertEquals(2, Regex("data-acbooks-quote=").findAll(result).count())
+        assertTrue(result.contains("""<blockquote data-acbooks-preserve="true" data-acbooks-quote="true" class="outer">"""))
+        assertTrue(result.contains("""<blockquote data-acbooks-preserve="true" class="inner" id="citation">"""))
+        assertEquals(input, result.replace(Regex(""" data-acbooks-(?:preserve|quote)="true""""), ""))
+        assertEquals(result, EpubLayoutNormalizer.normalize(result))
+    }
+
+    @Test
+    fun quoteStylingExcludesNavigationPoetryAndComplexContent() {
+        val input = html("""<blockquote><blockquote><a href="a.html#chapter">Chapter</a></blockquote></blockquote>
+            <section class="poem"><blockquote>Verse<br/>Verse</blockquote></section>
+            <blockquote epub:type="epigraph">Epigraph</blockquote>
+            <blockquote role="doc-footnote">Footnote</blockquote>
+            <blockquote><img src="image.jpg"/>Caption</blockquote>
+            <blockquote><table><tr><td>Data</td></tr></table></blockquote>
+            <blockquote><pre>Code</pre></blockquote>""")
+        assertFalse(EpubLayoutNormalizer.normalize(input).contains("data-acbooks-quote"))
+    }
 }

@@ -138,4 +138,58 @@
     break-inside: avoid;
   }
 
+  /* Textual block quotations use one subtle rule even when a legacy EPUB
+   * nests blockquotes for indentation. Use the active reading text color,
+   * not a fixed gray, so light, dark, sepia and custom themes stay legible.
+   * Keep real nested text, line breaks and links in their original DOM. */
+  :root[style*="readium-advanced-on"] body blockquote[data-acbooks-quote="true"] {
+    margin-block: 0.8em !important;
+    margin-inline: 0 !important;
+    padding-block: 0.15em !important;
+    padding-inline: 0.8em 0 !important;
+    border: 0 !important;
+    border-inline-start: 2px solid currentColor !important;
+    border-inline-start-color: color-mix(in srgb, currentColor 45%, transparent) !important;
+    font-size: 0.95em !important;
+    line-height: var(--USER__lineHeight, 1.5) !important;
+    color: inherit !important;
+    color: color-mix(in srgb, currentColor 85%, transparent) !important;
+    text-align: start !important;
+    text-indent: 0 !important;
+    word-spacing: normal !important;
+    letter-spacing: normal !important;
+  }
+
+  /* Consecutive quotation paragraphs share a continuous visual rule without
+   * merging DOM nodes or forcing the entire quote onto a single page. */
+  :root[style*="readium-advanced-on"] body blockquote[data-acbooks-quote="true"]:has(+ blockquote[data-acbooks-quote="true"]) {
+    margin-block-end: 0 !important;
+  }
+  :root[style*="readium-advanced-on"] body blockquote[data-acbooks-quote="true"] + blockquote[data-acbooks-quote="true"] {
+    margin-block-start: 0 !important;
+  }
+
+  :root[style*="readium-advanced-on"] body blockquote[data-acbooks-quote="true"] :is(blockquote, p, div) {
+    margin-inline: 0 !important;
+    padding-inline: 0 !important;
+    border: 0 !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+    color: inherit !important;
+    text-align: start !important;
+    text-indent: 0 !important;
+    word-spacing: normal !important;
+    letter-spacing: normal !important;
+  }
+  :root[style*="readium-advanced-on"] body blockquote[data-acbooks-quote="true"] blockquote {
+    margin-block: 0 !important;
+    padding-block: 0 !important;
+  }
+  :root[style*="readium-advanced-on"] body blockquote[data-acbooks-quote="true"] :is(span, b, strong, i, em, cite, q) {
+    color: inherit !important;
+    line-height: inherit !important;
+    text-align: inherit !important;
+    text-indent: 0 !important;
+  }
+
 }

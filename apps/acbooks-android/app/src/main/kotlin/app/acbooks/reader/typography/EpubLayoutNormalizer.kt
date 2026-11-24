@@ -17,6 +17,8 @@ internal object EpubLayoutNormalizer {
     private const val SPACER = "data-acbooks-spacer"
     private const val IMAGE_BLOCK = "data-acbooks-image-block"
     private const val IMAGE = "data-acbooks-image"
+    private const val QUOTE = "data-acbooks-quote"
+    private val quoteTags = setOf("blockquote", "p", "div", "span", "a", "b", "strong", "i", "em", "small", "sup", "sub", "cite", "q", "abbr", "br", "ruby", "rt", "rp", "u", "s")
     private val imageWrappers = setOf("div", "p", "section", "article", "main", "a", "span")
     private val captionTags = setOf("span", "a", "sup", "sub", "small", "b", "strong", "i", "em", "img")
     private val noteNumber = Regex("""^\[\s*[0-9]+\s*]""")
@@ -116,6 +118,23 @@ internal object EpubLayoutNormalizer {
                 block.select("img").forEach { mark(it, IMAGE) }
             }
         }
+        // A blockquote remains protected from heading/image rules, but plain
+        // textual quotations get their own opt-in styling. Nested wrappers
+        // are normalized together; never reparent text or remove anchors.
+        for (quote in body.select("blockquote")) {
+            if (quote.parents().any { it.normalName() == "blockquote" || isSpecial(it) }) continue
+            if (isProtectedQuoteNode(quote) || quote.text().isBlank()) continue
+            if (quote.getAllElements().any {
+                    it.normalName() !in quoteTags || isProtectedQuoteNode(it)
+                }) continue
+            // Legacy inline TOCs may use blockquotes solely as link indents.
+            // Require visible text outside links, not just a navigation label.
+            if (quote.getAllElements().none { element ->
+                    element.normalName() != "a" && element.ownText().isNotBlank() &&
+                        element.parents().none { it.normalName() == "a" }
+                }) continue
+            mark(quote, QUOTE)
+        }
         if (edits.isEmpty()) return html
         return StringBuilder(html).apply {
             edits.toSortedMap(compareByDescending { it }).forEach { (offset, attributes) ->
@@ -128,13 +147,24 @@ internal object EpubLayoutNormalizer {
         element.normalName() in headings ||
             element.attr("data-acbooks-heading") in setOf("chapter", "number", "section")
 
+    private fun isProtectedQuoteNode(element: Element): Boolean =
+        // The generic preservation marker on blockquote is deliberate and
+        // must not make a second normalization pass behave differently.
+        (element.normalName() != "blockquote" && isSpecial(element)) ||
+            hasSpecialSemantics(element)
+
+    private fun hasSpecialSemantics(element: Element): Boolean =
+        element.hasAttr("hidden") || element.attr("aria-hidden") == "true" ||
+            element.attr("epub:type").lowercase(Locale.ROOT).split(Regex("""\s+""")).any { it in specialTypes } ||
+            element.classNames().any { it.lowercase(Locale.ROOT) in specialClasses } ||
+            element.attr("role").lowercase(Locale.ROOT).split(Regex("""\s+""")).any {
+                it in setOf("doc-epigraph", "doc-footnote", "doc-endnote", "doc-noteref", "doc-toc", "doc-pagebreak")
+            }
+
     private fun isSpecial(element: Element?): Boolean {
         if (element == null) return false
         return element.normalName() in specialTags ||
-            element.hasAttr(PROTECTED) ||
-            element.hasAttr("hidden") || element.attr("aria-hidden") == "true" ||
-            element.attr("epub:type").lowercase(Locale.ROOT).split(Regex("""\s+""")).any { it in specialTypes } ||
-            element.classNames().any { it.lowercase(Locale.ROOT) in specialClasses }
+            element.hasAttr(PROTECTED) || hasSpecialSemantics(element)
     }
 
     private fun isImageOnly(element: Element): Boolean =
