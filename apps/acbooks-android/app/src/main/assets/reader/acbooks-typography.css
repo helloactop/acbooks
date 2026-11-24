@@ -45,3 +45,30 @@
   max-inline-size: 100% !important;
   object-fit: contain;
 }
+
+/* Semantic headings identified from the EPUB TOC and publisher metadata.
+ * The data attribute is inert in original-layout mode.
+ */
+:root[style*="readium-advanced-on"] body [data-acbooks-heading] {
+  text-align: start !important;
+  text-indent: 0 !important;
+  font-weight: 700 !important;
+  line-height: 1.4 !important;
+  margin-inline: 0 !important;
+  padding-inline: 0 !important;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+:root[style*="readium-advanced-on"] body [data-acbooks-heading="chapter"] {
+  font-size: 1.65rem !important;
+  margin-block: 0 0.9em !important;
+}
+:root[style*="readium-advanced-on"] body [data-acbooks-heading="section"] {
+  font-size: 1.35rem !important;
+  margin-block: 1em 0.65em !important;
+}
+:root[style*="readium-advanced-on"] body [data-acbooks-heading="number"] {
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+  margin-block: 0 0.35em !important;
+}
