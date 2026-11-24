@@ -1,0 +1,47 @@
+/* acbooks reflowable EPUB typography.
+ * In Readium Kotlin 3.4.0, publisherStyles=false sets the root advanced flag.
+ * Keep all overrides behind this flag so the existing original-layout toggle
+ * restores the publisher layout without reloading the chapter.
+ * Logical margins also preserve RTL/vertical reading directions.
+ */
+:root[style*="readium-advanced-on"] body :is(h1, h2, h3, h4, h5, h6):not(:where(nav *, table *, figure *, blockquote *, aside *)) {
+  text-align: start !important;
+  text-indent: 0 !important;
+  font-weight: 700 !important;
+  line-height: 1.4 !important;
+  margin-inline: 0 !important;
+  padding-inline: 0 !important;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+:root[style*="readium-advanced-on"] body h1:not(:where(nav *, table *, figure *, blockquote *, aside *)) {
+  font-size: 1.65rem !important;
+  margin-block: 1em 0.9em !important;
+}
+:root[style*="readium-advanced-on"] body h2:not(:where(nav *, table *, figure *, blockquote *, aside *)) {
+  font-size: 1.35rem !important;
+  margin-block: 1em 0.65em !important;
+}
+:root[style*="readium-advanced-on"] body :is(h3, h4, h5, h6):not(:where(nav *, table *, figure *, blockquote *, aside *)) {
+  font-size: 1.15rem !important;
+  margin-block: 0.8em 0.5em !important;
+}
+
+/* A leading heading has no extra top gap, including common chapter wrappers.
+ * Do not move nodes or reset every section's margins.
+ */
+:root[style*="readium-advanced-on"] body > :is(h1, h2):first-child,
+:root[style*="readium-advanced-on"] body > :is(section, article, div, header):first-child > :is(h1, h2):first-child,
+:root[style*="readium-advanced-on"] body > :is(section, article, div):first-child > header:first-child > :is(h1, h2):first-child {
+  margin-block-start: 0 !important;
+  padding-block-start: 0 !important;
+}
+
+/* Preserve image aspect ratios and avoid stretching illustrations. Keep
+ * captions, tables, quotes, poetry and footnotes in their authored structure.
+ */
+:root[style*="readium-advanced-on"] body img:not(:where(nav *, table *, aside *, a *)) {
+  max-inline-size: 100% !important;
+  object-fit: contain;
+}
