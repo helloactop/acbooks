@@ -54,4 +54,65 @@ class EpubLayoutNormalizerTest {
         assertTrue(result.contains("""<p data-acbooks-leading="true" data-acbooks-heading="chapter" id="title">认识世界"""))
         assertEquals(3, Regex("data-acbooks-leading=").findAll(result).count())
     }
+
+    @Test
+    fun emptyNamedAnchorBeforeNestedChapterDoesNotBlockLeadingDetection() {
+        val input = html("""<div class="anchor" id="section.xhtml">
+            </div><div class="wrapper"><h3><span class="center" id="chapter"><b>第</b><b>一</b><b>章</b></span></h3></div><div><p>Example body.</p></div>""")
+        val result = DeepEpubTypography.injectStylesheet(
+            input.toByteArray(), listOf(EpubHeadingHint("第一章", null, 0)),
+        ).decodeToString()
+        assertTrue(result.contains("""<div data-acbooks-spacer="true" class="anchor" id="section.xhtml">"""))
+        assertTrue(result.contains("""<div data-acbooks-leading="true" class="wrapper">"""))
+        assertTrue(result.contains("""<h3 data-acbooks-leading="true" data-acbooks-heading="chapter">"""))
+        assertTrue(result.contains("""<span class="center" id="chapter"><b>第</b><b>一</b><b>章</b></span>"""))
+    }
+
+    @Test
+    fun marksNestedImageOnlyBlocksWithoutMarkingMixedProseOrProtectedImages() {
+        val input = html("""<div class="indent"><div class="inner"><img src="picture.jpg"/></div></div><p>Text <img src="icon.jpg"/> more text</p><figure><img src="protected.jpg"/></figure>""")
+        val result = EpubLayoutNormalizer.normalize(input)
+        assertEquals(2, Regex("data-acbooks-image-block=").findAll(result).count())
+        assertTrue(result.contains("""<img data-acbooks-image="true" src="picture.jpg"/>"""))
+        assertTrue(result.contains("""<p>Text <img src="icon.jpg"/> more text</p>"""))
+        assertTrue(result.contains("""<img src="protected.jpg"/>"""))
+        assertEquals(input, result.replace(Regex(""" data-acbooks-(?:image-block|image|preserve)="true""""), ""))
+        assertEquals(result, EpubLayoutNormalizer.normalize(result))
+    }
+
+    @Test
+    fun emptyAnchorWithoutFollowingTitleIsNotCollapsed() {
+        val input = html("""<div id="blank"></div><p>Ordinary prose.</p>""")
+        assertFalse(EpubLayoutNormalizer.normalize(input).contains("data-acbooks-spacer"))
+    }
+
+    @Test
+    fun recognizesNumberedCaptionWithTrailingImagesButNotMixedProse() {
+        val input = html("""<p class="plate"><sup><small><a href="chapter.html#ref" id="note">[3]</a></small></sup><span>Example plate</span><img src="a.jpg"/><img src="b.jpg"/></p>
+            <p><sup><a href="#ref">[4]</a></sup>Text<img src="inline.jpg"/>continues here.</p>
+            <p>Ordinary paragraph<img src="other.jpg"/></p>
+            <aside><p><sup><a href="#ref">[5]</a></sup>Caption<img src="protected.jpg"/></p></aside>""")
+        val result = EpubLayoutNormalizer.normalize(input)
+        assertEquals(1, Regex("data-acbooks-image-block=").findAll(result).count())
+        assertEquals(2, Regex("data-acbooks-image=").findAll(result).count())
+        assertTrue(result.contains("""<a href="chapter.html#ref" id="note">[3]</a>"""))
+        assertTrue(result.contains("""<img data-acbooks-image="true" src="a.jpg"/>"""))
+        assertTrue(result.contains("""<img data-acbooks-image="true" src="b.jpg"/>"""))
+        assertTrue(result.contains("""<img src="inline.jpg"/>"""))
+        assertEquals(input, result.replace(Regex(""" data-acbooks-(?:image-block|image|preserve)="true""""), ""))
+        assertEquals(result, EpubLayoutNormalizer.normalize(result))
+    }
+
+    @Test
+    fun unnumberedPlateCaptionRequiresEstablishedMatchingParagraphStyle() {
+        val input = html("""<p class="plate"><sup><a href="#ref">[1]</a></sup><span>Plate one</span><img src="a.jpg"/></p>
+            <p class="plate"><span>Example vessel</span><img src="b.jpg"/></p>
+            <p class="unrelated"><span>Short text</span><img src="c.jpg"/></p>
+            <p class="plate"><span>A complete sentence.</span><img src="d.jpg"/></p>""")
+        val result = EpubLayoutNormalizer.normalize(input)
+        assertEquals(2, Regex("data-acbooks-image-block=").findAll(result).count())
+        assertTrue(result.contains("""<img data-acbooks-image="true" src="b.jpg"/>"""))
+        assertTrue(result.contains("""<img src="c.jpg"/>"""))
+        assertTrue(result.contains("""<img src="d.jpg"/>"""))
+    }
 }

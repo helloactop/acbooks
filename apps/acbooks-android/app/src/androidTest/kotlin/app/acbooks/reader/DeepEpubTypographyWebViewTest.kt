@@ -1,5 +1,6 @@
 package app.acbooks.reader
 
+import android.view.View
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.test.platform.app.InstrumentationRegistry
@@ -21,6 +22,14 @@ class DeepEpubTypographyWebViewTest {
         lateinit var webView: WebView
         instrumentation.runOnMainSync {
             webView = WebView(context)
+            val density = context.resources.displayMetrics.density
+            val width = (384 * density).toInt()
+            val height = (768 * density).toInt()
+            webView.measure(
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+            )
+            webView.layout(0, 0, width, height)
             webView.settings.javaScriptEnabled = true
             webView.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -30,8 +39,8 @@ class DeepEpubTypographyWebViewTest {
             webView.loadDataWithBaseURL(
                 null,
                 """<!DOCTYPE html><html dir="ltr" style="--USER__advancedSettings: readium-advanced-on">
-                   <head><style>html { font-size: 20px; } h1 { text-align: center !important; margin-top: 80px !important; font-size: 20px !important; } #wrapper { padding-top: 70px !important; min-height: 200px !important; } #poem h2 { text-align: center; font-size: 19px; }</style>
-                   <style>$css</style></head><body><section id="wrapper" data-acbooks-leading="true"><h1 id="title" data-acbooks-leading="true">Chapter</h1><p id="number" data-acbooks-heading="number">第二章</p><p id="semantic" data-acbooks-heading="chapter" style="text-align:center;font-size:20px">Semantic title</p><p>Text</p></section><section id="poem" data-acbooks-preserve="true"><h2 id="verse">Poem</h2></section></body></html>""",
+                   <head><style>html { font-size: 20px; } h1 { text-align: center !important; margin-top: 80px !important; font-size: 20px !important; } #wrapper { padding-top: 70px !important; min-height: 200px !important; } #poem h2 { text-align: center; font-size: 19px; } #nested { display:block; text-align:center; font-size:0.5em; } #empty { margin-top:100px; margin-bottom:100px; } #picture { text-indent:2em; text-align:left; } #image { width:900px; height:600px; }</style>
+                   <style>$css</style></head><body><div id="empty" data-acbooks-spacer="true"></div><section id="wrapper" data-acbooks-leading="true"><h1 id="title" data-acbooks-leading="true"><span id="nested">Chapter</span></h1><p id="number" data-acbooks-heading="number">第二章</p><p id="semantic" data-acbooks-heading="chapter" style="text-align:center;font-size:20px">Semantic title</p><p>Text</p></section><div id="picture" data-acbooks-image-block="true"><sup><a href="#semantic">[1]</a></sup><span>Example plate</span><img id="image" data-acbooks-image="true" width="900" height="600" src="data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%27900%27%20height=%27600%27/%3E" /></div><section id="poem" data-acbooks-preserve="true"><h2 id="verse">Poem</h2></section></body></html>""",
                 "text/html", "UTF-8", null,
             )
         }
@@ -50,6 +59,14 @@ class DeepEpubTypographyWebViewTest {
                 evaluate(webView, """(() => { const w = getComputedStyle(document.getElementById('wrapper')); const p = getComputedStyle(document.getElementById('verse')); return [w.paddingTop,w.minHeight,p.textAlign,p.fontSize].join('|'); })()"""),
             )
             assertEquals(
+                "\"start|33px|0px|0px|center|0px|block|100%\"",
+                evaluate(webView, """(() => { const n = getComputedStyle(document.getElementById('nested')); const e = getComputedStyle(document.getElementById('empty')); const p = getComputedStyle(document.getElementById('picture')); const i = getComputedStyle(document.getElementById('image')); return [n.textAlign,n.fontSize,e.marginTop,e.marginBottom,p.textAlign,p.textIndent,i.display,i.maxWidth].join('|'); })()"""),
+            )
+            assertEquals(
+                "true",
+                evaluate(webView, """(() => { const p = document.getElementById('picture').getBoundingClientRect(); const i = document.getElementById('image'); const r = i.getBoundingClientRect(); return r.width > 0 && r.width <= p.width + 1 && Math.abs((r.left+r.right)-(p.left+p.right)) < 2 && Math.abs(r.width / r.height - 1.5) < 0.05; })()"""),
+            )
+            assertEquals(
                 "\"center|80px|20px\"",
                 evaluate(webView, """(() => { document.documentElement.style.removeProperty('--USER__advancedSettings'); const s = getComputedStyle(document.getElementById('title')); return [s.textAlign,s.marginTop,s.fontSize].join('|'); })()"""),
             )
@@ -60,6 +77,10 @@ class DeepEpubTypographyWebViewTest {
             assertEquals(
                 "\"70px|200px\"",
                 evaluate(webView, """(() => { const w = getComputedStyle(document.getElementById('wrapper')); return [w.paddingTop,w.minHeight].join('|'); })()"""),
+            )
+            assertEquals(
+                "\"center|10px|100px|100px|left|40px\"",
+                evaluate(webView, """(() => { const n = getComputedStyle(document.getElementById('nested')); const e = getComputedStyle(document.getElementById('empty')); const p = getComputedStyle(document.getElementById('picture')); return [n.textAlign,n.fontSize,e.marginTop,e.marginBottom,p.textAlign,p.textIndent].join('|'); })()"""),
             )
         } finally {
             instrumentation.runOnMainSync { webView.destroy() }

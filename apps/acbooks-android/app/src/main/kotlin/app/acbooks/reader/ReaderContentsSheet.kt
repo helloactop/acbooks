@@ -13,7 +13,13 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -43,6 +49,21 @@ internal fun ReaderContentsSheet(
     onDismiss: () -> Unit,
     onSelect: (ReaderChapter) -> Unit,
 ) {
+    val selectedIndex = selectedReaderContentsIndex(
+        chapters.orEmpty().map { it.link.url().toString() }, currentHref,
+    )
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex.coerceAtLeast(0))
+    // Reset the positioning guard for each opening. Wait for a valid chapter
+    // if publication/locator data arrives asynchronously, then position once.
+    // Subsequent locator emissions must not fight the user's manual scrolling.
+    var positionedForOpen by remember(show) { mutableStateOf(false) }
+    LaunchedEffect(show, selectedIndex) {
+        if (show && selectedIndex >= 0 && !positionedForOpen) {
+            listState.scrollToItem(selectedIndex)
+            positionedForOpen = true
+        }
+    }
+
     GlassBottomSheet(
         show = show,
         onDismissRequest = onDismiss,
@@ -69,13 +90,12 @@ internal fun ReaderContentsSheet(
                 )
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
                     contentPadding = PaddingValues(top = 12.dp, bottom = 20.dp),
                 ) {
                     itemsIndexed(chapters, key = { index, _ -> index }) { index, chapter ->
-                        val selected = currentHref != null &&
-                            chapter.link.href.toString().substringBefore('#') ==
-                            currentHref.substringBefore('#')
+                        val selected = index == selectedIndex
                         Text(
                             text = chapter.title ?: stringResource(R.string.reader_chapter_fallback, index + 1),
                             modifier = Modifier.fillMaxWidth()

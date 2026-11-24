@@ -43,7 +43,12 @@ internal object EpubSemanticAnalyzer {
                     element.selectFirst("img,svg,math,video,audio,object,iframe,table") == null
             }
         val minDepth = hints.minOfOrNull { it.depth } ?: 0
-        val normalizedHints = hints.map { it to normalize(it.title) }.filter { it.second.isNotEmpty() }
+        val normalizedHints = hints.mapNotNull { hint ->
+            val label = EpubTocLabels.displayTitle(hint.title) ?: return@mapNotNull null
+            if (EpubTocLabels.isNoteLabel(label)) null
+            else normalize(label).takeIf { it.isNotEmpty() }?.let { hint.copy(title = label) to it }
+        }
+        val hasRootChapter = normalizedHints.any { (hint, _) -> hint.fragment == null && hint.depth == minDepth }
         val texts = candidates.map { it.text().trim() }
         val keys = texts.map { if (it.length <= MAX_TITLE_LENGTH) normalize(it) else "" }
         val counts = keys.groupingBy { it }.eachCount()
@@ -81,7 +86,14 @@ internal object EpubSemanticAnalyzer {
                 normalizedHints.firstOrNull { (hint, title) -> hint.fragment == null && key == title }?.first
             } else null
             val match = anchored ?: byText
-            val role = explicit ?: match?.let { if (it.depth == minDepth) "chapter" else "section" }
+            val role = explicit ?: match?.let {
+                // Some NCX files flatten chapters and numbered subsections to
+                // the same depth. A root resource entry plus an anchored,
+                // parenthesized ordinal is sufficient evidence of a subsection.
+                if (it.depth > minDepth ||
+                    (hasRootChapter && it.fragment != null && EpubTocLabels.isNumberedSubsection(it.title))
+                ) "section" else "chapter"
+            }
             if (role != null) roles[index] = role
         }
 
