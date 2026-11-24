@@ -5,13 +5,15 @@ import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Layout
+import org.readium.r2.shared.publication.Link
+import org.readium.r2.shared.util.Url
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.util.Try
 import org.readium.r2.shared.util.resource.TransformingContainer
 import org.readium.r2.shared.util.resource.TransformingResource
 
 /**
- * First-stage, non-destructive typography for reflowable EPUB spine documents.
+ * Non-destructive typography for reflowable EPUB spine documents.
  * Readium 3.4.0 updates --USER__advancedSettings on all active pages when the
  * publisher-layout preference changes; the stylesheet uses that same switch.
  */
@@ -52,10 +54,24 @@ internal object DeepEpubTypography {
             .toSet()
         if (chapterUrls.isEmpty()) return
 
+        val hints = mutableMapOf<Url, MutableList<EpubHeadingHint>>()
+        fun collect(links: List<Link>, depth: Int) {
+            for (link in links) {
+                val url = link.url()
+                val title = link.title?.trim()
+                if (!title.isNullOrEmpty() && url.removeFragment() in chapterUrls) {
+                    hints.getOrPut(url.removeFragment()) { mutableListOf() }
+                        .add(EpubHeadingHint(title, url.fragment, depth))
+                }
+                collect(link.children, depth + 1)
+            }
+        }
+        collect(builder.manifest.tableOfContents, 0)
+
         builder.container = TransformingContainer(builder.container) { url, resource ->
             if (url.removeFragment() !in chapterUrls) resource
             else TransformingResource(resource) { bytes ->
-                Try.success(injectStylesheet(bytes))
+                Try.success(injectStylesheet(bytes, hints[url.removeFragment()].orEmpty()))
             }
         }
     }
@@ -63,9 +79,10 @@ internal object DeepEpubTypography {
     /**
      * Insert a single XHTML-safe link without reserializing the document or
      * changing body nodes, ids, text, hrefs, whitespace or publisher styles.
+     * Semantic recognition may add inert data attributes to existing tags.
      * Unsupported encodings, malformed headers and large chapters fail open.
      */
-    internal fun injectStylesheet(bytes: ByteArray): ByteArray {
+    internal fun injectStylesheet(bytes: ByteArray, hints: List<EpubHeadingHint> = emptyList()): ByteArray {
         if (bytes.size > MAX_CHAPTER_BYTES) return bytes
         val html = try {
             Charsets.UTF_8.newDecoder()
@@ -80,12 +97,19 @@ internal object DeepEpubTypography {
         if (declaredEncoding != null && !declaredEncoding.equals("utf-8", ignoreCase = true)) return bytes
         val close = headTokens.findAll(html).firstOrNull { headEnd.matches(it.value) } ?: return bytes
         if (headStart.find(html)?.range?.first?.let { it < close.range.first } != true) return bytes
-        return buildString(html.length + STYLESHEET_LINK.length + 2) {
+        val injected = buildString(html.length + STYLESHEET_LINK.length + 2) {
             append(html, 0, close.range.first)
             append('\n')
             append(STYLESHEET_LINK)
             append('\n')
             append(html, close.range.first, html.length)
-        }.toByteArray(Charsets.UTF_8)
+        }
+        val annotated = try {
+            EpubSemanticAnalyzer.annotate(injected, hints)
+        } catch (_: Exception) {
+            // A malformed document should still be readable with basic CSS.
+            injected
+        }
+        return annotated.toByteArray(Charsets.UTF_8)
     }
 }
