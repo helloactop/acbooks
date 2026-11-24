@@ -87,7 +87,7 @@ class EpubSemanticAnalyzerTest {
             EpubHeadingHint("Chapter One", "chapter", 0),
         )).decodeToString()
         assertTrue(result.contains("acbooks-typography.css"))
-        assertTrue(result.contains("""<p data-acbooks-heading="chapter" id="chapter">Chapter One"""))
+        assertTrue(result.contains("""<p data-acbooks-leading="true" data-acbooks-heading="chapter" id="chapter">Chapter One"""))
         assertTrue(result.contains("<p>Body</p>"))
     }
 }
