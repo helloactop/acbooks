@@ -62,12 +62,23 @@ internal object EpubSemanticAnalyzer {
             }
             // An anchor alone is not enough: arbitrary paragraphs can be linked
             // from the TOC too. Require matching text or explicit heading evidence.
+            val nearbyIds = buildSet {
+                element.parents().forEach { if (it.id().isNotEmpty()) add(it.id()) }
+                val previous = element.previousElementSibling()
+                if (previous != null && previous.normalName() == "a" && previous.text().isBlank()) {
+                    if (previous.id().isNotEmpty()) add(previous.id())
+                    if (previous.hasAttr("name")) add(previous.attr("name"))
+                }
+            }
             val anchored = normalizedHints.firstOrNull { (hint, title) ->
-                hint.fragment != null && hint.fragment in ids &&
-                    (key == title || explicit != null || element.normalName() in headingTags)
+                val fragment = hint.fragment
+                fragment != null && (
+                    (fragment in ids && (key == title || explicit != null || element.normalName() in headingTags)) ||
+                        (fragment in nearbyIds && key == title && counts[key] == 1)
+                    )
             }?.first
             val byText = if (index < 6 && key.length >= 2 && counts[key] == 1) {
-                normalizedHints.firstOrNull { (_, title) -> key == title }?.first
+                normalizedHints.firstOrNull { (hint, title) -> hint.fragment == null && key == title }?.first
             } else null
             val match = anchored ?: byText
             val role = explicit ?: match?.let { if (it.depth == minDepth) "chapter" else "section" }
