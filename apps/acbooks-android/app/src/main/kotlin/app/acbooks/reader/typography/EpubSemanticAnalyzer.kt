@@ -31,11 +31,6 @@ internal object EpubSemanticAnalyzer {
         """^(?:第\s*[零〇一二三四五六七八九十百千万两0-9IVXLCDM]+\s*[章节卷部篇回]|(?:chapter|part|book)\s+(?:[0-9]+|[ivxlcdm]+))[\s.:：、．]*$""",
         RegexOption.IGNORE_CASE,
     )
-    // Printed-book TOCs sometimes retain a dotted leader and page number.
-    // Strip only an explicit leader, never ordinary title-ending digits.
-    private val pageLeader = Regex("""(?:\.{3,}|…+|·{3,})\s*[0-9]+\s*$""")
-    private val noteLabel = Regex("""^(?:\[\s*[0-9]+\s*]|【\s*[0-9]+\s*】)$""")
-    private val subsectionPrefix = Regex("""^\(\s*[零〇一二三四五六七八九十百千万两0-9]+\s*\)\s*\S""")
     private val whitespaceAndPunctuation = Regex("""[\p{P}\p{Z}\s]+""")
     private val tagStart = Regex("""^<[a-zA-Z][a-zA-Z0-9:_-]*""")
 
@@ -49,9 +44,8 @@ internal object EpubSemanticAnalyzer {
             }
         val minDepth = hints.minOfOrNull { it.depth } ?: 0
         val normalizedHints = hints.mapNotNull { hint ->
-            val label = Normalizer.normalize(hint.title.trim(), Normalizer.Form.NFKC)
-                .replace(pageLeader, "").trim()
-            if (noteLabel.matches(label)) null
+            val label = EpubTocLabels.displayTitle(hint.title) ?: return@mapNotNull null
+            if (EpubTocLabels.isNoteLabel(label)) null
             else normalize(label).takeIf { it.isNotEmpty() }?.let { hint.copy(title = label) to it }
         }
         val hasRootChapter = normalizedHints.any { (hint, _) -> hint.fragment == null && hint.depth == minDepth }
@@ -97,7 +91,7 @@ internal object EpubSemanticAnalyzer {
                 // the same depth. A root resource entry plus an anchored,
                 // parenthesized ordinal is sufficient evidence of a subsection.
                 if (it.depth > minDepth ||
-                    (hasRootChapter && it.fragment != null && subsectionPrefix.containsMatchIn(it.title))
+                    (hasRootChapter && it.fragment != null && EpubTocLabels.isNumberedSubsection(it.title))
                 ) "section" else "chapter"
             }
             if (role != null) roles[index] = role

@@ -195,7 +195,15 @@ internal class EpubDocumentFragment : Fragment() {
                     }
                 }
                 navigator.currentLocator.collect { position ->
-                    currentHref = position.href.toString()
+                    // Readium may return an anchor in locations.fragments rather
+                    // than in href itself. Prefer an exact known TOC target.
+                    val resource = position.href.removeFragment()
+                    val anchors = position.locations.fragments + listOfNotNull(position.href.fragment)
+                    val matching = chapters.orEmpty().firstOrNull { chapter ->
+                        val url = chapter.link.url()
+                        url.removeFragment() == resource && url.fragment?.let { it in anchors } == true
+                    }
+                    currentHref = matching?.link?.url()?.toString() ?: resource.toString()
                     onCurrentHrefChanged?.invoke(currentHref)
                     if (lastPosition != null && position != lastPosition) {
                         library.saveReadingPosition(
@@ -276,16 +284,20 @@ private suspend fun openPublication(context: android.content.Context, file: File
 }
 
 private fun Publication.readerChapters(): List<ReaderChapter> {
-    val result = mutableListOf<ReaderChapter>()
+    val sourceLinks = mutableListOf<Link>()
+    val entries = mutableListOf<ReaderContentsEntry>()
     fun addLinks(links: List<Link>, depth: Int) {
         for (link in links) {
-            result += ReaderChapter(link, link.title?.takeIf { it.isNotBlank() }, depth)
+            sourceLinks += link
+            entries += ReaderContentsEntry(link.url().toString(), link.title, depth, link.children.isNotEmpty())
             addLinks(link.children, depth + 1)
         }
     }
     // Some EPUBs have no navigation document; use their reading order as a fallback.
     addLinks(tableOfContents.ifEmpty { readingOrder }, 0)
-    return result
+    return normalizeReaderContents(entries).map { item ->
+        ReaderChapter(sourceLinks[item.sourceIndex], item.entry.title, item.entry.depth)
+    }
 }
 
 private object OfflineHttpClient : HttpClient {

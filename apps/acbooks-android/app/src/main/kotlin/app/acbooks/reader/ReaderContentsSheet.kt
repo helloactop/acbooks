@@ -68,14 +68,15 @@ internal fun ReaderContentsSheet(
                     textAlign = TextAlign.Center,
                 )
             } else {
+                val selectedIndex = selectedReaderContentsIndex(
+                    chapters.map { it.link.url().toString() }, currentHref,
+                )
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
                     contentPadding = PaddingValues(top = 12.dp, bottom = 20.dp),
                 ) {
                     itemsIndexed(chapters, key = { index, _ -> index }) { index, chapter ->
-                        val selected = currentHref != null &&
-                            chapter.link.href.toString().substringBefore('#') ==
-                            currentHref.substringBefore('#')
+                        val selected = index == selectedIndex
                         Text(
                             text = chapter.title ?: stringResource(R.string.reader_chapter_fallback, index + 1),
                             modifier = Modifier.fillMaxWidth()
