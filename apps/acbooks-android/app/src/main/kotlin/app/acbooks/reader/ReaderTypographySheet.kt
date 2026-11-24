@@ -141,45 +141,13 @@ internal fun ReaderTypographySheet(
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
 
-                    TypographySection(R.string.reader_typography_font)
-                    GlassSegmentedTabRow(
-                        tabs = listOf(
-                            stringResource(R.string.reader_typography_font_book),
-                            stringResource(R.string.reader_typography_font_serif),
-                            stringResource(R.string.reader_typography_font_sans),
-                            stringResource(R.string.reader_typography_font_mono),
-                        ),
-                        selectedIndex = ReaderFontFamily.entries.indexOf(current.fontFamily),
-                        onSelect = {
-                            val family = ReaderFontFamily.entries[it]
-                            save(current.copy(
-                                fontFamily = family,
-                                publisherStyles = if (family != ReaderFontFamily.BOOK) false
-                                    else current.publisherStyles,
-                            ))
-                        },
-                        backdrop = backdrop,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    TypographySlider(
-                        title = stringResource(R.string.reader_typography_size),
-                        value = current.fontSize,
-                        defaultValue = 1f,
-                        range = 0.75f..2f,
-                        steps = 24,
-                        format = { "${(it * 100).roundToInt()}%" },
-                        onPreview = { draft = current.copy(fontSize = it) },
-                        onCommit = { draft?.let { save(it) } },
-                    )
-
                     TypographySection(R.string.reader_typography_paragraph)
                     GlassSegmentedTabRow(
                         tabs = listOf(
                             stringResource(R.string.reader_typography_publisher),
                             stringResource(R.string.reader_typography_optimized),
                         ),
-                        selectedIndex = if (current.publisherStyles == false) 1 else 0,
+                        selectedIndex = if (current.isOptimizedLayout) 1 else 0,
                         onSelect = { save(current.withPublisherLayout(original = it == 0)) },
                         backdrop = backdrop,
                         modifier = Modifier.fillMaxWidth(),
@@ -190,30 +158,63 @@ internal fun ReaderTypographySheet(
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
 
-                    TypographySlider(
-                        title = stringResource(R.string.reader_typography_line_height),
-                        value = current.lineHeight,
-                        defaultValue = 1.2f,
-                        range = 1f..2f,
-                        steps = 9,
-                        format = { "${((it * 10).roundToInt() / 10.0)}×" },
-                        onPreview = {
-                            draft = current.copy(lineHeight = it, publisherStyles = false)
-                        },
-                        onCommit = { draft?.let { save(it) } },
-                    )
+                    // Publisher mode has no editable layout controls. The
+                    // saved optimized values remain in draft and DataStore.
+                    if (current.isOptimizedLayout) {
+                        TypographySection(R.string.reader_typography_font)
+                        GlassSegmentedTabRow(
+                            tabs = listOf(
+                                stringResource(R.string.reader_typography_font_book),
+                                stringResource(R.string.reader_typography_font_serif),
+                                stringResource(R.string.reader_typography_font_sans),
+                                stringResource(R.string.reader_typography_font_mono),
+                            ),
+                            selectedIndex = ReaderFontFamily.entries.indexOf(current.fontFamily),
+                            onSelect = {
+                                val family = ReaderFontFamily.entries[it]
+                                save(current.copy(fontFamily = family))
+                            },
+                            backdrop = backdrop,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
 
-                    TypographySection(R.string.reader_typography_page)
-                    TypographySlider(
-                        title = stringResource(R.string.reader_typography_margins),
-                        value = current.pageMargins,
-                        defaultValue = 1f,
-                        range = 0.5f..2f,
-                        steps = 14,
-                        format = { "${((it * 10).roundToInt() / 10.0)}×" },
-                        onPreview = { draft = current.copy(pageMargins = it) },
-                        onCommit = { draft?.let { save(it) } },
-                    )
+                        TypographySlider(
+                            title = stringResource(R.string.reader_typography_size),
+                            value = current.fontSize,
+                            defaultValue = 1.3f,
+                            range = 0.75f..2f,
+                            steps = 24,
+                            format = { "${(it * 100).roundToInt()}%" },
+                            onPreview = { draft = current.copy(fontSize = it) },
+                            onCommit = { draft?.let { save(it) } },
+                        )
+
+                        TypographySlider(
+                            title = stringResource(R.string.reader_typography_line_height),
+                            value = current.lineHeight,
+                            defaultValue = 1.5f,
+                            range = 1f..2f,
+                            steps = 9,
+                            format = { "${((it * 10).roundToInt() / 10.0)}×" },
+                            onPreview = {
+                                draft = current.copy(lineHeight = it)
+                            },
+                            onCommit = { draft?.let { save(it) } },
+                        )
+
+                        TypographySection(R.string.reader_typography_page)
+                        TypographySlider(
+                            title = stringResource(R.string.reader_typography_margins),
+                            value = current.pageMargins,
+                            defaultValue = 1f,
+                            range = 0.5f..2f,
+                            steps = 14,
+                            format = { "${((it * 10).roundToInt() / 10.0)}×" },
+                            onPreview = { draft = current.copy(pageMargins = it) },
+                            onCommit = { draft?.let { save(it) } },
+                        )
+
+                    }
 
                     TypographySection(R.string.reader_typography_appearance)
                     GlassSegmentedTabRow(

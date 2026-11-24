@@ -113,7 +113,7 @@
     <string name="reader_typography_paragraph">段落</string>
     <string name="reader_typography_publisher">原书排版</string>
     <string name="reader_typography_optimized">优化排版</string>
-    <string name="reader_typography_publisher_note">原书排版保留书籍样式；调整字体或行距会切换为优化排版。</string>
+    <string name="reader_typography_publisher_note">原书排版保留书籍样式。字体、字号、行距和页边距仅可在优化排版中调整。</string>
     <string name="reader_typography_line_height">行距</string>
     <string name="reader_typography_page">页面</string>
     <string name="reader_typography_margins">左右边距</string>
