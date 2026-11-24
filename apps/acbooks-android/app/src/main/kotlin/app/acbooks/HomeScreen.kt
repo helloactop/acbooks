@@ -49,6 +49,7 @@ import java.time.LocalTime
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text
@@ -58,6 +59,7 @@ import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.glass.GlassTopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.Cloud
+import top.yukonga.miuix.kmp.nav.transition.navTransitionSource
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -292,7 +294,15 @@ private fun HomeBookCover(
     onClick: (() -> Unit)? = null,
 ) {
     Card(
-        modifier = modifier.aspectRatio(3f / 4f),
+        modifier = modifier.aspectRatio(3f / 4f)
+            .navTransitionSource(
+                route = AcbooksRoute.Reader(book.id),
+                cornerRadius = CardDefaults.CornerRadius,
+                containerColor = MiuixTheme.colorScheme.surfaceContainer,
+                // A book may move between the recent row and the continue-reading card.
+                // Keep the same key across those mutually exclusive placements.
+                sourceKey = "home:cover:${book.id}",
+            ),
         insideMargin = PaddingValues(0.dp),
         onClick = onClick,
         showIndication = onClick != null,

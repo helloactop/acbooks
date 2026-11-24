@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity() {
 }
 
 @Serializable
-private sealed interface AcbooksRoute : NavKey {
+internal sealed interface AcbooksRoute : NavKey {
     @Serializable
     data object Main : AcbooksRoute
 
@@ -277,7 +277,9 @@ internal fun AcbooksNavigation(library: LibraryViewModel) {
                 },
             )
         }
-        entry<AcbooksRoute.Reader> { route ->
+        entry<AcbooksRoute.Reader>(
+            transition = NavTransitions.expansion(containerColor = MiuixTheme.colorScheme.background),
+        ) { route ->
             LocalReaderScreen(model = library, bookId = route.bookId)
         }
     }
