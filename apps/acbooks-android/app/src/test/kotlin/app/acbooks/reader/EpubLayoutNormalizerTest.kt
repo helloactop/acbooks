@@ -102,4 +102,17 @@ class EpubLayoutNormalizerTest {
         assertEquals(input, result.replace(Regex(""" data-acbooks-(?:image-block|image|preserve)="true""""), ""))
         assertEquals(result, EpubLayoutNormalizer.normalize(result))
     }
+
+    @Test
+    fun unnumberedPlateCaptionRequiresEstablishedMatchingParagraphStyle() {
+        val input = html("""<p class="plate"><sup><a href="#ref">[1]</a></sup><span>Plate one</span><img src="a.jpg"/></p>
+            <p class="plate"><span>Example vessel</span><img src="b.jpg"/></p>
+            <p class="unrelated"><span>Short text</span><img src="c.jpg"/></p>
+            <p class="plate"><span>A complete sentence.</span><img src="d.jpg"/></p>""")
+        val result = EpubLayoutNormalizer.normalize(input)
+        assertEquals(2, Regex("data-acbooks-image-block=").findAll(result).count())
+        assertTrue(result.contains("""<img data-acbooks-image="true" src="b.jpg"/>"""))
+        assertTrue(result.contains("""<img src="c.jpg"/>"""))
+        assertTrue(result.contains("""<img src="d.jpg"/>"""))
+    }
 }

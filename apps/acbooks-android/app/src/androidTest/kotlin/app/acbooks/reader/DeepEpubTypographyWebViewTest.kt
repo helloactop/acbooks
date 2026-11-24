@@ -1,5 +1,6 @@
 package app.acbooks.reader
 
+import android.view.View
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.test.platform.app.InstrumentationRegistry
@@ -21,6 +22,14 @@ class DeepEpubTypographyWebViewTest {
         lateinit var webView: WebView
         instrumentation.runOnMainSync {
             webView = WebView(context)
+            val density = context.resources.displayMetrics.density
+            val width = (384 * density).toInt()
+            val height = (768 * density).toInt()
+            webView.measure(
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+            )
+            webView.layout(0, 0, width, height)
             webView.settings.javaScriptEnabled = true
             webView.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {

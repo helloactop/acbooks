@@ -95,9 +95,23 @@ internal object EpubLayoutNormalizer {
         // This is not ordinary mixed prose: require a local superscript
         // backlink, a short nonempty caption, and images after all text.
         if (!isSpecial(document.selectFirst("html"))) {
-            for (block in body.select("p,div")) {
-                if (isSpecial(block) || block.parents().any { isSpecial(it) }) continue
-                if (!isCaptionedImageBlock(block)) continue
+            val eligible = body.select("p,div").filter { block ->
+                !isSpecial(block) && block.parents().none { isSpecial(it) } &&
+                    hasTrailingCaptionImages(block)
+            }
+            val numbered = eligible.filter { hasNumberedBacklink(it) }
+            // A short unnumbered caption can reuse the exact same nonempty
+            // class set as an established plate paragraph in this document.
+            // Do not infer a caption from a class name alone.
+            val plateStyles = numbered.map { it.classNames().toSet() }.filter { it.isNotEmpty() }.toSet()
+            val unnumbered = eligible.filter { block ->
+                block !in numbered && block.classNames().toSet() in plateStyles &&
+                    block.text().trim().length in 1..40 &&
+                    block.children().firstOrNull()?.normalName() == "span" &&
+                    block.childNodes().none { it is TextNode && it.wholeText.isNotBlank() } &&
+                    block.text().none { it in "。！？.!?；;" }
+            }
+            for (block in numbered + unnumbered) {
                 mark(block, IMAGE_BLOCK)
                 block.select("img").forEach { mark(it, IMAGE) }
             }
@@ -129,17 +143,21 @@ internal object EpubLayoutNormalizer {
                 it == element || (!isSpecial(it) && (it.normalName() in imageWrappers || it.normalName() == "img"))
             }
 
-    private fun isCaptionedImageBlock(element: Element): Boolean {
+    private fun hasNumberedBacklink(element: Element): Boolean {
         val text = element.text().trim()
         val number = noteNumber.find(text) ?: return false
-        if (text.length > 120 || text.substring(number.range.last + 1).isBlank()) return false
+        if (text.substring(number.range.last + 1).isBlank()) return false
+        return element.select("sup a[href]").any {
+            it.text().trim() == number.value && localBacklink.matches(it.attr("href"))
+        }
+    }
+
+    private fun hasTrailingCaptionImages(element: Element): Boolean {
+        val text = element.text().trim()
+        if (text.isEmpty() || text.length > 120) return false
         if (element.getAllElements().any {
                 it != element && (isSpecial(it) || it.normalName() !in captionTags)
             }) return false
-        val backlink = element.select("sup a[href]").any {
-            it.text().trim() == number.value && localBacklink.matches(it.attr("href"))
-        }
-        if (!backlink) return false
 
         // The images must be direct trailing children, not inline in a
         // sentence; multiple plate images in one paragraph are supported.
