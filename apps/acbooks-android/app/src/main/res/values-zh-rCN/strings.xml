@@ -130,6 +130,10 @@
     <string name="library_display_sort">显示与排序</string>
     <string name="library_more">更多书库操作</string>
     <string name="library_display_mode">显示方式</string>
+    <string name="library_sort_mode">排序方式</string>
+    <string name="library_sort_recent_reading">最近阅读</string>
+    <string name="library_sort_author">作者</string>
+    <string name="library_sort_title">书名</string>
     <string name="library_compact">紧凑模式</string>
     <string name="library_comfortable">舒适模式</string>
     <string name="library_add_books">添加书籍</string>

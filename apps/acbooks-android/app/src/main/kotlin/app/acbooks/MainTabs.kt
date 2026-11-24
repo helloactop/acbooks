@@ -116,6 +116,7 @@ internal fun MainTabs(
     val searchBarAlpha = rememberGlassSearchBarAlpha(searchExpanded)
     val topBarTransition = Modifier.glassSearchBarTransition(searchExpanded) { 1f }
     val displayMode by library.displayMode.collectAsStateWithLifecycle()
+    val sortMode by library.sortMode.collectAsStateWithLifecycle()
     val recentReading by library.recentReading.collectAsStateWithLifecycle()
     val currentShelf = remember(catalog.shelves, shelfId) { catalog.shelves.firstOrNull { it.shelf.id == shelfId } }
     LaunchedEffect(isCurrentDestination, catalog.loaded, catalog.failed, currentShelf) {
@@ -227,6 +228,8 @@ internal fun MainTabs(
                     catalog = catalog,
                     shelfId = shelfId,
                     mode = displayMode,
+                    sortMode = sortMode,
+                    recentReading = recentReading,
                     scrollBehavior = scrollBehavior,
                     pagePadding = pagePadding,
                     coverFile = library::coverFile,
@@ -380,11 +383,13 @@ internal fun MainTabs(
             bookTarget = bookMenuTarget,
             backdrop = menuBackdrop,
             mode = displayMode,
+            sortMode = sortMode,
             importing = importProgress?.running == true,
             cloudConnected = cloud.connection.hasSession,
             cloudBusy = cloud.busy,
             onDismiss = { menu -> if (libraryMenu == menu) libraryMenu = null },
             onDisplayMode = library::setDisplayMode,
+            onSortMode = library::setSortMode,
             onAddBooks = {
                 libraryMenu = null
                 picker.launch(arrayOf("application/epub+zip", "application/pdf"))
