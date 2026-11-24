@@ -30,8 +30,8 @@ class DeepEpubTypographyWebViewTest {
             webView.loadDataWithBaseURL(
                 null,
                 """<!DOCTYPE html><html dir="ltr" style="--USER__advancedSettings: readium-advanced-on">
-                   <head><style>html { font-size: 20px; } h1 { text-align: center; margin-top: 80px; font-size: 20px; }</style>
-                   <style>$css</style></head><body><section><h1 id="title">Chapter</h1><p id="number" data-acbooks-heading="number">第二章</p><p id="semantic" data-acbooks-heading="chapter" style="text-align:center;font-size:20px">Semantic title</p><p>Text</p></section></body></html>""",
+                   <head><style>html { font-size: 20px; } h1 { text-align: center !important; margin-top: 80px !important; font-size: 20px !important; } #wrapper { padding-top: 70px !important; min-height: 200px !important; } #poem h2 { text-align: center; font-size: 19px; }</style>
+                   <style>$css</style></head><body><section id="wrapper" data-acbooks-leading="true"><h1 id="title" data-acbooks-leading="true">Chapter</h1><p id="number" data-acbooks-heading="number">第二章</p><p id="semantic" data-acbooks-heading="chapter" style="text-align:center;font-size:20px">Semantic title</p><p>Text</p></section><section id="poem" data-acbooks-preserve="true"><h2 id="verse">Poem</h2></section></body></html>""",
                 "text/html", "UTF-8", null,
             )
         }
@@ -46,12 +46,20 @@ class DeepEpubTypographyWebViewTest {
                 evaluate(webView, """(() => { const s = getComputedStyle(document.getElementById('semantic')); const n = getComputedStyle(document.getElementById('number')); return [s.textAlign,s.fontSize,n.fontSize].join('|'); })()"""),
             )
             assertEquals(
+                "\"0px|0px|center|19px\"",
+                evaluate(webView, """(() => { const w = getComputedStyle(document.getElementById('wrapper')); const p = getComputedStyle(document.getElementById('verse')); return [w.paddingTop,w.minHeight,p.textAlign,p.fontSize].join('|'); })()"""),
+            )
+            assertEquals(
                 "\"center|80px|20px\"",
                 evaluate(webView, """(() => { document.documentElement.style.removeProperty('--USER__advancedSettings'); const s = getComputedStyle(document.getElementById('title')); return [s.textAlign,s.marginTop,s.fontSize].join('|'); })()"""),
             )
             assertEquals(
                 "\"center|20px\"",
                 evaluate(webView, """(() => { const s = getComputedStyle(document.getElementById('semantic')); return [s.textAlign,s.fontSize].join('|'); })()"""),
+            )
+            assertEquals(
+                "\"70px|200px\"",
+                evaluate(webView, """(() => { const w = getComputedStyle(document.getElementById('wrapper')); return [w.paddingTop,w.minHeight].join('|'); })()"""),
             )
         } finally {
             instrumentation.runOnMainSync { webView.destroy() }

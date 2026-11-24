@@ -19,7 +19,10 @@ class DeepEpubTypographyTest {
             <aside id="note">脚注</aside></body></html>""".trimIndent()
         val result = DeepEpubTypography.injectStylesheet(html.toByteArray()).decodeToString()
         assertTrue(result.indexOf(linkUrl) in 1 until result.indexOf("</head>"))
-        assertEquals(html.substringAfter("</head>"), result.substringAfter("</head>"))
+        assertEquals(
+            html.substringAfter("</head>"),
+            result.substringAfter("</head>").replace(Regex(""" data-acbooks-(?:leading|preserve)="true""""), ""),
+        )
         assertTrue(result.contains("""<link rel="stylesheet" href="book.css" />"""))
         assertEquals(result, DeepEpubTypography.injectStylesheet(result.toByteArray()).decodeToString())
     }

@@ -1,74 +1,96 @@
-/* acbooks reflowable EPUB typography.
- * In Readium Kotlin 3.4.0, publisherStyles=false sets the root advanced flag.
- * Keep all overrides behind this flag so the existing original-layout toggle
- * restores the publisher layout without reloading the chapter.
- * Logical margins also preserve RTL/vertical reading directions.
+/* Important declarations in a named layer outrank unlayered author
+ * !important rules, without altering the publisher's CSS. Inline !important
+ * declarations and earlier author layers retain their normal cascade priority.
  */
-:root[style*="readium-advanced-on"] body :is(h1, h2, h3, h4, h5, h6):not(:where(nav *, table *, figure *, blockquote *, aside *)) {
-  text-align: start !important;
-  text-indent: 0 !important;
-  font-weight: 700 !important;
-  line-height: 1.4 !important;
-  margin-inline: 0 !important;
-  padding-inline: 0 !important;
-  break-after: avoid;
-  page-break-after: avoid;
-}
+@layer acbooks-typography {
+  /* acbooks reflowable EPUB typography.
+   * In Readium Kotlin 3.4.0, publisherStyles=false sets the root advanced flag.
+   * Keep all overrides behind this flag so the existing original-layout toggle
+   * restores the publisher layout without reloading the chapter.
+   * Logical margins also preserve RTL/vertical reading directions.
+   */
+  :root[style*="readium-advanced-on"] body :is(h1, h2, h3, h4, h5, h6):not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    text-align: start !important;
+    text-indent: 0 !important;
+    font-weight: 700 !important;
+    line-height: 1.4 !important;
+    margin-inline: 0 !important;
+    padding-inline: 0 !important;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
 
-:root[style*="readium-advanced-on"] body h1:not(:where(nav *, table *, figure *, blockquote *, aside *)) {
-  font-size: 1.65rem !important;
-  margin-block: 1em 0.9em !important;
-}
-:root[style*="readium-advanced-on"] body h2:not(:where(nav *, table *, figure *, blockquote *, aside *)) {
-  font-size: 1.35rem !important;
-  margin-block: 1em 0.65em !important;
-}
-:root[style*="readium-advanced-on"] body :is(h3, h4, h5, h6):not(:where(nav *, table *, figure *, blockquote *, aside *)) {
-  font-size: 1.15rem !important;
-  margin-block: 0.8em 0.5em !important;
-}
+  :root[style*="readium-advanced-on"] body h1:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    font-size: 1.65rem !important;
+    margin-block: 1em 0.9em !important;
+  }
+  :root[style*="readium-advanced-on"] body h2:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    font-size: 1.35rem !important;
+    margin-block: 1em 0.65em !important;
+  }
+  :root[style*="readium-advanced-on"] body :is(h3, h4, h5, h6):not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    font-size: 1.15rem !important;
+    margin-block: 0.8em 0.5em !important;
+  }
 
-/* A leading heading has no extra top gap, including common chapter wrappers.
- * Do not move nodes or reset every section's margins.
- */
-:root[style*="readium-advanced-on"] body > :is(h1, h2):first-child,
-:root[style*="readium-advanced-on"] body > :is(section, article, div, header):first-child > :is(h1, h2):first-child,
-:root[style*="readium-advanced-on"] body > :is(section, article, div):first-child > header:first-child > :is(h1, h2):first-child {
-  margin-block-start: 0 !important;
-  padding-block-start: 0 !important;
-}
+  /* A leading heading has no extra top gap, including common chapter wrappers.
+   * Do not move nodes or reset every section's margins.
+   */
+  :root[style*="readium-advanced-on"] body > :is(h1, h2):first-child:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)),
+  :root[style*="readium-advanced-on"] body > :is(section, article, div, header):first-child > :is(h1, h2):first-child:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)),
+  :root[style*="readium-advanced-on"] body > :is(section, article, div):first-child > header:first-child > :is(h1, h2):first-child:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    margin-block-start: 0 !important;
+    padding-block-start: 0 !important;
+  }
 
-/* Preserve image aspect ratios and avoid stretching illustrations. Keep
- * captions, tables, quotes, poetry and footnotes in their authored structure.
- */
-:root[style*="readium-advanced-on"] body img:not(:where(nav *, table *, aside *, a *)) {
-  max-inline-size: 100% !important;
-  object-fit: contain;
-}
+  /* Preserve image aspect ratios and avoid stretching illustrations. Keep
+   * captions, tables, quotes, poetry and footnotes in their authored structure.
+   */
+  :root[style*="readium-advanced-on"] body img:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, aside *, a *)) {
+    max-inline-size: 100% !important;
+    object-fit: contain;
+  }
 
-/* Semantic headings identified from the EPUB TOC and publisher metadata.
- * The data attribute is inert in original-layout mode.
- */
-:root[style*="readium-advanced-on"] body [data-acbooks-heading] {
-  text-align: start !important;
-  text-indent: 0 !important;
-  font-weight: 700 !important;
-  line-height: 1.4 !important;
-  margin-inline: 0 !important;
-  padding-inline: 0 !important;
-  break-after: avoid;
-  page-break-after: avoid;
-}
-:root[style*="readium-advanced-on"] body [data-acbooks-heading="chapter"] {
-  font-size: 1.65rem !important;
-  margin-block: 0 0.9em !important;
-}
-:root[style*="readium-advanced-on"] body [data-acbooks-heading="section"] {
-  font-size: 1.35rem !important;
-  margin-block: 1em 0.65em !important;
-}
-:root[style*="readium-advanced-on"] body [data-acbooks-heading="number"] {
-  font-size: 0.85rem !important;
-  font-weight: 500 !important;
-  margin-block: 0 0.35em !important;
+  /* Semantic headings identified from the EPUB TOC and publisher metadata.
+   * The data attribute is inert in original-layout mode.
+   */
+  :root[style*="readium-advanced-on"] body [data-acbooks-heading]:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    text-align: start !important;
+    text-indent: 0 !important;
+    font-weight: 700 !important;
+    line-height: 1.4 !important;
+    margin-inline: 0 !important;
+    padding-inline: 0 !important;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  :root[style*="readium-advanced-on"] body [data-acbooks-heading="chapter"]:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    font-size: 1.65rem !important;
+    margin-block: 0 0.9em !important;
+  }
+  :root[style*="readium-advanced-on"] body [data-acbooks-heading="section"]:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    font-size: 1.35rem !important;
+    margin-block: 1em 0.65em !important;
+  }
+  :root[style*="readium-advanced-on"] body [data-acbooks-heading="number"]:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    margin-block: 0 0.35em !important;
+  }
+
+  /* Only wrappers on the uninterrupted path to a leading heading are marked.
+   * Clear the block-start spacing and artificial minimum height, not the
+   * inline margins, background, display, position, or content of a chapter.
+   */
+  :root[style*="readium-advanced-on"] body :is(div, section, article, header, main)[data-acbooks-leading="true"]:not([data-acbooks-heading]):not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    margin-block-start: 0 !important;
+    padding-block-start: 0 !important;
+    min-block-size: 0 !important;
+    min-height: 0 !important;
+  }
+  :root[style*="readium-advanced-on"] body :is(h1, h2, h3, h4, h5, h6, [data-acbooks-heading])[data-acbooks-leading="true"]:not(:where([data-acbooks-preserve], [data-acbooks-preserve] *, nav *, table *, figure *, blockquote *, aside *, pre *)) {
+    margin-block-start: 0 !important;
+    padding-block-start: 0 !important;
+  }
+
 }
