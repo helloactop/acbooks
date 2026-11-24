@@ -19,6 +19,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.withResumed
 import app.acbooks.R
 import app.acbooks.library.LibraryViewModel
+import app.acbooks.reader.typography.DeepEpubTypography
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
@@ -142,6 +143,9 @@ internal class EpubDocumentFragment : Fragment() {
                 val factory = EpubNavigatorFactory(opened).createFragmentFactory(
                     initialLocator = locator,
                     initialPreferences = initialPreferences,
+                    configuration = EpubNavigatorFragment.Configuration(
+                        servedAssets = listOf(DeepEpubTypography.ASSET_PATH),
+                    ),
                     paginationListener = object : EpubNavigatorFragment.PaginationListener {
                         override fun onPageLoaded() {
                             if (loading.parent === root) root.removeView(loading)
@@ -253,7 +257,11 @@ private suspend fun openPublication(context: android.content.Context, file: File
             val opener = PublicationOpener(DefaultPublicationParser(context, OfflineHttpClient, retriever, pdfFactory = null))
             val asset = retriever.retrieve(file.toUrl(isDirectory = false)).getOrNull() ?: return@withContext null
             unownedAsset = asset
-            val publication = opener.open(asset, allowUserInteraction = false).getOrNull() ?: return@withContext null
+            val publication = opener.open(
+                asset,
+                allowUserInteraction = false,
+                onCreatePublication = { DeepEpubTypography.install(this) },
+            ).getOrNull() ?: return@withContext null
             unownedPublication = publication
             unownedAsset = null
             publication.takeIf {
