@@ -85,4 +85,21 @@ class EpubLayoutNormalizerTest {
         val input = html("""<div id="blank"></div><p>Ordinary prose.</p>""")
         assertFalse(EpubLayoutNormalizer.normalize(input).contains("data-acbooks-spacer"))
     }
+
+    @Test
+    fun recognizesNumberedCaptionWithTrailingImagesButNotMixedProse() {
+        val input = html("""<p class="plate"><sup><small><a href="chapter.html#ref" id="note">[3]</a></small></sup><span>Example plate</span><img src="a.jpg"/><img src="b.jpg"/></p>
+            <p><sup><a href="#ref">[4]</a></sup>Text<img src="inline.jpg"/>continues here.</p>
+            <p>Ordinary paragraph<img src="other.jpg"/></p>
+            <aside><p><sup><a href="#ref">[5]</a></sup>Caption<img src="protected.jpg"/></p></aside>""")
+        val result = EpubLayoutNormalizer.normalize(input)
+        assertEquals(1, Regex("data-acbooks-image-block=").findAll(result).count())
+        assertEquals(2, Regex("data-acbooks-image=").findAll(result).count())
+        assertTrue(result.contains("""<a href="chapter.html#ref" id="note">[3]</a>"""))
+        assertTrue(result.contains("""<img data-acbooks-image="true" src="a.jpg"/>"""))
+        assertTrue(result.contains("""<img data-acbooks-image="true" src="b.jpg"/>"""))
+        assertTrue(result.contains("""<img src="inline.jpg"/>"""))
+        assertEquals(input, result.replace(Regex(""" data-acbooks-(?:image-block|image|preserve)="true""""), ""))
+        assertEquals(result, EpubLayoutNormalizer.normalize(result))
+    }
 }

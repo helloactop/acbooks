@@ -18,6 +18,9 @@ internal object EpubLayoutNormalizer {
     private const val IMAGE_BLOCK = "data-acbooks-image-block"
     private const val IMAGE = "data-acbooks-image"
     private val imageWrappers = setOf("div", "p", "section", "article", "main", "a", "span")
+    private val captionTags = setOf("span", "a", "sup", "sub", "small", "b", "strong", "i", "em", "img")
+    private val noteNumber = Regex("""^\[\s*[0-9]+\s*]""")
+    private val localBacklink = Regex("""^(?:[^:/?#]+/)*[^:/?#]*#[^\s]+$""")
     private val wrapperTags = setOf("div", "section", "article", "header", "main")
     private val specialTags = setOf("nav", "aside", "blockquote", "pre", "figure", "figcaption", "table", "svg", "math", "footer")
     private val specialTypes = setOf("cover", "titlepage", "toc", "footnote", "endnote",
@@ -87,6 +90,18 @@ internal object EpubLayoutNormalizer {
                 blocks.forEach { mark(it, IMAGE_BLOCK) }
             }
         }
+        // Legacy illustrated books often put a numbered backlink, a short
+        // caption and one or more full-size images in the same paragraph.
+        // This is not ordinary mixed prose: require a local superscript
+        // backlink, a short nonempty caption, and images after all text.
+        if (!isSpecial(document.selectFirst("html"))) {
+            for (block in body.select("p,div")) {
+                if (isSpecial(block) || block.parents().any { isSpecial(it) }) continue
+                if (!isCaptionedImageBlock(block)) continue
+                mark(block, IMAGE_BLOCK)
+                block.select("img").forEach { mark(it, IMAGE) }
+            }
+        }
         if (edits.isEmpty()) return html
         return StringBuilder(html).apply {
             edits.toSortedMap(compareByDescending { it }).forEach { (offset, attributes) ->
@@ -113,6 +128,32 @@ internal object EpubLayoutNormalizer {
             element.getAllElements().all {
                 it == element || (!isSpecial(it) && (it.normalName() in imageWrappers || it.normalName() == "img"))
             }
+
+    private fun isCaptionedImageBlock(element: Element): Boolean {
+        val text = element.text().trim()
+        val number = noteNumber.find(text) ?: return false
+        if (text.length > 120 || text.substring(number.range.last + 1).isBlank()) return false
+        if (element.getAllElements().any {
+                it != element && (isSpecial(it) || it.normalName() !in captionTags)
+            }) return false
+        val backlink = element.select("sup a[href]").any {
+            it.text().trim() == number.value && localBacklink.matches(it.attr("href"))
+        }
+        if (!backlink) return false
+
+        // The images must be direct trailing children, not inline in a
+        // sentence; multiple plate images in one paragraph are supported.
+        var seenImage = false
+        for (node in element.childNodes()) {
+            when (node) {
+                is TextNode -> if (seenImage && node.wholeText.isNotBlank()) return false
+                is Element -> if (node.normalName() == "img") {
+                    seenImage = true
+                } else if (seenImage || node.selectFirst("img") != null) return false
+            }
+        }
+        return seenImage
+    }
 
     private fun firstMeaningfulChild(parent: Element, spacers: MutableList<Element>): Element? {
         for (node in parent.childNodes()) {

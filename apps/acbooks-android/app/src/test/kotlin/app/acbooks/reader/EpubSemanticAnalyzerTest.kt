@@ -90,4 +90,24 @@ class EpubSemanticAnalyzerTest {
         assertTrue(result.contains("""<p data-acbooks-leading="true" data-acbooks-heading="chapter" id="chapter">Chapter One"""))
         assertTrue(result.contains("<p>Body</p>"))
     }
+
+    @Test
+    fun printedPageLeadersAndFlatNumberedSubsectionsMatchWithoutPromotingNotes() {
+        val input = html("""<p id="c"><span class="bold">一 造型艺术</span></p>
+            <p id="s1"><span class="bold">（一）形态</span></p><p>Ordinary body.</p>
+            <p id="s2">（二）色彩</p><p id="note">[1]</p><p id="year">艺术2026</p>""")
+        val result = EpubSemanticAnalyzer.annotate(input, listOf(
+            EpubHeadingHint("一 造型艺术... 4", null, 0),
+            EpubHeadingHint("（一）形态... 4", "s1", 0),
+            EpubHeadingHint("（二）色彩……13", "s2", 0),
+            EpubHeadingHint("[1]", "note", 0),
+            EpubHeadingHint("艺术2026", "year", 1),
+        ))
+        assertTrue(result.contains("""<p data-acbooks-heading="chapter" id="c">"""))
+        assertTrue(result.contains("""<p data-acbooks-heading="section" id="s1">"""))
+        assertTrue(result.contains("""<p data-acbooks-heading="section" id="s2">"""))
+        assertTrue(result.contains("""<p id="note">[1]</p>"""))
+        assertTrue(result.contains("""<p data-acbooks-heading="section" id="year">艺术2026"""))
+        assertEquals(input, result.replace(Regex(""" data-acbooks-heading="[^"]+""""), ""))
+    }
 }

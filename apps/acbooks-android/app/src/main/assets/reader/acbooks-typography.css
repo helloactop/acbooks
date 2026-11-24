@@ -132,7 +132,8 @@
     inline-size: auto !important;
     max-inline-size: 100% !important;
     block-size: auto !important;
-    max-height: 100vh !important;
+    /* Reserve room for page margins and a short caption in paginated mode. */
+    max-block-size: calc(100vh - 3rem) !important;
     object-fit: contain !important;
     break-inside: avoid;
   }
