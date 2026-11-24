@@ -117,7 +117,7 @@
     <string name="reader_typography_paragraph">Paragraph</string>
     <string name="reader_typography_publisher">Original</string>
     <string name="reader_typography_optimized">Optimized</string>
-    <string name="reader_typography_publisher_note">Original follows the book’s styles. Adjusting font or line height switches to optimized layout.</string>
+    <string name="reader_typography_publisher_note">Original follows the book’s styles. Font, size, line spacing and margins can be adjusted only in optimized layout.</string>
     <string name="reader_typography_line_height">Line spacing</string>
     <string name="reader_typography_page">Page</string>
     <string name="reader_typography_margins">Side margins</string>

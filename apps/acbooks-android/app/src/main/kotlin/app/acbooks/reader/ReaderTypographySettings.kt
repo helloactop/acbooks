@@ -30,6 +30,8 @@ internal data class ReaderTypographySettings(
     val backgroundArgb: Int? = null,
     val textArgb: Int? = null,
 ) {
+    val isOptimizedLayout: Boolean get() = publisherStyles == false
+
     /** Ignore corrupt or unsupported stored ranges rather than breaking EPUB opening. */
     fun normalized(): ReaderTypographySettings = copy(
         fontSize = fontSize.inRange(0.1..5.0),
@@ -80,17 +82,39 @@ internal data class ReaderTypographyProfile(
 }
 
 /**
- * Original layout leaves paragraph/font CSS to the EPUB publisher. Keep theme,
- * screen margins and text scaling, but clear overrides that might survive from
- * optimized layout and contradict the "original" label.
+ * Store the user's optimized typography even while the publisher layout is
+ * active. The old implementation erased these fields on every mode switch.
  */
 internal fun ReaderTypographySettings.withPublisherLayout(original: Boolean): ReaderTypographySettings =
-    if (!original) copy(publisherStyles = false)
-    else copy(
+    if (original) copy(publisherStyles = true)
+    else withOptimizedDefaults().copy(publisherStyles = false)
+
+/** Old versions cleared fields on switching to original layout. Recover the
+ * default optimized values for missing fields; never overwrite a saved value.
+ */
+private fun ReaderTypographySettings.withOptimizedDefaults(): ReaderTypographySettings {
+    val defaults = defaultReaderTypographySettings()
+    return copy(
+        fontSize = fontSize ?: defaults.fontSize,
+        lineHeight = lineHeight ?: defaults.lineHeight,
+        pageMargins = pageMargins ?: defaults.pageMargins,
+        paragraphIndent = paragraphIndent ?: defaults.paragraphIndent,
+        paragraphSpacing = paragraphSpacing ?: defaults.paragraphSpacing,
+        letterSpacing = letterSpacing ?: defaults.letterSpacing,
+        textAlignment = textAlignment ?: defaults.textAlignment,
+    )
+}
+
+/** Only the runtime preferences are masked. Never persist this projection. */
+internal fun ReaderTypographySettings.forRendering(): ReaderTypographySettings =
+    if (isOptimizedLayout) normalized().withOptimizedDefaults()
+    else normalized().copy(
         publisherStyles = true,
         fontFamily = ReaderFontFamily.BOOK,
+        fontSize = null,
         fontWeight = null,
         lineHeight = null,
+        pageMargins = null,
         paragraphIndent = null,
         paragraphSpacing = null,
         letterSpacing = null,
@@ -108,7 +132,7 @@ internal enum class ReaderAppearance { SYSTEM, LIGHT, DARK, SEPIA }
 /** Keep mapping out of Composables so opening a book and future live updates agree. */
 @OptIn(ExperimentalReadiumApi::class)
 internal fun ReaderTypographySettings.toEpubPreferences(systemDark: Boolean): EpubPreferences {
-    val saved = normalized()
+    val saved = forRendering()
     return EpubPreferences(
         theme = when (saved.appearance) {
             ReaderAppearance.SYSTEM -> if (systemDark) Theme.DARK else Theme.LIGHT

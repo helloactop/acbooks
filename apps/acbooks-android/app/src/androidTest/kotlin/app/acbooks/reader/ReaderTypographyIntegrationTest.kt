@@ -4,6 +4,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.readium.r2.navigator.preferences.FontFamily
 import org.readium.r2.navigator.preferences.TextAlign
@@ -46,6 +47,43 @@ class ReaderTypographyIntegrationTest {
             assertEquals(Theme.SEPIA, prefs.theme)
         } finally {
             store.save(original)
+        }
+    }
+    @Test
+    fun layoutModeRoundTripPersistsOptimizedValuesAndMasksOriginalPreferences(): Unit = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val store = ReaderTypographyStore(context)
+        val previous = store.settings.first()
+        val optimized = defaultReaderTypographySettings().copy(
+            fontSize = 1.8, lineHeight = 1.7, pageMargins = 1.5,
+            fontFamily = ReaderFontFamily.SERIF, appearance = ReaderAppearance.SEPIA,
+        )
+        val bookId = "typography-layout-mode-test"
+        try {
+            val original = optimized.withPublisherLayout(original = true)
+            store.save(original)
+            store.saveBook(bookId, original)
+            val global = store.settings.first()
+            val book = store.forBook(bookId).first().effective
+            for (saved in listOf(global, book)) {
+                assertEquals(original, saved)
+                val prefs = saved.toEpubPreferences(systemDark = false)
+                assertEquals(true, prefs.publisherStyles)
+                assertNull(prefs.fontSize)
+                assertNull(prefs.fontFamily)
+                assertNull(prefs.lineHeight)
+                assertNull(prefs.pageMargins)
+                assertEquals(Theme.SEPIA, prefs.theme)
+
+                val restored = saved.withPublisherLayout(original = false)
+                assertEquals(optimized, restored)
+                assertEquals(1.8, restored.toEpubPreferences(false).fontSize)
+                assertEquals(1.7, restored.toEpubPreferences(false).lineHeight)
+                assertEquals(1.9, restored.copy(lineHeight = 1.9).toEpubPreferences(false).lineHeight)
+            }
+        } finally {
+            store.clearBook(bookId)
+            store.save(previous)
         }
     }
 }

@@ -55,32 +55,58 @@ class ReaderTypographySettingsTest {
     }
 
     @Test
-    fun originalLayoutDiscardsConflictingPublisherOverrides() {
-        val customized = ReaderTypographySettings(
+    fun originalLayoutMasksOverridesWithoutErasingSavedOptimizedValues() {
+        val customized = defaultReaderTypographySettings().copy(
             fontFamily = ReaderFontFamily.SERIF,
-            fontSize = 1.3,
+            fontSize = 1.8,
+            fontWeight = 1.2,
             lineHeight = 1.7,
             paragraphIndent = 2.0,
             paragraphSpacing = 0.3,
             letterSpacing = 0.2,
-            textAlignment = ReaderTextAlignment.JUSTIFY,
+            wordSpacing = 0.1,
+            textAlignment = ReaderTextAlignment.LEFT,
             pageMargins = 1.5,
             appearance = ReaderAppearance.SEPIA,
-            publisherStyles = false,
+            scroll = true,
         )
-
         val original = customized.withPublisherLayout(original = true)
-        assertEquals(true, original.publisherStyles)
-        assertEquals(ReaderFontFamily.BOOK, original.fontFamily)
-        assertNull(original.lineHeight)
-        assertNull(original.paragraphIndent)
-        assertNull(original.paragraphSpacing)
-        assertNull(original.letterSpacing)
-        assertNull(original.textAlignment)
-        assertEquals(1.3, original.fontSize)
-        assertEquals(1.5, original.pageMargins)
-        assertEquals(ReaderAppearance.SEPIA, original.appearance)
-        assertEquals(false, original.withPublisherLayout(original = false).publisherStyles)
+        assertEquals(customized.copy(publisherStyles = true), original)
+        assertEquals(false, original.isOptimizedLayout)
+
+        val rendered = original.forRendering()
+        assertEquals(ReaderFontFamily.BOOK, rendered.fontFamily)
+        assertNull(rendered.fontSize)
+        assertNull(rendered.fontWeight)
+        assertNull(rendered.lineHeight)
+        assertNull(rendered.pageMargins)
+        assertNull(rendered.paragraphIndent)
+        assertNull(rendered.paragraphSpacing)
+        assertNull(rendered.letterSpacing)
+        assertNull(rendered.wordSpacing)
+        assertNull(rendered.textAlignment)
+        assertEquals(ReaderAppearance.SEPIA, rendered.appearance)
+        assertEquals(true, rendered.scroll)
+
+        val restored = original.withPublisherLayout(original = false)
+        assertEquals(customized, restored)
+        assertEquals(customized, restored.forRendering())
+        assertEquals(true, restored.isOptimizedLayout)
+        assertEquals(1.9, restored.copy(lineHeight = 1.9).forRendering().lineHeight)
+    }
+
+    @Test
+    fun switchingOldClearedProfilesBackToOptimizedRestoresMissingDefaults() {
+        val old = ReaderTypographySettings(publisherStyles = true, fontSize = 1.6, pageMargins = 1.4)
+        val restored = old.withPublisherLayout(original = false)
+        assertEquals(1.6, restored.fontSize)
+        assertEquals(1.4, restored.pageMargins)
+        assertEquals(1.5, restored.lineHeight)
+        assertEquals(2.0, restored.paragraphIndent)
+        assertEquals(0.0, restored.paragraphSpacing)
+        assertEquals(ReaderTextAlignment.JUSTIFY, restored.textAlignment)
+        assertEquals(true, restored.isOptimizedLayout)
+        assertEquals(false, ReaderTypographySettings().isOptimizedLayout)
     }
 
     @Test
