@@ -134,6 +134,10 @@
     <string name="library_display_sort">Display and sort</string>
     <string name="library_more">More library actions</string>
     <string name="library_display_mode">Display mode</string>
+    <string name="library_sort_mode">Sort by</string>
+    <string name="library_sort_recent_reading">Recently read</string>
+    <string name="library_sort_author">Author</string>
+    <string name="library_sort_title">Title</string>
     <string name="library_compact">Compact</string>
     <string name="library_comfortable">Comfortable</string>
     <string name="library_add_books">Add books</string>

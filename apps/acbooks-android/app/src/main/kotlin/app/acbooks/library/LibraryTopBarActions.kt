@@ -51,6 +51,8 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.layout.CascadingPopupDefaults
 import top.yukonga.miuix.kmp.icon.glass.Add
 import top.yukonga.miuix.kmp.icon.glass.BookOutline
+import top.yukonga.miuix.kmp.icon.glass.ContactsCircle
+import top.yukonga.miuix.kmp.icon.glass.DigitalStatistics
 import top.yukonga.miuix.kmp.icon.glass.GridView
 import top.yukonga.miuix.kmp.icon.glass.Delete
 import top.yukonga.miuix.kmp.icon.glass.Edit
@@ -61,6 +63,8 @@ import top.yukonga.miuix.kmp.icon.glass.Refresh
 import top.yukonga.miuix.kmp.icon.glass.Tune
 
 internal enum class LibraryMenu { Display, More, Book }
+
+private enum class LibraryDisplaySubmenu { Display, Sort }
 
 @Composable
 internal fun LibraryTopBarActions(
@@ -104,11 +108,13 @@ internal fun BoxScope.LibraryMenus(
     bookTarget: BookMenuTarget?,
     backdrop: Backdrop,
     mode: LibraryDisplayMode,
+    sortMode: LibrarySortMode,
     importing: Boolean,
     cloudConnected: Boolean,
     cloudBusy: Boolean,
     onDismiss: (LibraryMenu) -> Unit,
     onDisplayMode: (LibraryDisplayMode) -> Unit,
+    onSortMode: (LibrarySortMode) -> Unit,
     onAddBooks: () -> Unit,
     onSync: () -> Unit,
     onRead: (String) -> Unit,
@@ -122,8 +128,10 @@ internal fun BoxScope.LibraryMenus(
         anchor = displayAnchor,
         backdrop = backdrop,
         mode = mode,
+        sortMode = sortMode,
         onDismiss = { onDismiss(LibraryMenu.Display) },
         onDisplayMode = onDisplayMode,
+        onSortMode = onSortMode,
     )
     GlassTransformPopup(
         show = activeMenu == LibraryMenu.More,
@@ -170,12 +178,17 @@ private fun BoxScope.LibraryDisplayPopup(
     anchor: GlassPopupAnchor,
     backdrop: Backdrop,
     mode: LibraryDisplayMode,
+    sortMode: LibrarySortMode,
     onDismiss: () -> Unit,
     onDisplayMode: (LibraryDisplayMode) -> Unit,
+    onSortMode: (LibrarySortMode) -> Unit,
 ) {
     var submenuOpen by remember { mutableStateOf(false) }
     var submenuPresent by remember { mutableStateOf(false) }
     var submenuAnchor by remember { mutableStateOf(Rect.Zero) }
+    var displayBounds by remember { mutableStateOf(Rect.Zero) }
+    var sortBounds by remember { mutableStateOf(Rect.Zero) }
+    var submenuKind by remember { mutableStateOf(LibraryDisplaySubmenu.Display) }
     val sizing = GlassPopupSizing()
     var primaryWidth by remember { mutableStateOf(sizing.minWidth) }
     val density = LocalDensity.current
@@ -229,13 +242,35 @@ private fun BoxScope.LibraryDisplayPopup(
                 text = stringResource(R.string.library_display_mode),
                 icon = MiuixIcons.Glass.GridView,
                 showArrow = true,
-                arrowRotation = { submenuArrow * (1f - anchor.secondaryBackProgress) },
+                arrowRotation = {
+                    if (submenuKind == LibraryDisplaySubmenu.Display) submenuArrow * (1f - anchor.secondaryBackProgress) else 0f
+                },
                 modifier = Modifier.onGloballyPositioned { coordinates ->
-                    if (!submenuPresent) submenuAnchor = coordinates.boundsInWindow()
+                    if (!submenuPresent) displayBounds = coordinates.boundsInWindow()
                 },
                 onClick = {
                     if (show && !submenuPresent) {
-                        // Freeze the parent row's bounds before stacking it.
+                        submenuKind = LibraryDisplaySubmenu.Display
+                        submenuAnchor = displayBounds
+                        submenuPresent = true
+                        submenuOpen = true
+                    }
+                },
+            )
+            GlassPopupItem(
+                text = stringResource(R.string.library_sort_mode),
+                icon = MiuixIcons.Glass.Tune,
+                showArrow = true,
+                arrowRotation = {
+                    if (submenuKind == LibraryDisplaySubmenu.Sort) submenuArrow * (1f - anchor.secondaryBackProgress) else 0f
+                },
+                modifier = Modifier.onGloballyPositioned { coordinates ->
+                    if (!submenuPresent) sortBounds = coordinates.boundsInWindow()
+                },
+                onClick = {
+                    if (show && !submenuPresent) {
+                        submenuKind = LibraryDisplaySubmenu.Sort
+                        submenuAnchor = sortBounds
                         submenuPresent = true
                         submenuOpen = true
                     }
@@ -253,9 +288,10 @@ private fun BoxScope.LibraryDisplayPopup(
             sizing = sizing.copy(minWidth = primaryWidth),
             onDismissFinished = { submenuPresent = false },
         ) {
+            val sorting = submenuKind == LibraryDisplaySubmenu.Sort
             GlassPopupItem(
-                text = stringResource(R.string.library_display_mode),
-                icon = MiuixIcons.Glass.GridView,
+                text = stringResource(if (sorting) R.string.library_sort_mode else R.string.library_display_mode),
+                icon = if (sorting) MiuixIcons.Glass.Tune else MiuixIcons.Glass.GridView,
                 showArrow = true,
                 arrowRotation = { submenuArrow * (1f - anchor.secondaryBackProgress) },
                 onClick = { submenuOpen = false },
@@ -267,26 +303,46 @@ private fun BoxScope.LibraryDisplayPopup(
                 ),
                 thickness = GlassPopupDefaults.DividerThickness,
             )
-            GlassPopupItem(
-                text = stringResource(R.string.library_compact),
-                icon = MiuixIcons.Glass.GridView,
-                selected = mode == LibraryDisplayMode.Compact,
-                onClick = {
-                    onDisplayMode(LibraryDisplayMode.Compact)
-                    submenuOpen = false
-                    onDismiss()
-                },
-            )
-            GlassPopupItem(
-                text = stringResource(R.string.library_comfortable),
-                icon = MiuixIcons.Glass.ImageOutline,
-                selected = mode == LibraryDisplayMode.Comfortable,
-                onClick = {
-                    onDisplayMode(LibraryDisplayMode.Comfortable)
-                    submenuOpen = false
-                    onDismiss()
-                },
-            )
+            if (sorting) {
+                LibrarySortMode.entries.forEach { choice ->
+                    val (label, icon) = when (choice) {
+                        LibrarySortMode.RecentReading -> R.string.library_sort_recent_reading to MiuixIcons.Glass.DigitalStatistics
+                        LibrarySortMode.Author -> R.string.library_sort_author to MiuixIcons.Glass.ContactsCircle
+                        LibrarySortMode.Title -> R.string.library_sort_title to MiuixIcons.Glass.BookOutline
+                    }
+                    GlassPopupItem(
+                        text = stringResource(label),
+                        icon = icon,
+                        selected = sortMode == choice,
+                        onClick = {
+                            onSortMode(choice)
+                            submenuOpen = false
+                            onDismiss()
+                        },
+                    )
+                }
+            } else {
+                GlassPopupItem(
+                    text = stringResource(R.string.library_compact),
+                    icon = MiuixIcons.Glass.GridView,
+                    selected = mode == LibraryDisplayMode.Compact,
+                    onClick = {
+                        onDisplayMode(LibraryDisplayMode.Compact)
+                        submenuOpen = false
+                        onDismiss()
+                    },
+                )
+                GlassPopupItem(
+                    text = stringResource(R.string.library_comfortable),
+                    icon = MiuixIcons.Glass.ImageOutline,
+                    selected = mode == LibraryDisplayMode.Comfortable,
+                    onClick = {
+                        onDisplayMode(LibraryDisplayMode.Comfortable)
+                        submenuOpen = false
+                        onDismiss()
+                    },
+                )
+            }
         }
     }
 }

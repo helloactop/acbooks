@@ -220,6 +220,8 @@ internal fun LibraryScreen(
     catalog: LibraryCatalog,
     shelfId: String?,
     mode: LibraryDisplayMode,
+    sortMode: LibrarySortMode,
+    recentReading: List<RecentBookReading>,
     scrollBehavior: ScrollBehavior,
     pagePadding: PaddingValues,
     coverFile: (LocalBookCard) -> File?,
@@ -229,7 +231,12 @@ internal fun LibraryScreen(
     onShowMenu: (BookMenuTarget) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
-    val entries = remember(catalog.books, catalog.shelves, shelfId) { catalog.gridEntries(shelfId) }
+    val sortedBooks = remember(catalog.books, sortMode, recentReading) {
+        sortLibraryBooks(catalog.books, sortMode, recentReading)
+    }
+    val entries = remember(sortedBooks, catalog.shelves, shelfId) {
+        catalog.copy(books = sortedBooks).gridEntries(shelfId)
+    }
     val compact = mode == LibraryDisplayMode.Compact
     val horizontalGap = if (compact) 12.dp else 16.dp
     val verticalGap = if (compact) 20.dp else 24.dp
@@ -290,7 +297,7 @@ internal fun LibraryScreen(
     }
 }
 
-private sealed interface LibraryGridEntry {
+internal sealed interface LibraryGridEntry {
     val key: String
 
     data class Book(val book: LocalBookCard) : LibraryGridEntry {
@@ -302,7 +309,7 @@ private sealed interface LibraryGridEntry {
     }
 }
 
-private fun LibraryCatalog.gridEntries(shelfId: String?): List<LibraryGridEntry> {
+internal fun LibraryCatalog.gridEntries(shelfId: String?): List<LibraryGridEntry> {
     if (shelfId != null) {
         val memberIds = shelves.firstOrNull { it.shelf.id == shelfId }?.bookIds.orEmpty().toSet()
         return books.asSequence().filter { it.id in memberIds }.map { LibraryGridEntry.Book(it) }.toList()

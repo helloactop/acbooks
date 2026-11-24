@@ -117,6 +117,7 @@ internal enum class LibraryDisplayMode(val preference: String) {
 
 private val Context.libraryDisplayPreferences by preferencesDataStore(name = "library_display")
 private val displayModeKey = stringPreferencesKey("display_mode")
+private val sortModeKey = stringPreferencesKey("sort_mode")
 private const val ReadingIdleLimitMillis = 5 * 60 * 1000L
 
 private class ForegroundReading(val bookId: String, val startedAt: Long, val startedElapsed: Long) {
@@ -300,6 +301,14 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
                 ?: LibraryDisplayMode.Compact
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryDisplayMode.Compact)
+    val sortMode = preferences.data
+        .catch { failure ->
+            if (failure !is IOException) throw failure
+            Log.w("Library", "Could not read the library sort preference", failure)
+            emit(emptyPreferences())
+        }
+        .map { saved -> LibrarySortMode.fromPreference(saved[sortModeKey]) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibrarySortMode.RecentReading)
     private val _progress = MutableStateFlow<ImportProgress?>(null)
     val progress = _progress.asStateFlow()
     private val _bookEditor = MutableStateFlow<BookEditorState?>(null)
@@ -439,6 +448,16 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
                 preferences.edit { it[displayModeKey] = mode.preference }
             } catch (failure: IOException) {
                 Log.w("Library", "Could not save the library display preference", failure)
+            }
+        }
+    }
+
+    fun setSortMode(mode: LibrarySortMode) {
+        viewModelScope.launch {
+            try {
+                preferences.edit { it[sortModeKey] = mode.preference }
+            } catch (failure: IOException) {
+                Log.w("Library", "Could not save the library sort preference", failure)
             }
         }
     }
